@@ -102,7 +102,7 @@ export function TerminalPane({ agent, onRemove }: Props) {
 
   async function handleRestart() {
     if (isAlive && !window.confirm(`Restart "${agent.label}"?`)) return;
-    restart();
+    await restart();
   }
 
   return (

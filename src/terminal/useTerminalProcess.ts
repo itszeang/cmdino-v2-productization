@@ -50,7 +50,7 @@ export interface TerminalProcessHandle {
   ready: boolean;
   clear: () => void;
   copyVisible: () => Promise<void>;
-  restart: () => void;
+  restart: () => Promise<void>;
   kill: () => Promise<void>;
 }
 
@@ -60,38 +60,38 @@ export function useTerminalProcess({
   cwd,
   launchCommand,
 }: Options): TerminalProcessHandle {
-  const [dinoState, setDinoState]     = useState<DinoState>("idle_center");
-  const [lifecycle, setLifecycle]     = useState<TerminalLifecycleState>("spawning");
-  const [restartKey, setRestartKey]   = useState(0);
+  const [dinoState, setDinoState] = useState<DinoState>("idle_center");
+  const [lifecycle, setLifecycle] = useState<TerminalLifecycleState>("spawning");
 
-  const dinoStateRef  = useRef<DinoState>("idle_center");
-  const termRef       = useRef<Terminal | null>(null);
+  const dinoStateRef          = useRef<DinoState>("idle_center");
+  const termRef               = useRef<Terminal | null>(null);
+  // Blocks the exit event handler from clobbering lifecycle during restart
+  const restartInProgressRef  = useRef(false);
 
-  // ── Stable action functions ───────────────────────────────────────────────
+  // ── Stable actions ────────────────────────────────────────────────────────
 
   const clear = useCallback(() => {
-    termRef.current?.clear();
+    const t = termRef.current;
+    if (!t) return;
+    t.clear();
+    t.focus(); // restore input focus after buffer wipe
   }, []);
 
   const copyVisible = useCallback(async () => {
-    const term = termRef.current;
-    if (!term) return;
-    const buf = term.buffer.active;
+    const t = termRef.current;
+    if (!t) return;
+    const buf = t.buffer.active;
     const lines: string[] = [];
-    for (let i = buf.viewportY; i < buf.viewportY + term.rows; i++) {
+    for (let i = buf.viewportY; i < buf.viewportY + t.rows; i++) {
       const line = buf.getLine(i);
       if (line) lines.push(line.translateToString(true));
     }
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
-      term.write("\r\n\x1b[2m[copied to clipboard]\x1b[0m\r\n");
+      t.write("\r\n\x1b[2m[copied to clipboard]\x1b[0m\r\n");
     } catch {
-      term.write("\r\n\x1b[31m[clipboard unavailable]\x1b[0m\r\n");
+      t.write("\r\n\x1b[31m[clipboard unavailable]\x1b[0m\r\n");
     }
-  }, []);
-
-  const restart = useCallback(() => {
-    setRestartKey((k) => k + 1);
   }, []);
 
   const kill = useCallback(async () => {
@@ -101,8 +101,52 @@ export function useTerminalProcess({
     dinoStateRef.current = "terminal_dead";
   }, [agentId]);
 
-  // ── Terminal lifecycle effect ─────────────────────────────────────────────
-  // Re-runs when agentId changes or restart() is called.
+  /**
+   * Restart: awaits kill so backend session is gone before we re-spawn.
+   * Does NOT re-run the useEffect — reuses the same xterm instance and
+   * event listeners (they filter by agentId so they pick up the new PTY).
+   */
+  const restart = useCallback(async () => {
+    if (restartInProgressRef.current) return;
+    restartInProgressRef.current = true;
+
+    const t = termRef.current;
+    try {
+      // Kill existing PTY — awaited so backend removes the session before spawn.
+      await terminalBridge.kill(agentId).catch(() => {});
+
+      t?.clear();
+      t?.focus();
+
+      setLifecycle("spawning");
+      setDinoState("idle_center");
+      dinoStateRef.current = "idle_center";
+
+      if (!t) throw new Error("terminal not mounted");
+
+      const { cols, rows } = t;
+      await terminalBridge.spawn(agentId, cwd ?? ".", cols, rows);
+
+      setLifecycle("running");
+      t.focus();
+
+      if (launchCommand?.trim()) {
+        setTimeout(() => {
+          terminalBridge.write(agentId, launchCommand.trim() + "\r").catch(() => {});
+        }, 300);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      t?.write(`\r\n\x1b[31m[CMDino restart failed: ${msg}]\x1b[0m\r\n`);
+      setLifecycle("error");
+      setDinoState("terminal_error");
+      dinoStateRef.current = "terminal_error";
+    } finally {
+      restartInProgressRef.current = false;
+    }
+  }, [agentId, cwd, launchCommand]);
+
+  // ── Terminal lifecycle effect (runs once per agentId) ─────────────────────
 
   useEffect(() => {
     const container = containerRef.current;
@@ -111,6 +155,7 @@ export function useTerminalProcess({
     setLifecycle("spawning");
     setDinoState("idle_center");
     dinoStateRef.current = "idle_center";
+    restartInProgressRef.current = false;
 
     const term = new Terminal({
       theme: XTERM_THEME,
@@ -175,13 +220,15 @@ export function useTerminalProcess({
     terminalBridge
       .onExit((ev) => {
         if (ev.agent_id !== agentId) return;
-        const newLifecycle: TerminalLifecycleState =
+        // Ignore exit events fired during restart — restart() owns lifecycle then.
+        if (restartInProgressRef.current) return;
+        const lc: TerminalLifecycleState =
           ev.reason === "killed" ? "killed"
-          : ev.reason === "error" ? "error"
+          : ev.reason === "error"  ? "error"
           : "exited";
         dinoStateRef.current = "terminal_dead";
         setDinoState("terminal_dead");
-        setLifecycle(newLifecycle);
+        setLifecycle(lc);
         const label = ev.reason === "killed" ? "killed" : "exited";
         term.write(`\r\n\x1b[2m[process ${label}]\x1b[0m\r\n`);
       })
@@ -213,8 +260,8 @@ export function useTerminalProcess({
           const msg = err instanceof Error ? err.message : String(err);
           term.write(`\r\n\x1b[31m[PTY error: ${msg}]\x1b[0m\r\n`);
           setLifecycle("error");
-          dinoStateRef.current = "terminal_error";
           setDinoState("terminal_error");
+          dinoStateRef.current = "terminal_error";
         });
     });
 
@@ -230,7 +277,7 @@ export function useTerminalProcess({
       term.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentId, restartKey]);
+  }, [agentId]);
 
   return {
     dinoState,
