@@ -3,7 +3,24 @@
     "allow": [
       "Bash(npm --version)",
       "Bash(cargo --version)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(CARGO_NET_OFFLINE=true cargo check --manifest-path src-tauri/Cargo.toml)",
+      "Bash(CARGO_NET_OFFLINE=true cargo check --manifest-path /c/Users/burak/Desktop/cmdino-build/src-tauri/Cargo.toml)",
+      "Bash(git -C /c/Users/burak/Desktop/cmdino-build add package.json package-lock.json src/main.tsx src/index.css src/App.tsx src/domain/terminalAgent.ts src/components/TerminalPane.tsx src/terminal/stdoutVibeParser.ts src/terminal/terminalBridge.ts src/terminal/useTerminalProcess.ts src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/src/lib.rs src-tauri/src/terminal.rs src-tauri/capabilities/default.json)",
+      "Bash(git -C /c/Users/burak/Desktop/cmdino-build status --short)",
+      "Bash(git -C /c/Users/burak/Desktop/cmdino-build commit -m ' *)",
+      "Bash(git -C /c/Users/burak/Desktop/cmdino-build push)",
+      "Bash(curl -s http://localhost:1420)",
+      "mcp__playwright__browser_navigate",
+      "Bash(npx tsc *)",
+      "Bash(git -C /c/Users/burak/Desktop/cmdino-build add src/terminal/terminalBridge.ts)",
+      "Bash(git -C /c/Users/burak/Desktop/cmdino-build commit -m \"fix: camelCase invoke keys for Tauri v2 command dispatch\")",
+      "Bash(git -C /c/Users/burak/Desktop/cmdino-build add .)",
+      "Bash(git -C /c/Users/burak/Desktop/cmdino-build commit -m \"feat: V0.1B real terminal bridge\")"
     ]
   }
 }
