@@ -4,7 +4,6 @@ export interface TerminalAgent {
   id: string;
   label: string;
   dinoId: DinoId;
-  logs: string[];
 }
 
 export function createTerminalAgent(
@@ -12,5 +11,5 @@ export function createTerminalAgent(
   label: string,
   dinoId: DinoId
 ): TerminalAgent {
-  return { id, label, dinoId, logs: [] };
+  return { id, label, dinoId };
 }

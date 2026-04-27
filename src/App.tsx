@@ -49,7 +49,7 @@ export default function App() {
         >
           CMDino
         </span>
-        <span style={{ color: "#1a3a4a", fontSize: 11 }}>v0.1A · Visual Spine</span>
+        <span style={{ color: "#1a3a4a", fontSize: 11 }}>v0.1B · Real Terminal Bridge</span>
         <span
           style={{
             marginLeft: "auto",
@@ -58,7 +58,7 @@ export default function App() {
             letterSpacing: 1,
           }}
         >
-          SIMULATION MODE
+          PTY BRIDGE
         </span>
       </div>
 
