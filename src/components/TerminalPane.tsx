@@ -107,7 +107,9 @@ export function TerminalPane({ agent, onRemove }: Props) {
 
         {/* Close button */}
         <button
-          onClick={() => onRemove(agent.id)}
+          onClick={() => {
+            if (!ready || window.confirm(`Kill "${agent.label}"?`)) onRemove(agent.id);
+          }}
           title="Close terminal"
           style={{
             marginLeft: 8,
