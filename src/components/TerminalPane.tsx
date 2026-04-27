@@ -1,5 +1,6 @@
-import { useRef } from "react";
+import { useState, useRef } from "react";
 import { DinoLane } from "../dino/DinoLane";
+import { LogsPanel } from "./LogsPanel";
 import type { TerminalAgent } from "../domain/terminalAgent";
 import {
   useTerminalProcess,
@@ -25,15 +26,9 @@ const LIFECYCLE_COLORS: Record<TerminalLifecycleState, string> = {
   error:    "#f87171",
 };
 
-function dotColor(state: string): string {
-  return STATE_COLORS[state] ?? "#1e3a4a";
-}
+function dotColor(s: string): string { return STATE_COLORS[s] ?? "#1e3a4a"; }
+function lifecycleLabel(lc: TerminalLifecycleState): string { return lc.toUpperCase(); }
 
-function lifecycleLabel(lc: TerminalLifecycleState): string {
-  return lc.toUpperCase();
-}
-
-// Small header icon button
 function HdrBtn({
   title,
   onClick,
@@ -84,18 +79,33 @@ interface Props {
 
 export function TerminalPane({ agent, onRemove }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { dinoState, lifecycle, clear, copyVisible, restart, kill } =
-    useTerminalProcess({
-      agentId: agent.id,
-      containerRef,
-      cwd: agent.cwd,
-      launchCommand: agent.launchCommand,
-    });
+  const {
+    dinoState,
+    lifecycle,
+    copyVisible,
+    restart,
+    kill,
+    getSessionLogs,
+    focusTerminal,
+  } = useTerminalProcess({
+    agentId: agent.id,
+    containerRef,
+    cwd: agent.cwd,
+    launchCommand: agent.launchCommand,
+  });
 
-  const color       = dotColor(dinoState);
-  const lcColor     = LIFECYCLE_COLORS[lifecycle];
-  const pulse       = dinoState === "patrol_running" || dinoState === "heavy_processing";
-  const isAlive     = lifecycle === "running" || lifecycle === "spawning";
+  const [showLogs, setShowLogs] = useState(false);
+
+  const color    = dotColor(dinoState);
+  const lcColor  = LIFECYCLE_COLORS[lifecycle];
+  const pulse    = dinoState === "patrol_running" || dinoState === "heavy_processing";
+  const isAlive  = lifecycle === "running" || lifecycle === "spawning";
+
+  function handleOpenLogs() { setShowLogs(true); }
+  function handleCloseLogs() {
+    setShowLogs(false);
+    focusTerminal();
+  }
 
   async function handleRemove() {
     if (isAlive && !window.confirm(`Kill "${agent.label}"?`)) return;
@@ -119,6 +129,7 @@ export function TerminalPane({ agent, onRemove }: Props) {
         overflow: "hidden",
         height: "100%",
         boxShadow: "0 0 32px rgba(0,200,255,0.05)",
+        position: "relative",
       }}
     >
       {/* Header */}
@@ -133,7 +144,6 @@ export function TerminalPane({ agent, onRemove }: Props) {
           flexShrink: 0,
         }}
       >
-        {/* Status dot */}
         <div
           className={pulse ? "status-dot-pulse" : undefined}
           style={{
@@ -149,8 +159,6 @@ export function TerminalPane({ agent, onRemove }: Props) {
             flexShrink: 0,
           }}
         />
-
-        {/* Label */}
         <span style={{ color: "#7dd3fc", fontWeight: 700, fontSize: 12, letterSpacing: 0.5 }}>
           {agent.label}
         </span>
@@ -170,16 +178,16 @@ export function TerminalPane({ agent, onRemove }: Props) {
           {lifecycleLabel(lifecycle)}
         </span>
 
-        {/* ── Action buttons ── */}
+        {/* Action buttons */}
         <HdrBtn title="Copy visible output" onClick={() => { void copyVisible(); }}>
           ⎘
         </HdrBtn>
         <HdrBtn
-          title="Clear terminal"
-          onClick={clear}
+          title="View session logs"
+          onClick={handleOpenLogs}
           onMouseDown={(e) => e.preventDefault()}
         >
-          ⌫
+          ≡
         </HdrBtn>
         <HdrBtn title="Restart terminal" onClick={() => { void handleRestart(); }}>
           ↺
@@ -197,6 +205,16 @@ export function TerminalPane({ agent, onRemove }: Props) {
 
       {/* DinoLane */}
       <DinoLane dinoId={agent.dinoId} state={dinoState} />
+
+      {/* Logs panel — rendered as fixed overlay when open */}
+      {showLogs && (
+        <LogsPanel
+          label={agent.label}
+          lifecycle={lifecycle}
+          getLogs={getSessionLogs}
+          onClose={handleCloseLogs}
+        />
+      )}
     </div>
   );
 }

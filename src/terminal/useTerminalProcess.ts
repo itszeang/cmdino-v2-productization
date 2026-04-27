@@ -12,6 +12,8 @@ export type TerminalLifecycleState =
   | "killed"
   | "error";
 
+const MAX_LOG_CHARS = 200 * 1024; // ~200 KB cap on raw session buffer
+
 const XTERM_THEME = {
   background:          "#070b0e",
   foreground:          "#c8d8e8",
@@ -48,10 +50,13 @@ export interface TerminalProcessHandle {
   lifecycle: TerminalLifecycleState;
   /** Derived: lifecycle === "running" */
   ready: boolean;
-  clear: () => void;
   copyVisible: () => Promise<void>;
   restart: () => Promise<void>;
   kill: () => Promise<void>;
+  /** Returns the raw session log buffer (ANSI codes included) */
+  getSessionLogs: () => string;
+  /** Focuses the xterm instance */
+  focusTerminal: () => void;
 }
 
 export function useTerminalProcess({
@@ -63,19 +68,17 @@ export function useTerminalProcess({
   const [dinoState, setDinoState] = useState<DinoState>("idle_center");
   const [lifecycle, setLifecycle] = useState<TerminalLifecycleState>("spawning");
 
-  const dinoStateRef          = useRef<DinoState>("idle_center");
-  const termRef               = useRef<Terminal | null>(null);
-  // Blocks the exit event handler from clobbering lifecycle during restart
-  const restartInProgressRef  = useRef(false);
+  const dinoStateRef         = useRef<DinoState>("idle_center");
+  const termRef              = useRef<Terminal | null>(null);
+  const logsRef              = useRef<string>("");          // raw session output
+  const restartInProgressRef = useRef(false);
 
   // ── Stable actions ────────────────────────────────────────────────────────
 
-  const clear = useCallback(() => {
-    const t = termRef.current;
-    if (!t) return;
-    t.clear();
-    // Defer focus so the button's click-event bubble chain finishes first.
-    requestAnimationFrame(() => t.focus());
+  const getSessionLogs = useCallback(() => logsRef.current, []);
+
+  const focusTerminal = useCallback(() => {
+    requestAnimationFrame(() => termRef.current?.focus());
   }, []);
 
   const copyVisible = useCallback(async () => {
@@ -102,20 +105,14 @@ export function useTerminalProcess({
     dinoStateRef.current = "terminal_dead";
   }, [agentId]);
 
-  /**
-   * Restart: awaits kill so backend session is gone before we re-spawn.
-   * Does NOT re-run the useEffect — reuses the same xterm instance and
-   * event listeners (they filter by agentId so they pick up the new PTY).
-   */
   const restart = useCallback(async () => {
     if (restartInProgressRef.current) return;
     restartInProgressRef.current = true;
 
     const t = termRef.current;
     try {
-      // Kill existing PTY — awaited so backend removes the session before spawn.
       await terminalBridge.kill(agentId).catch(() => {});
-
+      logsRef.current = ""; // clear session buffer on restart
       t?.clear();
       t?.focus();
 
@@ -147,12 +144,13 @@ export function useTerminalProcess({
     }
   }, [agentId, cwd, launchCommand]);
 
-  // ── Terminal lifecycle effect (runs once per agentId) ─────────────────────
+  // ── Terminal lifecycle effect ─────────────────────────────────────────────
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
+    logsRef.current = "";
     setLifecycle("spawning");
     setDinoState("idle_center");
     dinoStateRef.current = "idle_center";
@@ -210,6 +208,12 @@ export function useTerminalProcess({
       .onData((ev) => {
         if (ev.agent_id !== agentId) return;
         term.write(ev.data);
+        // Accumulate session log (bounded)
+        const next = logsRef.current + ev.data;
+        logsRef.current = next.length > MAX_LOG_CHARS
+          ? next.slice(next.length - MAX_LOG_CHARS)
+          : next;
+        // Drive dino state
         const parsed = parseStdoutVibe(ev.data);
         if (parsed && parsed !== dinoStateRef.current) {
           dinoStateRef.current = parsed;
@@ -221,7 +225,6 @@ export function useTerminalProcess({
     terminalBridge
       .onExit((ev) => {
         if (ev.agent_id !== agentId) return;
-        // Ignore exit events fired during restart — restart() owns lifecycle then.
         if (restartInProgressRef.current) return;
         const lc: TerminalLifecycleState =
           ev.reason === "killed" ? "killed"
@@ -284,9 +287,10 @@ export function useTerminalProcess({
     dinoState,
     lifecycle,
     ready: lifecycle === "running",
-    clear,
     copyVisible,
     restart,
     kill,
+    getSessionLogs,
+    focusTerminal,
   };
 }

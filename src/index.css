@@ -55,6 +55,98 @@ body {
   animation: pulse-glow 1.1s ease-in-out infinite;
 }
 
+/* ── Logs panel ───────────────────────────────────────────────────── */
+
+.logs-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.logs-panel {
+  background: #0b0f14;
+  border: 1px solid #0e2233;
+  border-radius: 8px;
+  width: 700px;
+  max-width: calc(100vw - 32px);
+  height: 540px;
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 60px rgba(0, 200, 255, 0.08), 0 24px 80px rgba(0, 0, 0, 0.8);
+}
+
+.logs-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #0e2233;
+  background: #0d1520;
+  flex-shrink: 0;
+  border-radius: 8px 8px 0 0;
+}
+
+.logs-title {
+  color: #7dd3fc;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.logs-lifecycle-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+}
+
+.logs-btn {
+  background: transparent;
+  border: 1px solid #1a2a3a;
+  border-radius: 3px;
+  color: #445566;
+  font-size: 10px;
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.logs-btn:hover { border-color: #00c8ff; color: #00c8ff; }
+.logs-btn--close { }
+.logs-btn--close:hover { border-color: #f87171; color: #f87171; }
+
+.logs-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px 14px;
+  background: #070b0e;
+  border-radius: 0 0 8px 8px;
+}
+
+.logs-pre {
+  margin: 0;
+  font-family: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+  font-size: 11px;
+  line-height: 1.65;
+  color: #8899aa;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.logs-empty {
+  color: #334455;
+  font-size: 11px;
+  text-align: center;
+  padding: 60px 0;
+}
+
 /* ── Agent creation modal ─────────────────────────────────────────── */
 
 .modal-overlay {
