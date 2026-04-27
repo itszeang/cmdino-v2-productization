@@ -7,7 +7,7 @@ import {
   isCenteringState,
 } from "../terminal/dinoStateMachine";
 
-const LANE_HEIGHT = 72;
+const LANE_HEIGHT = 92;
 const PATROL_SPEED = 90;     // px/sec
 const CENTER_SPEED = 70;     // px/sec
 const PATROL_MIN = 0.10;
@@ -133,8 +133,13 @@ export function DinoLane({ dinoId, state }: Props) {
         position: "relative",
         width: "100%",
         height: LANE_HEIGHT,
-        background: "rgba(0,0,0,0.55)",
-        borderTop: "1px solid #0e2233",
+        background: "rgba(0,0,0,0.65)",
+        backgroundImage: [
+          "repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,200,255,0.018) 3px, rgba(0,200,255,0.018) 4px)",
+          "repeating-linear-gradient(90deg, transparent, transparent 24px, rgba(0,200,255,0.012) 24px, rgba(0,200,255,0.012) 25px)",
+        ].join(", "),
+        borderTop: "1px solid rgba(0,200,255,0.12)",
+        boxShadow: "inset 0 1px 0 rgba(0,200,255,0.06)",
         overflow: "hidden",
         flexShrink: 0,
       }}
@@ -154,7 +159,7 @@ export function DinoLane({ dinoId, state }: Props) {
         ref={spriteWrapRef}
         style={{
           position: "absolute",
-          bottom: 0,
+          bottom: 6,
           left: 0,
           width: FRAME_PX,
           height: FRAME_PX,

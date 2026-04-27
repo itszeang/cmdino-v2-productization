@@ -8,8 +8,8 @@ preloadDino("female-cole");
 export default function App() {
   const agents = useMemo(
     () => [
-      createTerminalAgent("agent-1", "Agent Alpha", "female-cole"),
-      createTerminalAgent("agent-2", "Agent Beta",  "female-cole"),
+      createTerminalAgent("agent-1", "Claude Builder",  "female-cole"),
+      createTerminalAgent("agent-2", "Codex Reviewer", "female-cole"),
     ],
     []
   );

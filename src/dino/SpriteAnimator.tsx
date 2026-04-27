@@ -3,8 +3,8 @@ import { loadAsset } from "./assetLoader";
 import { DINO_MANIFEST } from "../config/dinoManifest";
 
 const SPRITE_HEIGHT = 24;
-const SCALE = 3;
-export const FRAME_PX = SPRITE_HEIGHT * SCALE; // 72px — all frames are square at 3x
+const SCALE = 4;
+export const FRAME_PX = SPRITE_HEIGHT * SCALE; // 96px — all frames are square at 4x
 
 interface Props {
   dinoId: string;
