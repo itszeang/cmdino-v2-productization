@@ -1,6 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
+// Tauri v2 serializes Rust snake_case params as camelCase on the JS side.
+// Event payloads are plain serde_json — agent_id stays snake_case.
+
 export interface TerminalDataEvent {
   agent_id: string;
   data: string;
@@ -14,7 +17,7 @@ export interface TerminalExitEvent {
 export const terminalBridge = {
   spawn(agentId: string, cwd: string, cols: number, rows: number): Promise<void> {
     return invoke("spawn_terminal", {
-      agent_id: agentId,
+      agentId,
       shell: "cmd.exe",
       cwd,
       cols,
@@ -23,15 +26,15 @@ export const terminalBridge = {
   },
 
   write(agentId: string, data: string): Promise<void> {
-    return invoke("write_terminal", { agent_id: agentId, data });
+    return invoke("write_terminal", { agentId, data });
   },
 
   resize(agentId: string, cols: number, rows: number): Promise<void> {
-    return invoke("resize_terminal", { agent_id: agentId, cols, rows });
+    return invoke("resize_terminal", { agentId, cols, rows });
   },
 
   kill(agentId: string): Promise<void> {
-    return invoke("kill_terminal", { agent_id: agentId });
+    return invoke("kill_terminal", { agentId });
   },
 
   onData(cb: (e: TerminalDataEvent) => void): Promise<UnlistenFn> {
