@@ -24,13 +24,16 @@ function stateLabel(state: string): string {
 
 interface Props {
   agent: TerminalAgent;
+  onRemove: (id: string) => void;
 }
 
-export function TerminalPane({ agent }: Props) {
+export function TerminalPane({ agent, onRemove }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { dinoState, ready } = useTerminalProcess({
     agentId: agent.id,
     containerRef,
+    cwd: agent.cwd,
+    launchCommand: agent.launchCommand,
   });
 
   const color = dotColor(dinoState);
@@ -56,7 +59,7 @@ export function TerminalPane({ agent }: Props) {
           display: "flex",
           alignItems: "center",
           gap: 8,
-          padding: "7px 12px",
+          padding: "7px 10px 7px 12px",
           background: "#0d1520",
           borderBottom: "1px solid #0e2233",
           flexShrink: 0,
@@ -101,9 +104,32 @@ export function TerminalPane({ agent }: Props) {
         >
           {ready ? stateLabel(dinoState) : "CONNECTING…"}
         </span>
+
+        {/* Close button */}
+        <button
+          onClick={() => onRemove(agent.id)}
+          title="Close terminal"
+          style={{
+            marginLeft: 8,
+            background: "none",
+            border: "none",
+            color: "#2a3a4a",
+            fontSize: 14,
+            lineHeight: 1,
+            cursor: "pointer",
+            padding: "2px 4px",
+            borderRadius: 3,
+            transition: "color 0.15s",
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#2a3a4a"; }}
+        >
+          ✕
+        </button>
       </div>
 
-      {/* xterm.js container — fills remaining space */}
+      {/* xterm.js container */}
       <div
         ref={containerRef}
         style={{
@@ -114,7 +140,7 @@ export function TerminalPane({ agent }: Props) {
         }}
       />
 
-      {/* DinoLane — preserved from V0.1A */}
+      {/* DinoLane */}
       <DinoLane dinoId={agent.dinoId} state={dinoState} />
     </div>
   );

@@ -6,32 +6,34 @@ import { parseStdoutVibe } from "./stdoutVibeParser";
 import type { DinoState } from "./dinoStateMachine";
 
 const XTERM_THEME = {
-  background:       "#070b0e",
-  foreground:       "#c8d8e8",
-  cursor:           "#00c8ff",
-  cursorAccent:     "#070b0e",
+  background:          "#070b0e",
+  foreground:          "#c8d8e8",
+  cursor:              "#00c8ff",
+  cursorAccent:        "#070b0e",
   selectionBackground: "#00c8ff33",
-  black:            "#0d1117",
-  red:              "#f87171",
-  green:            "#4ade80",
-  yellow:           "#facc15",
-  blue:             "#60a5fa",
-  magenta:          "#c084fc",
-  cyan:             "#22d3ee",
-  white:            "#e2e8f0",
-  brightBlack:      "#374151",
-  brightRed:        "#fca5a5",
-  brightGreen:      "#86efac",
-  brightYellow:     "#fde68a",
-  brightBlue:       "#93c5fd",
-  brightMagenta:    "#d8b4fe",
-  brightCyan:       "#67e8f9",
-  brightWhite:      "#f8fafc",
+  black:               "#0d1117",
+  red:                 "#f87171",
+  green:               "#4ade80",
+  yellow:              "#facc15",
+  blue:                "#60a5fa",
+  magenta:             "#c084fc",
+  cyan:                "#22d3ee",
+  white:               "#e2e8f0",
+  brightBlack:         "#374151",
+  brightRed:           "#fca5a5",
+  brightGreen:         "#86efac",
+  brightYellow:        "#fde68a",
+  brightBlue:          "#93c5fd",
+  brightMagenta:       "#d8b4fe",
+  brightCyan:          "#67e8f9",
+  brightWhite:         "#f8fafc",
 };
 
 interface Options {
   agentId: string;
   containerRef: React.RefObject<HTMLDivElement>;
+  cwd?: string;
+  launchCommand?: string;
 }
 
 export interface TerminalProcessHandle {
@@ -42,11 +44,12 @@ export interface TerminalProcessHandle {
 export function useTerminalProcess({
   agentId,
   containerRef,
+  cwd,
+  launchCommand,
 }: Options): TerminalProcessHandle {
   const [dinoState, setDinoState] = useState<DinoState>("idle_center");
   const [ready, setReady] = useState(false);
 
-  // Stable ref so parser callback never has stale dinoState
   const dinoStateRef = useRef<DinoState>("idle_center");
 
   useEffect(() => {
@@ -68,17 +71,21 @@ export function useTerminalProcess({
     term.loadAddon(fitAddon);
     term.open(container);
 
-    const unlistens = { data: null as null | (() => void), exit: null as null | (() => void) };
+    const unlistens = {
+      data: null as null | (() => void),
+      exit: null as null | (() => void),
+    };
     let active = true;
 
-    // Detect Tauri context — plain browser has no __TAURI_INTERNALS__
-    const isTauri = Boolean((window as unknown as Record<string, unknown>).__TAURI_INTERNALS__);
+    const isTauri = Boolean(
+      (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
+    );
 
     if (!isTauri) {
       requestAnimationFrame(() => {
         if (!active) return;
         fitAddon.fit();
-        term.write("\x1b[33m[web preview mode — no PTY]\x1b[0m\r\n");
+        term.write("\x1b[33m[web preview — no PTY]\x1b[0m\r\n");
         term.write("\x1b[2mrun: npm run tauri dev\x1b[0m\r\n");
       });
       return () => {
@@ -87,17 +94,14 @@ export function useTerminalProcess({
       };
     }
 
-    // Forward PTY resize through term.onResize
     const disposeResize = term.onResize(({ cols, rows }) => {
       terminalBridge.resize(agentId, cols, rows).catch(() => {});
     });
 
-    // Forward keyboard input to PTY
     const disposeInput = term.onData((data) => {
       terminalBridge.write(agentId, data).catch(() => {});
     });
 
-    // Subscribe to PTY output
     terminalBridge
       .onData((ev) => {
         if (ev.agent_id !== agentId) return;
@@ -113,7 +117,6 @@ export function useTerminalProcess({
         else unlistens.data = fn;
       });
 
-    // Subscribe to PTY exit
     terminalBridge
       .onExit((ev) => {
         if (ev.agent_id !== agentId) return;
@@ -127,26 +130,32 @@ export function useTerminalProcess({
         else unlistens.exit = fn;
       });
 
-    // ResizeObserver → fit → onResize chain
     const ro = new ResizeObserver(() => {
-      try { fitAddon.fit(); } catch { /* ignore if disposed */ }
+      try { fitAddon.fit(); } catch { /* disposed */ }
     });
     ro.observe(container);
 
-    // Spawn PTY after first fit
     requestAnimationFrame(() => {
       if (!active) return;
       fitAddon.fit();
       const { cols, rows } = term;
       terminalBridge
-        .spawn(agentId, ".", cols, rows)
+        .spawn(agentId, cwd ?? ".", cols, rows)
         .then(() => {
-          if (active) setReady(true);
+          if (!active) return;
+          setReady(true);
+          // Write launch command after shell initialises
+          if (launchCommand?.trim()) {
+            setTimeout(() => {
+              if (active) {
+                terminalBridge.write(agentId, launchCommand.trim() + "\r").catch(() => {});
+              }
+            }, 300);
+          }
         })
         .catch((err: unknown) => {
           const msg = err instanceof Error ? err.message : String(err);
           term.write(`\r\n\x1b[31m[PTY error: ${msg}]\x1b[0m\r\n`);
-          term.write(`\x1b[33m[run with: npm run tauri dev]\x1b[0m\r\n`);
         });
     });
 
@@ -160,7 +169,6 @@ export function useTerminalProcess({
       terminalBridge.kill(agentId).catch(() => {});
       term.dispose();
     };
-    // agentId is stable per pane; containerRef.current is DOM-stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId]);
 

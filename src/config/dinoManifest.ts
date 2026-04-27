@@ -34,28 +34,35 @@ export type DinoEntry = {
   ghost: GhostAnims;
 };
 
-export const DINO_MANIFEST: Record<string, DinoEntry> = {
-  "female-cole": {
-    base: {
-      idle:  { frames: 3, fps: 7,  loop: true  },
-      move:  { frames: 6, fps: 12, loop: true  },
-      dash:  { frames: 6, fps: 16, loop: true  },
-      scan:  { frames: 6, fps: 8,  loop: true  },
-      avoid: { frames: 3, fps: 10, loop: false },
-      hurt:  { frames: 4, fps: 8,  loop: false },
-      dead:  { frames: 5, fps: 5,  loop: false },
-      jump:  { frames: 4, fps: 10, loop: false },
-      bite:  { frames: 3, fps: 9,  loop: false },
-      kick:  { frames: 3, fps: 9,  loop: false },
-    },
-    egg: {
-      crack: { frames: 4, fps: 8, loop: false },
-      hatch: { frames: 4, fps: 8, loop: false },
-      move:  { frames: 4, fps: 8, loop: false },
-    },
-    ghost: {
-      idle: { frames: 3, fps: 6, loop: true },
-      move: { frames: 4, fps: 8, loop: true },
-    },
+// All five verified dinos share identical frame counts (DemChing pack).
+const SHARED_ENTRY: DinoEntry = {
+  base: {
+    idle:  { frames: 3, fps: 7,  loop: true  },
+    move:  { frames: 6, fps: 12, loop: true  },
+    dash:  { frames: 6, fps: 16, loop: true  },
+    scan:  { frames: 6, fps: 8,  loop: true  },
+    avoid: { frames: 3, fps: 10, loop: false },
+    hurt:  { frames: 4, fps: 8,  loop: false },
+    dead:  { frames: 5, fps: 5,  loop: false },
+    jump:  { frames: 4, fps: 10, loop: false },
+    bite:  { frames: 3, fps: 9,  loop: false },
+    kick:  { frames: 3, fps: 9,  loop: false },
   },
+  egg: {
+    crack: { frames: 4, fps: 8, loop: false },
+    hatch: { frames: 4, fps: 8, loop: false },
+    move:  { frames: 4, fps: 8, loop: false },
+  },
+  ghost: {
+    idle: { frames: 3, fps: 6, loop: true },
+    move: { frames: 4, fps: 8, loop: true },
+  },
+};
+
+export const DINO_MANIFEST: Record<string, DinoEntry> = {
+  "female-cole": SHARED_ENTRY,
+  "female-kira": SHARED_ENTRY,
+  "female-loki": SHARED_ENTRY,
+  "male-cole":   SHARED_ENTRY,
+  "male-kira":   SHARED_ENTRY,
 };
