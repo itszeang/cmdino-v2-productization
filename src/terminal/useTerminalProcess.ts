@@ -74,7 +74,8 @@ export function useTerminalProcess({
     const t = termRef.current;
     if (!t) return;
     t.clear();
-    t.focus(); // restore input focus after buffer wipe
+    // Defer focus so the button's click-event bubble chain finishes first.
+    requestAnimationFrame(() => t.focus());
   }, []);
 
   const copyVisible = useCallback(async () => {

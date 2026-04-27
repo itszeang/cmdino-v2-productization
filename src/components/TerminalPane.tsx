@@ -37,11 +37,13 @@ function lifecycleLabel(lc: TerminalLifecycleState): string {
 function HdrBtn({
   title,
   onClick,
+  onMouseDown,
   children,
   danger = false,
 }: {
   title: string;
   onClick: () => void;
+  onMouseDown?: React.MouseEventHandler<HTMLButtonElement>;
   children: React.ReactNode;
   danger?: boolean;
 }) {
@@ -49,6 +51,7 @@ function HdrBtn({
     <button
       title={title}
       onClick={onClick}
+      onMouseDown={onMouseDown}
       style={{
         background: "none",
         border: "none",
@@ -171,7 +174,11 @@ export function TerminalPane({ agent, onRemove }: Props) {
         <HdrBtn title="Copy visible output" onClick={() => { void copyVisible(); }}>
           ⎘
         </HdrBtn>
-        <HdrBtn title="Clear terminal" onClick={clear}>
+        <HdrBtn
+          title="Clear terminal"
+          onClick={clear}
+          onMouseDown={(e) => e.preventDefault()}
+        >
           ⌫
         </HdrBtn>
         <HdrBtn title="Restart terminal" onClick={() => { void handleRestart(); }}>
