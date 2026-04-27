@@ -68,9 +68,24 @@ export function useTerminalProcess({
     term.loadAddon(fitAddon);
     term.open(container);
 
-    // Defer fit so flex layout is painted
     const unlistens = { data: null as null | (() => void), exit: null as null | (() => void) };
     let active = true;
+
+    // Detect Tauri context — plain browser has no __TAURI_INTERNALS__
+    const isTauri = Boolean((window as unknown as Record<string, unknown>).__TAURI_INTERNALS__);
+
+    if (!isTauri) {
+      requestAnimationFrame(() => {
+        if (!active) return;
+        fitAddon.fit();
+        term.write("\x1b[33m[web preview mode — no PTY]\x1b[0m\r\n");
+        term.write("\x1b[2mrun: npm run tauri dev\x1b[0m\r\n");
+      });
+      return () => {
+        active = false;
+        term.dispose();
+      };
+    }
 
     // Forward PTY resize through term.onResize
     const disposeResize = term.onResize(({ cols, rows }) => {
