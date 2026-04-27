@@ -4,3 +4,5 @@ dist/
 app-icon-src.png
 src-tauri/target/
 src-tauri/gen/schemas/
+.playwright-mcp/
+*.png
