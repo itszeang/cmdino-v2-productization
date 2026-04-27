@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import type { TerminalAgent } from "../domain/terminalAgent";
 
-export const MAX_TERMINALS = 4;
+export const MAX_TERMINALS = 12;
 
 type NewAgent = Omit<TerminalAgent, "id">;
 
