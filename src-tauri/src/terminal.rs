@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
@@ -17,7 +17,8 @@ pub struct DataPayload {
 #[derive(Clone, Serialize)]
 pub struct ExitPayload {
     agent_id: String,
-    code: i32,
+    code: Option<i32>,
+    reason: String, // "exited" | "killed" | "error"
 }
 
 // ── Per-agent PTY handle ──────────────────────────────────────────────────────
@@ -29,11 +30,21 @@ struct PtyHandle {
 
 // ── Shared app state ──────────────────────────────────────────────────────────
 
-pub struct TerminalState(Arc<Mutex<HashMap<String, PtyHandle>>>);
+struct StateInner {
+    sessions: HashMap<String, PtyHandle>,
+    // Tracks agent IDs that were intentionally killed so the reader thread
+    // does not emit a duplicate "exited" event.
+    killed: HashSet<String>,
+}
+
+pub struct TerminalState(Arc<Mutex<StateInner>>);
 
 impl TerminalState {
     pub fn new() -> Self {
-        TerminalState(Arc::new(Mutex::new(HashMap::new())))
+        TerminalState(Arc::new(Mutex::new(StateInner {
+            sessions: HashMap::new(),
+            killed: HashSet::new(),
+        })))
     }
 }
 
@@ -49,15 +60,15 @@ pub fn spawn_terminal(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
+    // Reject duplicate active session
     {
-        let map = state.0.lock().unwrap();
-        if map.contains_key(&agent_id) {
+        let inner = state.0.lock().unwrap();
+        if inner.sessions.contains_key(&agent_id) {
             return Err(format!("terminal already running for {agent_id}"));
         }
     }
 
     let pty_system = native_pty_system();
-
     let size = PtySize { rows, cols, pixel_width: 0, pixel_height: 0 };
 
     let pair = pty_system
@@ -81,9 +92,6 @@ pub fn spawn_terminal(
     let _child = slave
         .spawn_command(cmd)
         .map_err(|e| format!("spawn: {e}"))?;
-
-    // Drop slave so master read reaches EOF when child exits (required on Unix,
-    // harmless on Windows ConPTY).
     drop(slave);
 
     let writer = master
@@ -94,10 +102,15 @@ pub fn spawn_terminal(
         .try_clone_reader()
         .map_err(|e| format!("clone_reader: {e}"))?;
 
-    // Spawn reader thread — streams PTY output as terminal:data events
-    let app_clone     = app.clone();
-    let id_clone      = agent_id.clone();
-    let state_arc     = state.0.clone();
+    // Insert handle BEFORE spawning reader thread to avoid early-exit races.
+    state.0.lock().unwrap().sessions.insert(
+        agent_id.clone(),
+        PtyHandle { master, writer },
+    );
+
+    let app_clone = app.clone();
+    let id_clone  = agent_id.clone();
+    let state_arc = state.0.clone();
 
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
@@ -113,14 +126,22 @@ pub fn spawn_terminal(
                 }
             }
         }
-        state_arc.lock().unwrap().remove(&id_clone);
-        let _ = app_clone.emit(
-            "terminal:exit",
-            ExitPayload { agent_id: id_clone, code: 0 },
-        );
-    });
 
-    state.0.lock().unwrap().insert(agent_id, PtyHandle { master, writer });
+        // Only emit "exited" if the session was not already killed.
+        let should_emit = {
+            let mut inner = state_arc.lock().unwrap();
+            let was_active  = inner.sessions.remove(&id_clone).is_some();
+            let was_killed  = inner.killed.remove(&id_clone);
+            was_active && !was_killed
+        };
+
+        if should_emit {
+            let _ = app_clone.emit(
+                "terminal:exit",
+                ExitPayload { agent_id: id_clone, code: Some(0), reason: "exited".to_string() },
+            );
+        }
+    });
 
     Ok(())
 }
@@ -131,12 +152,9 @@ pub fn write_terminal(
     agent_id: String,
     data: String,
 ) -> Result<(), String> {
-    let mut map = state.0.lock().unwrap();
-    let handle = map.get_mut(&agent_id).ok_or("terminal not found")?;
-    handle
-        .writer
-        .write_all(data.as_bytes())
-        .map_err(|e| e.to_string())
+    let mut inner = state.0.lock().unwrap();
+    let handle = inner.sessions.get_mut(&agent_id).ok_or("terminal not found")?;
+    handle.writer.write_all(data.as_bytes()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -146,8 +164,8 @@ pub fn resize_terminal(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    let map = state.0.lock().unwrap();
-    let handle = map.get(&agent_id).ok_or("terminal not found")?;
+    let inner = state.0.lock().unwrap();
+    let handle = inner.sessions.get(&agent_id).ok_or("terminal not found")?;
     handle
         .master
         .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
@@ -157,8 +175,25 @@ pub fn resize_terminal(
 #[tauri::command]
 pub fn kill_terminal(
     state: tauri::State<'_, TerminalState>,
+    app: AppHandle,
     agent_id: String,
 ) -> Result<(), String> {
-    state.0.lock().unwrap().remove(&agent_id);
+    let removed = {
+        let mut inner = state.0.lock().unwrap();
+        let removed = inner.sessions.remove(&agent_id);
+        if removed.is_some() {
+            inner.killed.insert(agent_id.clone());
+        }
+        removed.is_some()
+    };
+
+    if removed {
+        // Dropping PtyHandle closes master → ConPTY sends EOF to child → reader thread exits.
+        let _ = app.emit(
+            "terminal:exit",
+            ExitPayload { agent_id, code: None, reason: "killed".to_string() },
+        );
+    }
+
     Ok(())
 }
