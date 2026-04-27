@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.DS_Store
+app-icon-src.png
+src-tauri/target/
+src-tauri/gen/schemas/
