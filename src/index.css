@@ -1,3 +1,23 @@
+/* ── CMDino design tokens ─────────────────────────────────────────── */
+:root {
+  --c-bg:         #080b0f;
+  --c-surface:    #0b0f14;
+  --c-surface2:   #0d1520;
+  --c-border:     #0e2233;
+  --c-border2:    #0c1a24;
+  --c-cyan:       #00c8ff;
+  --c-cyan-dim:   #00c8ff44;
+  --c-cyan-faint: #00c8ff0f;
+  --c-text:       #c8d8e8;
+  --c-text-dim:   #7dd3fc;
+  --c-text-muted: #334455;
+  --c-text-ghost: #1a3a4a;
+  --c-red:        #f87171;
+  --c-yellow:     #facc15;
+  --c-green:      #22c55e;
+  --c-purple:     #a855f7;
+}
+
 *,
 *::before,
 *::after {
@@ -320,3 +340,34 @@ body {
 }
 .modal-btn--create:hover { background: #00c8ff0f; }
 .modal-btn--create:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Shared range input style ─────────────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  height: 2px;
+  background: #0e2233;
+  border-radius: 1px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #00c8ff;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(0,200,255,0.5);
+}
+input[type="range"]::-webkit-slider-track {
+  height: 2px;
+  background: #0e2233;
+}
+
+/* ── Toolbar divider ─────────────────────────────────────────────── */
+.tb-divider {
+  width: 1px;
+  height: 14px;
+  background: #0a1a24;
+  flex-shrink: 0;
+  margin: 0 2px;
+}

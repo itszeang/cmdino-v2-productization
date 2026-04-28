@@ -4,18 +4,27 @@ import { DINO_MANIFEST } from "../config/dinoManifest";
 
 const SPRITE_HEIGHT = 24;
 const SCALE = 4;
-export const FRAME_PX = SPRITE_HEIGHT * SCALE; // 96px — all frames are square at 4x
+export const FRAME_PX = SPRITE_HEIGHT * SCALE; // 96px — all frames are square at 4×
 
 interface Props {
-  dinoId: string;
-  category: "base" | "egg" | "ghost";
-  animName: string;
-  flipX?: boolean;
+  dinoId:         string;
+  category:       "base" | "egg" | "ghost";
+  animName:       string;
+  flipX?:         boolean;
+  animationSpeed?: number; // multiplier on fps, default 1
+  displayScale?:  number;  // CSS size multiplier, default 1
 }
 
-export function SpriteAnimator({ dinoId, category, animName, flipX = false }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rafRef = useRef(0);
+export function SpriteAnimator({
+  dinoId, category, animName, flipX = false,
+  animationSpeed = 1, displayScale = 1,
+}: Props) {
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const rafRef      = useRef(0);
+  const speedRef    = useRef(animationSpeed);
+
+  // Keep speed ref current without restarting the draw loop
+  useEffect(() => { speedRef.current = animationSpeed; }, [animationSpeed]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -24,22 +33,21 @@ export function SpriteAnimator({ dinoId, category, animName, flipX = false }: Pr
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    canvas.width = FRAME_PX;
+    canvas.width  = FRAME_PX;
     canvas.height = FRAME_PX;
     ctx.clearRect(0, 0, FRAME_PX, FRAME_PX);
 
-    const dinoEntry = DINO_MANIFEST[dinoId];
-    const catEntry = dinoEntry?.[category] as Record<string, { frames: number; fps: number; loop: boolean }> | undefined;
+    const dinoEntry  = DINO_MANIFEST[dinoId];
+    const catEntry   = dinoEntry?.[category] as Record<string, { frames: number; fps: number; loop: boolean }> | undefined;
     const animConfig = catEntry?.[animName];
     if (!animConfig) return;
 
     const { frames, fps, loop } = animConfig;
-    const frameInterval = 1000 / fps;
 
-    let frameIndex = 0;
+    let frameIndex    = 0;
     let lastFrameTime = 0;
     let image: HTMLImageElement | null = null;
-    let cancelled = false;
+    let cancelled     = false;
 
     loadAsset(dinoId, category, animName).then((img) => {
       if (!cancelled) image = img;
@@ -49,7 +57,9 @@ export function SpriteAnimator({ dinoId, category, animName, flipX = false }: Pr
       if (cancelled) return;
 
       if (image) {
-        const frameW = image.width / frames;
+        const frameW         = image.width / frames;
+        const effectiveFps   = fps * speedRef.current;
+        const frameInterval  = 1000 / Math.max(effectiveFps, 0.1);
 
         if (now - lastFrameTime >= frameInterval) {
           if (loop) {
@@ -72,7 +82,7 @@ export function SpriteAnimator({ dinoId, category, animName, flipX = false }: Pr
         ctx.drawImage(
           image,
           frameIndex * frameW, 0, frameW, SPRITE_HEIGHT,
-          0, 0, FRAME_PX, FRAME_PX
+          0, 0, FRAME_PX, FRAME_PX,
         );
 
         if (flipX) ctx.restore();
@@ -89,12 +99,19 @@ export function SpriteAnimator({ dinoId, category, animName, flipX = false }: Pr
     };
   }, [dinoId, category, animName, flipX]);
 
+  const displayPx = Math.round(FRAME_PX * displayScale);
+
   return (
     <canvas
       ref={canvasRef}
       width={FRAME_PX}
       height={FRAME_PX}
-      style={{ imageRendering: "pixelated" }}
+      style={{
+        imageRendering: "pixelated",
+        width:          displayPx,
+        height:         displayPx,
+        display:        "block",
+      }}
     />
   );
 }

@@ -7,6 +7,7 @@ import type { TerminalAttachment } from "../domain/orchestration";
 import { attachmentKindFromPath } from "../domain/orchestration";
 import { fileBridge }      from "../orchestration/fileBridge";
 import type { WorkflowLinkKind } from "../domain/workflow";
+import type { AppSettings } from "../domain/appSettings";
 import {
   useTerminalProcess,
   type TerminalLifecycleState,
@@ -116,6 +117,7 @@ interface Props {
   onRemoveAttachment:   (attachmentId: string) => void;
   onLifecycleChange:    (agentId: string, lifecycle: TerminalLifecycleState) => void;
   onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
+  settings?:            AppSettings;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -124,6 +126,7 @@ export function TerminalPane({
   agent, onRemove, isRunning, onStart,
   allAgents, runningAgentIds, onAddAttachment, onRemoveAttachment,
   onLifecycleChange, onRecordWorkflowLink,
+  settings,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -133,9 +136,13 @@ export function TerminalPane({
     getSessionLogs, focusTerminal,
     sendInput, captureSelectedOrLastLines,
   } = useTerminalProcess({
-    agentId: agent.id, containerRef,
-    cwd: agent.cwd, launchCommand: agent.launchCommand,
-    agentKind: agent.agentKind, enabled: isRunning,
+    agentId:   agent.id,
+    containerRef,
+    cwd:       agent.cwd,
+    launchCommand: agent.launchCommand,
+    agentKind: agent.agentKind,
+    enabled:   isRunning,
+    fontScale: settings?.terminalFontScale ?? 1,
   });
 
   // Report lifecycle changes upward for WorkflowPanel display
@@ -374,10 +381,6 @@ export function TerminalPane({
           title={isAlive ? "Handoff output to another terminal" : "Start terminal first"}
         >HANDOFF ⇒</StripBtn>
 
-        {/* ── Debug hint — remove after confirming buttons work ── */}
-        <span style={{ color: "#162a3a", fontSize: 8, letterSpacing: 0.3, whiteSpace: "nowrap", flexShrink: 0 }}>
-          [{atts.length}att·{isAlive ? "alive" : lifecycle}]
-        </span>
       </div>
 
       {/* ── Add-path row (collapsible) ── */}
@@ -474,7 +477,12 @@ export function TerminalPane({
       )}
 
       {/* ── DinoLane ── */}
-      <DinoLane dinoId={agent.dinoId} state={dinoState} />
+      <DinoLane
+        dinoId={agent.dinoId}
+        state={dinoState}
+        animationSpeed={settings?.animationSpeed ?? 1}
+        dinoScale={settings?.dinoScale ?? 1}
+      />
 
       {/* ── Logs overlay ── */}
       {showLogs && (

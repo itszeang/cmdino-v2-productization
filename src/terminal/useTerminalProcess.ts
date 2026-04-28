@@ -61,6 +61,8 @@ interface Options {
   agentKind?: AgentKind;
   /** false = dormant; do not spawn PTY. Defaults to true. */
   enabled?: boolean;
+  /** Terminal font size multiplier. Updates live without PTY restart. Default 1. */
+  fontScale?: number;
 }
 
 export interface TerminalProcessHandle {
@@ -88,12 +90,14 @@ export function useTerminalProcess({
   launchCommand,
   agentKind,
   enabled = true,
+  fontScale = 1,
 }: Options): TerminalProcessHandle {
   const [dinoState, setDinoState] = useState<DinoState>("idle_center");
   const [lifecycle, setLifecycle] = useState<TerminalLifecycleState>("spawning");
 
   const dinoStateRef         = useRef<DinoState>("idle_center");
   const termRef              = useRef<Terminal | null>(null);
+  const fitAddonRef          = useRef<FitAddon | null>(null);
   const logsRef              = useRef<string>("");
   const recentOutputRef      = useRef<string>("");
   const restartInProgressRef = useRef(false);
@@ -163,6 +167,19 @@ export function useTerminalProcess({
       return { state: "patrol_running", hold: false };
     }
   }, []);
+
+  // ── Font scale live update ────────────────────────────────────────────────
+
+  useEffect(() => {
+    const t = termRef.current;
+    if (!t) return;
+    const sz = Math.max(8, Math.round(12 * fontScale));
+    if (t.options.fontSize === sz) return;
+    t.options.fontSize = sz;
+    requestAnimationFrame(() => {
+      try { fitAddonRef.current?.fit(); } catch { /* disposed */ }
+    });
+  }, [fontScale]);
 
   // ── Stable actions ────────────────────────────────────────────────────────
 
@@ -300,6 +317,7 @@ export function useTerminalProcess({
     });
 
     const fitAddon = new FitAddon();
+    fitAddonRef.current = fitAddon;
     term.loadAddon(fitAddon);
     term.open(container);
     termRef.current = term;
@@ -471,7 +489,8 @@ export function useTerminalProcess({
       try { ro.disconnect(); } catch { /* already disconnected */ }
       try { unlistens.data?.(); } catch { /* already unlistened */ }
       try { unlistens.exit?.(); } catch { /* already unlistened */ }
-      termRef.current = null;
+      termRef.current   = null;
+      fitAddonRef.current = null;
       try { term.dispose(); } catch { /* already disposed */ }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

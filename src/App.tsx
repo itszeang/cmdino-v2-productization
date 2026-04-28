@@ -3,12 +3,16 @@ import { TerminalGrid }       from "./components/TerminalGrid";
 import { AgentCreationModal } from "./components/AgentCreationModal";
 import { WorkspaceToolbar }   from "./components/WorkspaceToolbar";
 import { WorkflowPanel }      from "./components/WorkflowPanel";
+import { SettingsPanel }      from "./components/SettingsPanel";
+import { WelcomeModal }       from "./components/WelcomeModal";
 import { useTerminalAgents, MAX_TERMINALS } from "./state/useTerminalAgents";
+import { useAppSettings }     from "./state/useAppSettings";
 import { workspaceBridge }    from "./workspace/workspaceBridge";
 import { validateWorkspaceFile, sanitizeWorkspaceFilename } from "./domain/workspace";
 import type { AgentKind }     from "./domain/agentKind";
 import type { WorkflowLinkKind } from "./domain/workflow";
 import type { TerminalLifecycleState } from "./terminal/useTerminalProcess";
+import { DEMO_WORKSPACE }     from "./config/demoWorkspace";
 
 const isTauri = Boolean(
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
@@ -36,8 +40,11 @@ export default function App() {
     maxReached,
   } = useTerminalAgents();
 
+  const { settings, updateSettings, resetSettings } = useAppSettings();
+
   const [showModal,           setShowModal]           = useState(false);
   const [showWorkflow,        setShowWorkflow]        = useState(false);
+  const [showSettings,        setShowSettings]        = useState(false);
   const [savedWorkspaces,     setSavedWorkspaces]     = useState<string[]>([]);
   const [lifecycleByAgentId,  setLifecycleByAgentId]  = useState<Record<string, string>>({});
 
@@ -109,6 +116,15 @@ export default function App() {
     }
   }
 
+  // ── Demo workspace ────────────────────────────────────────────────────────
+
+  function loadDemoWorkspace() {
+    if (agents.length > 0) {
+      if (!window.confirm("Replace current workspace with the CMDino Alpha Demo?")) return;
+    }
+    loadWorkspaceConfig(DEMO_WORKSPACE);
+  }
+
   // ── Terminal creation ──────────────────────────────────────────────────────
 
   function handleCreate(form: {
@@ -142,7 +158,9 @@ export default function App() {
         onRefreshList={() => { void refreshList(); }}
         savedWorkspaces={savedWorkspaces}
         onStartAll={startAll}
+        onLoadDemo={loadDemoWorkspace}
         onOpenWorkflow={() => setShowWorkflow(true)}
+        onOpenSettings={() => setShowSettings(true)}
         onAddTerminal={() => setShowModal(true)}
         terminalCount={count}
         maxTerminals={MAX_TERMINALS}
@@ -169,17 +187,30 @@ export default function App() {
             <div style={{ fontSize: 12, color: "#1a3040" }}>
               Up to {MAX_TERMINALS} concurrent terminals · Real PTY · Dino state feedback
             </div>
-            <button
-              onClick={() => setShowModal(true)}
-              style={{
-                marginTop: 8, padding: "10px 24px", background: "#00c8ff0f",
-                border: "1px solid #00c8ff44", borderRadius: 6, color: "#00c8ff",
-                fontSize: 13, fontFamily: "inherit", fontWeight: 700,
-                letterSpacing: 1.5, cursor: "pointer", transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#00c8ff1a"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#00c8ff0f"; }}
-            >+ NEW TERMINAL</button>
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <button
+                onClick={() => setShowModal(true)}
+                style={{
+                  padding: "10px 24px", background: "#00c8ff0f",
+                  border: "1px solid #00c8ff44", borderRadius: 6, color: "#00c8ff",
+                  fontSize: 13, fontFamily: "inherit", fontWeight: 700,
+                  letterSpacing: 1.5, cursor: "pointer", transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#00c8ff1a"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#00c8ff0f"; }}
+              >+ NEW TERMINAL</button>
+              <button
+                onClick={loadDemoWorkspace}
+                style={{
+                  padding: "10px 20px", background: "none",
+                  border: "1px solid #1a3a4a", borderRadius: 6, color: "#334455",
+                  fontSize: 13, fontFamily: "inherit", fontWeight: 700,
+                  letterSpacing: 1.5, cursor: "pointer", transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#7dd3fc"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#00c8ff44"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#334455"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a3a4a"; }}
+              >LOAD DEMO</button>
+            </div>
           </div>
         ) : (
           <TerminalGrid
@@ -191,6 +222,7 @@ export default function App() {
             onRemoveAttachment={removeAttachment}
             onLifecycleChange={handleLifecycleChange}
             onRecordWorkflowLink={handleRecordWorkflowLink}
+            settings={settings}
           />
         )}
       </div>
@@ -200,6 +232,31 @@ export default function App() {
         <AgentCreationModal
           onConfirm={handleCreate}
           onCancel={() => setShowModal(false)}
+        />
+      )}
+
+      {/* First-launch mission briefing */}
+      {!settings.onboardingDismissed && (
+        <WelcomeModal
+          onDismiss={(dontShow) => updateSettings({ onboardingDismissed: dontShow })}
+          onLoadDemo={() => {
+            loadDemoWorkspace();
+            updateSettings({ onboardingDismissed: true });
+          }}
+        />
+      )}
+
+      {/* Settings panel overlay */}
+      {showSettings && (
+        <SettingsPanel
+          settings={settings}
+          onUpdate={updateSettings}
+          onReset={resetSettings}
+          onClose={() => setShowSettings(false)}
+          onShowOnboarding={() => {
+            updateSettings({ onboardingDismissed: false });
+            setShowSettings(false);
+          }}
         />
       )}
 

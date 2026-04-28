@@ -9,7 +9,9 @@ interface Props {
   onRefreshList:   () => void;
   savedWorkspaces: string[];
   onStartAll:      () => void;
+  onLoadDemo:      () => void;
   onOpenWorkflow:  () => void;
+  onOpenSettings:  () => void;
   onAddTerminal:   () => void;
   terminalCount:   number;
   maxTerminals:    number;
@@ -68,7 +70,9 @@ export function WorkspaceToolbar({
   onRefreshList,
   savedWorkspaces,
   onStartAll,
+  onLoadDemo,
   onOpenWorkflow,
+  onOpenSettings,
   onAddTerminal,
   terminalCount,
   maxTerminals,
@@ -184,11 +188,14 @@ export function WorkspaceToolbar({
         ))}
       </select>
 
+      <TbBtn onClick={onLoadDemo} title="Load CMDino Alpha Demo workspace">DEMO</TbBtn>
+
       {/* Start All — only visible when terminals exist */}
       {terminalCount > 0 && (
         <TbBtn onClick={onStartAll} title="Start all dormant terminals">START ALL</TbBtn>
       )}
       <TbBtn onClick={onOpenWorkflow} title="Open workflow view">WORKFLOW</TbBtn>
+      <TbBtn onClick={onOpenSettings} title="Visual settings">SETTINGS</TbBtn>
 
       {/* Spacer */}
       <span style={{ flex: 1 }} />
