@@ -10,12 +10,13 @@ export default function App() {
   function openModal() { setShowModal(true); }
   function closeModal() { setShowModal(false); }
 
-  function handleCreate(form: { label: string; command: string; cwd: string; dinoId: string }) {
+  function handleCreate(form: { label: string; command: string; cwd: string; dinoId: string; agentKind: import("./domain/agentKind").AgentKind }) {
     addAgent({
-      label: form.label,
-      dinoId: form.dinoId,
+      label:         form.label,
+      dinoId:        form.dinoId,
       launchCommand: form.command || undefined,
-      cwd: form.cwd || undefined,
+      cwd:           form.cwd || undefined,
+      agentKind:     form.agentKind,
     });
     closeModal();
   }

@@ -1,17 +1,26 @@
 import { useState } from "react";
 import { AGENT_PRESETS } from "../config/agentPresets";
 import { DINO_OPTIONS } from "../config/dinoOptions";
+import type { AgentKind } from "../domain/agentKind";
 
 interface FormState {
-  presetId: string;
+  presetId: AgentKind;
   label: string;
   command: string;
   cwd: string;
   dinoId: string;
 }
 
+interface ConfirmPayload {
+  label:     string;
+  command:   string;
+  cwd:       string;
+  dinoId:    string;
+  agentKind: AgentKind;
+}
+
 interface Props {
-  onConfirm: (form: Omit<FormState, "presetId">) => void;
+  onConfirm: (form: ConfirmPayload) => void;
   onCancel: () => void;
 }
 
@@ -26,7 +35,7 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
     dinoId: "female-cole",
   });
 
-  function applyPreset(presetId: string) {
+  function applyPreset(presetId: AgentKind) {
     const preset = AGENT_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
     setForm((f) => ({
@@ -40,10 +49,11 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
   function handleSubmit() {
     if (!form.label.trim()) return;
     onConfirm({
-      label: form.label.trim(),
-      command: form.command.trim(),
-      cwd: form.cwd.trim() || DEFAULT_CWD,
-      dinoId: form.dinoId,
+      label:     form.label.trim(),
+      command:   form.command.trim(),
+      cwd:       form.cwd.trim() || DEFAULT_CWD,
+      dinoId:    form.dinoId,
+      agentKind: form.presetId,
     });
   }
 

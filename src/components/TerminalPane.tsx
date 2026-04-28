@@ -88,10 +88,11 @@ export function TerminalPane({ agent, onRemove }: Props) {
     getSessionLogs,
     focusTerminal,
   } = useTerminalProcess({
-    agentId: agent.id,
+    agentId:       agent.id,
     containerRef,
-    cwd: agent.cwd,
+    cwd:           agent.cwd,
     launchCommand: agent.launchCommand,
+    agentKind:     agent.agentKind,
   });
 
   const [showLogs, setShowLogs] = useState(false);

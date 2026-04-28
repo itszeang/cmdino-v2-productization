@@ -1,5 +1,7 @@
+import type { AgentKind } from "../domain/agentKind";
+
 export interface AgentPreset {
-  id: string;
+  id: AgentKind;
   label: string;
   defaultLabel: string;
   defaultCommand: string;

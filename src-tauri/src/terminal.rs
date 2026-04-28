@@ -62,7 +62,10 @@ pub fn spawn_terminal(
 ) -> Result<(), String> {
     // Reject duplicate active session
     {
-        let inner = state.0.lock().unwrap();
+        let inner = state
+            .0
+            .lock()
+            .map_err(|_| "terminal state lock poisoned".to_string())?;
         if inner.sessions.contains_key(&agent_id) {
             return Err(format!("terminal already running for {agent_id}"));
         }
@@ -103,10 +106,12 @@ pub fn spawn_terminal(
         .map_err(|e| format!("clone_reader: {e}"))?;
 
     // Insert handle BEFORE spawning reader thread to avoid early-exit races.
-    state.0.lock().unwrap().sessions.insert(
-        agent_id.clone(),
-        PtyHandle { master, writer },
-    );
+    state
+        .0
+        .lock()
+        .map_err(|_| "terminal state lock poisoned".to_string())?
+        .sessions
+        .insert(agent_id.clone(), PtyHandle { master, writer });
 
     let app_clone = app.clone();
     let id_clone  = agent_id.clone();
@@ -114,9 +119,14 @@ pub fn spawn_terminal(
 
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
+        let mut read_error: Option<String> = None;
         loop {
             match reader.read(&mut buf) {
-                Ok(0) | Err(_) => break,
+                Ok(0) => break,
+                Err(e) => {
+                    read_error = Some(e.to_string());
+                    break;
+                }
                 Ok(n) => {
                     let data = String::from_utf8_lossy(&buf[..n]).into_owned();
                     let _ = app_clone.emit(
@@ -129,16 +139,35 @@ pub fn spawn_terminal(
 
         // Only emit "exited" if the session was not already killed.
         let should_emit = {
-            let mut inner = state_arc.lock().unwrap();
-            let was_active  = inner.sessions.remove(&id_clone).is_some();
-            let was_killed  = inner.killed.remove(&id_clone);
-            was_active && !was_killed
+            match state_arc.lock() {
+                Ok(mut inner) => {
+                    let was_active = inner.sessions.remove(&id_clone).is_some();
+                    let was_killed = inner.killed.remove(&id_clone);
+                    was_active && !was_killed
+                }
+                Err(_) => {
+                    let _ = app_clone.emit(
+                        "terminal:exit",
+                        ExitPayload {
+                            agent_id: id_clone.clone(),
+                            code: None,
+                            reason: "error".to_string(),
+                        },
+                    );
+                    false
+                }
+            }
         };
 
         if should_emit {
+            let is_error = read_error.is_some();
             let _ = app_clone.emit(
                 "terminal:exit",
-                ExitPayload { agent_id: id_clone, code: Some(0), reason: "exited".to_string() },
+                ExitPayload {
+                    agent_id: id_clone,
+                    code: if is_error { None } else { Some(0) },
+                    reason: if is_error { "error" } else { "exited" }.to_string(),
+                },
             );
         }
     });
@@ -152,7 +181,10 @@ pub fn write_terminal(
     agent_id: String,
     data: String,
 ) -> Result<(), String> {
-    let mut inner = state.0.lock().unwrap();
+    let mut inner = state
+        .0
+        .lock()
+        .map_err(|_| "terminal state lock poisoned".to_string())?;
     let handle = inner.sessions.get_mut(&agent_id).ok_or("terminal not found")?;
     handle.writer.write_all(data.as_bytes()).map_err(|e| e.to_string())
 }
@@ -164,7 +196,10 @@ pub fn resize_terminal(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    let inner = state.0.lock().unwrap();
+    let inner = state
+        .0
+        .lock()
+        .map_err(|_| "terminal state lock poisoned".to_string())?;
     let handle = inner.sessions.get(&agent_id).ok_or("terminal not found")?;
     handle
         .master
@@ -179,7 +214,10 @@ pub fn kill_terminal(
     agent_id: String,
 ) -> Result<(), String> {
     let removed = {
-        let mut inner = state.0.lock().unwrap();
+        let mut inner = state
+            .0
+            .lock()
+            .map_err(|_| "terminal state lock poisoned".to_string())?;
         let removed = inner.sessions.remove(&agent_id);
         if removed.is_some() {
             inner.killed.insert(agent_id.clone());

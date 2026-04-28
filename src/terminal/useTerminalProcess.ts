@@ -2,7 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { terminalBridge } from "./terminalBridge";
-import { parseStdoutVibe } from "./stdoutVibeParser";
+import {
+  classifyStdoutChunk,
+  createBurstTracker,
+  IDLE_AFTER_MS,
+  stripAnsi,
+  type BurstTracker,
+} from "./terminalIntelligence";
+import type { AgentActivity } from "./agentActivity";
+import { activityToDinoState } from "./agentActivity";
+import { classifyAgentOutput } from "./agentStateAdapters";
+import type { AgentKind } from "../domain/agentKind";
+import { inferAgentKind } from "../domain/agentKind";
 import type { DinoState } from "./dinoStateMachine";
 
 export type TerminalLifecycleState =
@@ -12,7 +23,10 @@ export type TerminalLifecycleState =
   | "killed"
   | "error";
 
-const MAX_LOG_CHARS = 200 * 1024; // ~200 KB cap on raw session buffer
+const MAX_LOG_CHARS    = 200 * 1024; // ~200 KB cap on raw session buffer
+const RECENT_OUT_MAX   = 6000;       // context window for adapter pattern matching
+
+const HOLD_ACTIVITIES = new Set<AgentActivity>(["asking_approval", "fatal_error"]);
 
 const XTERM_THEME = {
   background:          "#070b0e",
@@ -43,6 +57,7 @@ interface Options {
   containerRef: React.RefObject<HTMLDivElement>;
   cwd?: string;
   launchCommand?: string;
+  agentKind?: AgentKind;
 }
 
 export interface TerminalProcessHandle {
@@ -64,14 +79,82 @@ export function useTerminalProcess({
   containerRef,
   cwd,
   launchCommand,
+  agentKind,
 }: Options): TerminalProcessHandle {
   const [dinoState, setDinoState] = useState<DinoState>("idle_center");
   const [lifecycle, setLifecycle] = useState<TerminalLifecycleState>("spawning");
 
   const dinoStateRef         = useRef<DinoState>("idle_center");
   const termRef              = useRef<Terminal | null>(null);
-  const logsRef              = useRef<string>("");          // raw session output
+  const logsRef              = useRef<string>("");
+  const recentOutputRef      = useRef<string>("");
   const restartInProgressRef = useRef(false);
+  const idleTimerRef         = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const burstRef             = useRef<BurstTracker>(createBurstTracker());
+  const processAliveRef      = useRef(false);
+
+  // ── Intelligence helpers ──────────────────────────────────────────────────
+
+  const clearIdleTimer = useCallback(() => {
+    if (idleTimerRef.current !== null) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+  }, []);
+
+  const setDino = useCallback((next: DinoState) => {
+    if (dinoStateRef.current === next) return;
+    dinoStateRef.current = next;
+    setDinoState(next);
+  }, []);
+
+  const scheduleIdle = useCallback(() => {
+    clearIdleTimer();
+    idleTimerRef.current = setTimeout(() => {
+      if (processAliveRef.current) setDino("idle_center");
+    }, IDLE_AFTER_MS);
+  }, [clearIdleTimer, setDino]);
+
+  const resetIntelligence = useCallback(() => {
+    clearIdleTimer();
+    burstRef.current        = createBurstTracker();
+    recentOutputRef.current = "";
+    processAliveRef.current = false;
+  }, [clearIdleTimer]);
+
+  const classifyWithFallback = useCallback((
+    kind: AgentKind,
+    rawChunk: string,
+    normalizedChunk: string,
+    normalizedRecentOutput: string,
+  ): { state: DinoState; hold: boolean } => {
+    try {
+      const activity = classifyAgentOutput(kind, {
+        chunk: rawChunk,
+        recentOutput: recentOutputRef.current,
+        normalizedChunk,
+        normalizedRecentOutput,
+      });
+
+      if (activity !== null) {
+        return {
+          state: activityToDinoState(activity),
+          hold: HOLD_ACTIVITIES.has(activity),
+        };
+      }
+    } catch {
+      // Adapter failures must never escape the terminal event handler.
+    }
+
+    try {
+      return {
+        state: classifyStdoutChunk(rawChunk, burstRef.current),
+        hold: false,
+      };
+    } catch {
+      return { state: "patrol_running", hold: false };
+    }
+  }, []);
 
   // ── Stable actions ────────────────────────────────────────────────────────
 
@@ -99,11 +182,12 @@ export function useTerminalProcess({
   }, []);
 
   const kill = useCallback(async () => {
+    clearIdleTimer();
+    processAliveRef.current = false;
     await terminalBridge.kill(agentId).catch(() => {});
     setLifecycle("killed");
-    setDinoState("terminal_dead");
-    dinoStateRef.current = "terminal_dead";
-  }, [agentId]);
+    setDino("terminal_dead");
+  }, [agentId, clearIdleTimer, setDino]);
 
   const restart = useCallback(async () => {
     if (restartInProgressRef.current) return;
@@ -111,20 +195,21 @@ export function useTerminalProcess({
 
     const t = termRef.current;
     try {
+      resetIntelligence();
       await terminalBridge.kill(agentId).catch(() => {});
-      logsRef.current = ""; // clear session buffer on restart
+      logsRef.current = "";
       t?.clear();
       t?.focus();
 
       setLifecycle("spawning");
-      setDinoState("idle_center");
-      dinoStateRef.current = "idle_center";
+      setDino("idle_center");
 
       if (!t) throw new Error("terminal not mounted");
 
       const { cols, rows } = t;
       await terminalBridge.spawn(agentId, cwd ?? ".", cols, rows);
 
+      processAliveRef.current = true;
       setLifecycle("running");
       t.focus();
 
@@ -137,12 +222,11 @@ export function useTerminalProcess({
       const msg = err instanceof Error ? err.message : String(err);
       t?.write(`\r\n\x1b[31m[CMDino restart failed: ${msg}]\x1b[0m\r\n`);
       setLifecycle("error");
-      setDinoState("terminal_error");
-      dinoStateRef.current = "terminal_error";
+      setDino("terminal_error");
     } finally {
       restartInProgressRef.current = false;
     }
-  }, [agentId, cwd, launchCommand]);
+  }, [agentId, cwd, launchCommand, resetIntelligence, setDino]);
 
   // ── Terminal lifecycle effect ─────────────────────────────────────────────
 
@@ -151,10 +235,13 @@ export function useTerminalProcess({
     if (!container) return;
 
     logsRef.current = "";
+    resetIntelligence();
     setLifecycle("spawning");
-    setDinoState("idle_center");
-    dinoStateRef.current = "idle_center";
+    setDino("idle_center");
     restartInProgressRef.current = false;
+
+    // Resolve agent kind once at mount; does not change for a given agent
+    const resolvedKind: AgentKind = agentKind ?? inferAgentKind(launchCommand);
 
     const term = new Terminal({
       theme: XTERM_THEME,
@@ -188,55 +275,111 @@ export function useTerminalProcess({
         term.write("\x1b[33m[web preview — no PTY]\x1b[0m\r\n");
         term.write("\x1b[2mrun: npm run tauri dev\x1b[0m\r\n");
         setLifecycle("error");
+        setDino("terminal_error");
       });
       return () => {
         active = false;
         termRef.current = null;
-        term.dispose();
+        try { term.dispose(); } catch { /* already disposed */ }
       };
     }
 
     const disposeResize = term.onResize(({ cols, rows }) => {
+      if (!active || !processAliveRef.current) return;
       terminalBridge.resize(agentId, cols, rows).catch(() => {});
     });
 
     const disposeInput = term.onData((data) => {
+      if (!active || !processAliveRef.current) return;
       terminalBridge.write(agentId, data).catch(() => {});
+      if (data.length > 0) {
+        setDino("patrol_running");
+        scheduleIdle();
+      }
     });
 
     terminalBridge
       .onData((ev) => {
+        if (!active) return;
         if (ev.agent_id !== agentId) return;
-        term.write(ev.data);
+        if (typeof ev.data !== "string") return;
+
+        try {
+          term.write(ev.data);
+        } catch {
+          return;
+        }
+
         // Accumulate session log (bounded)
-        const next = logsRef.current + ev.data;
-        logsRef.current = next.length > MAX_LOG_CHARS
-          ? next.slice(next.length - MAX_LOG_CHARS)
-          : next;
-        // Drive dino state
-        const parsed = parseStdoutVibe(ev.data);
-        if (parsed && parsed !== dinoStateRef.current) {
-          dinoStateRef.current = parsed;
-          setDinoState(parsed);
+        const rawChunk = ev.data;
+        const nextLog  = logsRef.current + rawChunk;
+        logsRef.current = nextLog.length > MAX_LOG_CHARS
+          ? nextLog.slice(nextLog.length - MAX_LOG_CHARS)
+          : nextLog;
+
+        // Accumulate recent output for adapter context
+        const nextRecent = recentOutputRef.current + rawChunk;
+        recentOutputRef.current = nextRecent.length > RECENT_OUT_MAX
+          ? nextRecent.slice(nextRecent.length - RECENT_OUT_MAX)
+          : nextRecent;
+
+        let normalizedChunk = "";
+        let normalizedRecentOutput = "";
+        try {
+          normalizedChunk        = stripAnsi(rawChunk);
+          normalizedRecentOutput = stripAnsi(recentOutputRef.current);
+        } catch {
+          normalizedChunk        = rawChunk;
+          normalizedRecentOutput = recentOutputRef.current;
+        }
+
+        const result = classifyWithFallback(
+          resolvedKind,
+          rawChunk,
+          normalizedChunk,
+          normalizedRecentOutput,
+        );
+
+        setDino(result.state);
+        if (result.hold) {
+          clearIdleTimer(); // preserve the state; don't idle out
+        } else {
+          scheduleIdle();
         }
       })
-      .then((fn) => { if (!active) fn(); else unlistens.data = fn; });
+      .then((fn) => { if (!active) fn(); else unlistens.data = fn; })
+      .catch(() => {
+        if (!active) return;
+        setLifecycle("error");
+        setDino("terminal_error");
+      });
 
     terminalBridge
       .onExit((ev) => {
+        if (!active) return;
         if (ev.agent_id !== agentId) return;
         if (restartInProgressRef.current) return;
+        clearIdleTimer();
+        processAliveRef.current = false;
         const lc: TerminalLifecycleState =
           ev.reason === "killed" ? "killed"
           : ev.reason === "error"  ? "error"
           : "exited";
-        dinoStateRef.current = "terminal_dead";
-        setDinoState("terminal_dead");
+        setDino("terminal_dead");
         setLifecycle(lc);
         const label = ev.reason === "killed" ? "killed" : "exited";
-        term.write(`\r\n\x1b[2m[process ${label}]\x1b[0m\r\n`);
+        try {
+          term.write(`\r\n\x1b[2m[process ${label}]\x1b[0m\r\n`);
+        } catch {
+          // Terminal may already be disposed during a webview remount.
+        }
       })
-      .then((fn) => { if (!active) fn(); else unlistens.exit = fn; });
+      .then((fn) => { if (!active) fn(); else unlistens.exit = fn; })
+      .catch(() => {
+        if (!active) return;
+        setLifecycle("error");
+        setDino("terminal_error");
+      });
 
     const ro = new ResizeObserver(() => {
       try { fitAddon.fit(); } catch { /* disposed */ }
@@ -251,6 +394,7 @@ export function useTerminalProcess({
         .spawn(agentId, cwd ?? ".", cols, rows)
         .then(() => {
           if (!active) return;
+          processAliveRef.current = true;
           setLifecycle("running");
           if (launchCommand?.trim()) {
             setTimeout(() => {
@@ -262,23 +406,27 @@ export function useTerminalProcess({
         })
         .catch((err: unknown) => {
           const msg = err instanceof Error ? err.message : String(err);
-          term.write(`\r\n\x1b[31m[PTY error: ${msg}]\x1b[0m\r\n`);
+          try {
+            term.write(`\r\n\x1b[31m[PTY error: ${msg}]\x1b[0m\r\n`);
+          } catch {
+            // Terminal may already be disposed during teardown.
+          }
           setLifecycle("error");
-          setDinoState("terminal_error");
-          dinoStateRef.current = "terminal_error";
+          setDino("terminal_error");
         });
     });
 
     return () => {
       active = false;
-      disposeInput.dispose();
-      disposeResize.dispose();
-      ro.disconnect();
-      unlistens.data?.();
-      unlistens.exit?.();
-      terminalBridge.kill(agentId).catch(() => {});
+      clearIdleTimer();
+      processAliveRef.current = false;
+      try { disposeInput.dispose(); } catch { /* already disposed */ }
+      try { disposeResize.dispose(); } catch { /* already disposed */ }
+      try { ro.disconnect(); } catch { /* already disconnected */ }
+      try { unlistens.data?.(); } catch { /* already unlistened */ }
+      try { unlistens.exit?.(); } catch { /* already unlistened */ }
       termRef.current = null;
-      term.dispose();
+      try { term.dispose(); } catch { /* already disposed */ }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId]);

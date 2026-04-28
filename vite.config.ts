@@ -8,7 +8,16 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
-    watch: { ignored: ["**/src-tauri/**"] },
+    hmr: false,
+    watch: {
+      ignored: [
+        "**/.agents/**",
+        "**/.claude/**",
+        "**/docs/**",
+        "**/src/**",
+        "**/src-tauri/**",
+      ],
+    },
   },
   envPrefix: ["VITE_", "TAURI_"],
   build: {
