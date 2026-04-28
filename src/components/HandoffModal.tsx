@@ -3,14 +3,15 @@ import { terminalBridge } from "../terminal/terminalBridge";
 import type { TerminalAgent } from "../domain/terminalAgent";
 
 interface Props {
-  sourceAgentId: string;
-  sourceLabel:   string;
+  sourceAgentId:  string;
+  sourceLabel:    string;
   initialCapture: string;
-  runningTargets: TerminalAgent[]; // agents that can receive (running, not source)
+  runningTargets: TerminalAgent[];
   onClose:        () => void;
+  onSent?:        (targetAgentId: string) => void;
 }
 
-export function HandoffModal({ sourceAgentId, sourceLabel, initialCapture, runningTargets, onClose }: Props) {
+export function HandoffModal({ sourceAgentId, sourceLabel, initialCapture, runningTargets, onClose, onSent }: Props) {
   const [targetId,  setTargetId]  = useState(runningTargets[0]?.id ?? "");
   const [text,      setText]      = useState(initialCapture);
   const [sending,   setSending]   = useState(false);
@@ -22,11 +23,12 @@ export function HandoffModal({ sourceAgentId, sourceLabel, initialCapture, runni
     setSendError("");
     try {
       await terminalBridge.write(targetId, text);
+      onSent?.(targetId);   // record the link before closing
+      setSending(false);
+      onClose();            // explicit success close — avoids stale sendError in finally
     } catch (err) {
       setSendError(err instanceof Error ? err.message : String(err));
-    } finally {
       setSending(false);
-      if (!sendError) onClose();
     }
   }
 

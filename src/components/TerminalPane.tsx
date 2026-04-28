@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { DinoLane }        from "../dino/DinoLane";
 import { LogsPanel }       from "./LogsPanel";
 import { HandoffModal }    from "./HandoffModal";
@@ -6,6 +6,7 @@ import type { TerminalAgent }   from "../domain/terminalAgent";
 import type { TerminalAttachment } from "../domain/orchestration";
 import { attachmentKindFromPath } from "../domain/orchestration";
 import { fileBridge }      from "../orchestration/fileBridge";
+import type { WorkflowLinkKind } from "../domain/workflow";
 import {
   useTerminalProcess,
   type TerminalLifecycleState,
@@ -105,14 +106,16 @@ const PREVIEW_IDLE: PreviewState = { content: null, truncated: false, loading: f
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  agent:              TerminalAgent;
-  onRemove:           (id: string) => void;
-  isRunning:          boolean;
-  onStart:            () => void;
-  allAgents:          TerminalAgent[];
-  runningAgentIds:    Set<string>;
-  onAddAttachment:    (path: string) => void;
-  onRemoveAttachment: (attachmentId: string) => void;
+  agent:                TerminalAgent;
+  onRemove:             (id: string) => void;
+  isRunning:            boolean;
+  onStart:              () => void;
+  allAgents:            TerminalAgent[];
+  runningAgentIds:      Set<string>;
+  onAddAttachment:      (path: string) => void;
+  onRemoveAttachment:   (attachmentId: string) => void;
+  onLifecycleChange:    (agentId: string, lifecycle: TerminalLifecycleState) => void;
+  onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -120,6 +123,7 @@ interface Props {
 export function TerminalPane({
   agent, onRemove, isRunning, onStart,
   allAgents, runningAgentIds, onAddAttachment, onRemoveAttachment,
+  onLifecycleChange, onRecordWorkflowLink,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -133,6 +137,11 @@ export function TerminalPane({
     cwd: agent.cwd, launchCommand: agent.launchCommand,
     agentKind: agent.agentKind, enabled: isRunning,
   });
+
+  // Report lifecycle changes upward for WorkflowPanel display
+  useEffect(() => {
+    onLifecycleChange(agent.id, lifecycle);
+  }, [agent.id, lifecycle, onLifecycleChange]);
 
   // ── UI state ───────────────────────────────────────────────────────────────
 
@@ -485,6 +494,7 @@ export function TerminalPane({
           initialCapture={handoffCapture}
           runningTargets={runningTargets}
           onClose={() => setHandoffCapture(null)}
+          onSent={(targetId) => onRecordWorkflowLink(agent.id, targetId, "handoff")}
         />
       )}
     </div>

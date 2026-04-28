@@ -1,7 +1,9 @@
 import type { AgentKind } from "./agentKind";
 import { inferAgentKind } from "./agentKind";
+import type { WorkflowLink } from "./workflow";
+import { sanitizeWorkflowLinks } from "./workflow";
 
-export const WORKSPACE_SCHEMA_VERSION = 2 as const;
+export const WORKSPACE_SCHEMA_VERSION = 3 as const;
 
 export interface PersistedAttachment {
   id:       string;
@@ -21,14 +23,15 @@ export interface PersistedTerminalConfig {
 }
 
 export interface CmdinoWorkspaceFile {
-  schemaVersion: 2;
+  schemaVersion: 3;
   workspaceName: string;
   terminals:     PersistedTerminalConfig[];
+  workflowLinks: WorkflowLink[];
 }
 
 const VALID_KINDS    = new Set<string>(["claude", "codex", "gemini", "custom"]);
 const VALID_DINO_IDS = new Set<string>(["female-cole", "female-kira", "female-loki", "male-cole", "male-kira"]);
-const SUPPORTED_VERSIONS = new Set([1, 2]);
+const SUPPORTED_VERSIONS     = new Set([1, 2, 3]);
 const MAX_WORKSPACE_TERMINALS = 12;
 
 export function sanitizeWorkspaceFilename(name: string): string {
@@ -55,7 +58,7 @@ function parsePersistedAttachment(a: unknown, idx: number): PersistedAttachment 
   };
 }
 
-/** Accepts schemaVersion 1 (upgrades) or 2. Throws a descriptive Error on failure. */
+/** Accepts schemaVersion 1, 2, or 3. Throws a descriptive Error on failure. */
 export function validateWorkspaceFile(data: unknown): CmdinoWorkspaceFile {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("Workspace file is not a valid object.");
@@ -65,7 +68,7 @@ export function validateWorkspaceFile(data: unknown): CmdinoWorkspaceFile {
   const sv = obj.schemaVersion;
   if (!SUPPORTED_VERSIONS.has(sv as number)) {
     throw new Error(
-      `Unsupported schema version: ${String(sv)}. Supported: 1, ${WORKSPACE_SCHEMA_VERSION}.`
+      `Unsupported schema version: ${String(sv)}. Supported: 1, 2, 3.`
     );
   }
 
@@ -132,5 +135,12 @@ export function validateWorkspaceFile(data: unknown): CmdinoWorkspaceFile {
     }
   );
 
-  return { schemaVersion: 2, workspaceName, terminals };
+  // Build valid configId set for link sanitization
+  const validConfigIds = new Set(terminals.map((t) => t.configId));
+
+  // v1/v2: workflowLinks defaults to []; v3: validate provided links
+  const rawLinks = Array.isArray(obj.workflowLinks) ? obj.workflowLinks : [];
+  const workflowLinks: WorkflowLink[] = sanitizeWorkflowLinks(rawLinks, validConfigIds);
+
+  return { schemaVersion: 3, workspaceName, terminals, workflowLinks };
 }

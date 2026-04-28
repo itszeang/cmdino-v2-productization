@@ -9,6 +9,7 @@ interface Props {
   onRefreshList:   () => void;
   savedWorkspaces: string[];
   onStartAll:      () => void;
+  onOpenWorkflow:  () => void;
   onAddTerminal:   () => void;
   terminalCount:   number;
   maxTerminals:    number;
@@ -67,6 +68,7 @@ export function WorkspaceToolbar({
   onRefreshList,
   savedWorkspaces,
   onStartAll,
+  onOpenWorkflow,
   onAddTerminal,
   terminalCount,
   maxTerminals,
@@ -186,6 +188,7 @@ export function WorkspaceToolbar({
       {terminalCount > 0 && (
         <TbBtn onClick={onStartAll} title="Start all dormant terminals">START ALL</TbBtn>
       )}
+      <TbBtn onClick={onOpenWorkflow} title="Open workflow view">WORKFLOW</TbBtn>
 
       {/* Spacer */}
       <span style={{ flex: 1 }} />

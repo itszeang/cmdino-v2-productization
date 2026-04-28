@@ -1,5 +1,7 @@
 import { TerminalPane } from "./TerminalPane";
 import type { TerminalAgent } from "../domain/terminalAgent";
+import type { TerminalLifecycleState } from "../terminal/useTerminalProcess";
+import type { WorkflowLinkKind } from "../domain/workflow";
 
 function getCols(n: number): number {
   if (n === 1) return 1;
@@ -11,21 +13,20 @@ function getCols(n: number): number {
 }
 
 interface Props {
-  agents:             TerminalAgent[];
-  onRemove:           (id: string) => void;
-  runningAgentIds:    Set<string>;
-  onStart:            (id: string) => void;
-  onAddAttachment:    (agentId: string, path: string) => void;
-  onRemoveAttachment: (agentId: string, attachmentId: string) => void;
+  agents:               TerminalAgent[];
+  onRemove:             (id: string) => void;
+  runningAgentIds:      Set<string>;
+  onStart:              (id: string) => void;
+  onAddAttachment:      (agentId: string, path: string) => void;
+  onRemoveAttachment:   (agentId: string, attachmentId: string) => void;
+  onLifecycleChange:    (agentId: string, lifecycle: TerminalLifecycleState) => void;
+  onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
 }
 
 export function TerminalGrid({
-  agents,
-  onRemove,
-  runningAgentIds,
-  onStart,
-  onAddAttachment,
-  onRemoveAttachment,
+  agents, onRemove, runningAgentIds, onStart,
+  onAddAttachment, onRemoveAttachment,
+  onLifecycleChange, onRecordWorkflowLink,
 }: Props) {
   const n    = agents.length;
   const cols = getCols(n);
@@ -55,6 +56,8 @@ export function TerminalGrid({
             runningAgentIds={runningAgentIds}
             onAddAttachment={(path) => onAddAttachment(agent.id, path)}
             onRemoveAttachment={(attId) => onRemoveAttachment(agent.id, attId)}
+            onLifecycleChange={onLifecycleChange}
+            onRecordWorkflowLink={onRecordWorkflowLink}
           />
         ))}
       </div>

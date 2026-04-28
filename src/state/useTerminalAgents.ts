@@ -4,19 +4,29 @@ import type { CmdinoWorkspaceFile } from "../domain/workspace";
 import { WORKSPACE_SCHEMA_VERSION } from "../domain/workspace";
 import type { TerminalAttachment } from "../domain/orchestration";
 import { attachmentKindFromPath } from "../domain/orchestration";
+import type { WorkflowLink, WorkflowLinkKind } from "../domain/workflow";
+import {
+  upsertWorkflowLink,
+  removeWorkflowLink  as wfRemoveLink,
+  removeLinksForConfigId,
+  sanitizeWorkflowLinks,
+} from "../domain/workflow";
 
 export const MAX_TERMINALS = 12;
 
-// callers don't provide id, configId, or attachments — generated here
 type NewAgent = Omit<TerminalAgent, "id" | "configId" | "attachments">;
 
 export function useTerminalAgents() {
   const [agents,          setAgents]          = useState<TerminalAgent[]>([]);
   const [workspaceName,   setWorkspaceName]   = useState("Untitled Workspace");
   const [runningAgentIds, setRunningAgentIds] = useState<Set<string>>(new Set());
+  const [workflowLinks,   setWorkflowLinks]   = useState<WorkflowLink[]>([]);
 
-  const agentsRef = useRef<TerminalAgent[]>(agents);
-  useEffect(() => { agentsRef.current = agents; }, [agents]);
+  const agentsRef       = useRef<TerminalAgent[]>(agents);
+  const workflowLinksRef = useRef<WorkflowLink[]>(workflowLinks);
+
+  useEffect(() => { agentsRef.current       = agents;        }, [agents]);
+  useEffect(() => { workflowLinksRef.current = workflowLinks; }, [workflowLinks]);
 
   // ── Agent CRUD ────────────────────────────────────────────────────────────
 
@@ -39,24 +49,28 @@ export function useTerminalAgents() {
   }, []);
 
   const removeAgent = useCallback((id: string) => {
+    const agent = agentsRef.current.find((a) => a.id === id);
     setAgents((prev) => prev.filter((a) => a.id !== id));
-    setRunningAgentIds((ids) => {
-      const next = new Set(ids);
+    setRunningAgentIds((prev) => {
+      const next = new Set(prev);
       next.delete(id);
       return next;
     });
+    if (agent?.configId) {
+      setWorkflowLinks((prev) => removeLinksForConfigId(prev, agent.configId));
+    }
   }, []);
 
   // ── Attachment management ─────────────────────────────────────────────────
 
   const addAttachment = useCallback((agentId: string, path: string) => {
-    if (!attachmentKindFromPath(path)) return; // only .md/.txt
+    if (!attachmentKindFromPath(path)) return;
     const fileName = path.split(/[/\\]/).pop() ?? path;
     const att: TerminalAttachment = {
-      id:       crypto.randomUUID(),
+      id:      crypto.randomUUID(),
       path,
       fileName,
-      addedAt:  Date.now(),
+      addedAt: Date.now(),
     };
     setAgents((prev) =>
       prev.map((a) =>
@@ -75,6 +89,26 @@ export function useTerminalAgents() {
     );
   }, []);
 
+  // ── Workflow links ────────────────────────────────────────────────────────
+
+  const recordWorkflowLink = useCallback((
+    sourceAgentId: string,
+    targetAgentId: string,
+    kind:          WorkflowLinkKind,
+  ) => {
+    const agents = agentsRef.current;
+    const src    = agents.find((a) => a.id === sourceAgentId);
+    const tgt    = agents.find((a) => a.id === targetAgentId);
+    if (!src?.configId || !tgt?.configId || src.configId === tgt.configId) return;
+    setWorkflowLinks((prev) =>
+      upsertWorkflowLink(prev, src.configId, tgt.configId, kind)
+    );
+  }, []);
+
+  const removeWorkflowLink = useCallback((id: string) => {
+    setWorkflowLinks((prev) => wfRemoveLink(prev, id));
+  }, []);
+
   // ── Lifecycle control ─────────────────────────────────────────────────────
 
   const startAgent = useCallback((id: string) => {
@@ -90,6 +124,7 @@ export function useTerminalAgents() {
   const resetWorkspace = useCallback((name = "Untitled Workspace") => {
     setAgents([]);
     setRunningAgentIds(new Set());
+    setWorkflowLinks([]);
     setWorkspaceName(name);
   }, []);
 
@@ -111,8 +146,16 @@ export function useTerminalAgents() {
       })),
     }));
     setAgents(newAgents);
-    setRunningAgentIds(new Set()); // all dormant — user starts manually
+    setRunningAgentIds(new Set());
     setWorkspaceName(workspace.workspaceName);
+
+    // Restore workflow links — re-sanitize against loaded terminal configIds
+    const validConfigIds = new Set(newAgents.map((a) => a.configId));
+    const restoredLinks  = sanitizeWorkflowLinks(
+      workspace.workflowLinks ?? [],
+      validConfigIds,
+    );
+    setWorkflowLinks(restoredLinks);
   }, []);
 
   const buildWorkspaceFile = useCallback((): CmdinoWorkspaceFile => {
@@ -129,6 +172,7 @@ export function useTerminalAgents() {
         dinoId:        a.dinoId,
         attachments:   a.attachments.map(({ id, path, fileName }) => ({ id, path, fileName })),
       })),
+      workflowLinks: workflowLinksRef.current,
     };
   }, [workspaceName]);
 
@@ -137,10 +181,13 @@ export function useTerminalAgents() {
     workspaceName,
     setWorkspaceName,
     runningAgentIds,
+    workflowLinks,
     addAgent,
     removeAgent,
     addAttachment,
     removeAttachment,
+    recordWorkflowLink,
+    removeWorkflowLink,
     startAgent,
     startAll,
     resetWorkspace,
