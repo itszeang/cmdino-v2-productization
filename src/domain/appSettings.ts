@@ -3,6 +3,7 @@ export interface AppSettings {
   dinoScale:           number;  // 0.75 – 1.25, default 1
   terminalFontScale:   number;  // 0.85 – 1.25, default 1
   onboardingDismissed: boolean;
+  themeMode:           "dark" | "light";
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -10,6 +11,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dinoScale:           1,
   terminalFontScale:   1,
   onboardingDismissed: false,
+  themeMode:           "dark",
 };
 
 const SETTINGS_KEY = "cmdino.v1.settings";
@@ -40,6 +42,10 @@ export function loadSettings(): AppSettings {
         typeof p.onboardingDismissed === "boolean"
           ? p.onboardingDismissed
           : DEFAULT_SETTINGS.onboardingDismissed,
+      themeMode:
+        p.themeMode === "dark" || p.themeMode === "light"
+          ? p.themeMode
+          : DEFAULT_SETTINGS.themeMode,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
