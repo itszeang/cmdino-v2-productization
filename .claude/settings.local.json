@@ -37,7 +37,8 @@
       "Bash(git -C /c/Users/burak/Desktop/cmdino-build commit -m \"fix\\(v0.3\\): clear restores focus, restart awaits kill before re-spawn\")",
       "Bash(git -C /c/Users/burak/Desktop/cmdino-build commit -m \"fix: clear button preserves xterm focus via rAF + mousedown prevention\")",
       "Bash(git -C /c/Users/burak/Desktop/cmdino-build add src/terminal/useTerminalProcess.ts src/components/TerminalPane.tsx src/components/LogsPanel.tsx src/index.css)",
-      "Bash(git -C /c/Users/burak/Desktop/cmdino-build commit -m \"feat\\(v0.3.1\\): replace clear with session logs viewer\")"
+      "Bash(git -C /c/Users/burak/Desktop/cmdino-build commit -m \"feat\\(v0.3.1\\): replace clear with session logs viewer\")",
+      "Bash(cargo check *)"
     ]
   }
 }

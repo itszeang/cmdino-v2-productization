@@ -9,6 +9,7 @@ function stripAnsi(s: string): string {
 }
 
 const LIFECYCLE_COLORS: Record<TerminalLifecycleState, string> = {
+  dormant:  "#1e3a4a",
   spawning: "#facc15",
   running:  "#00c8ff",
   exited:   "#6b7280",

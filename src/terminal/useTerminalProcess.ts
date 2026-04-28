@@ -17,6 +17,7 @@ import { inferAgentKind } from "../domain/agentKind";
 import type { DinoState } from "./dinoStateMachine";
 
 export type TerminalLifecycleState =
+  | "dormant"
   | "spawning"
   | "running"
   | "exited"
@@ -58,6 +59,8 @@ interface Options {
   cwd?: string;
   launchCommand?: string;
   agentKind?: AgentKind;
+  /** false = dormant; do not spawn PTY. Defaults to true. */
+  enabled?: boolean;
 }
 
 export interface TerminalProcessHandle {
@@ -72,6 +75,10 @@ export interface TerminalProcessHandle {
   getSessionLogs: () => string;
   /** Focuses the xterm instance */
   focusTerminal: () => void;
+  /** Write raw text into the running PTY. No-op when not running. */
+  sendInput: (text: string) => void;
+  /** Return xterm selection if any, else last N lines of buffer. */
+  captureSelectedOrLastLines: (lastLines?: number) => string;
 }
 
 export function useTerminalProcess({
@@ -80,6 +87,7 @@ export function useTerminalProcess({
   cwd,
   launchCommand,
   agentKind,
+  enabled = true,
 }: Options): TerminalProcessHandle {
   const [dinoState, setDinoState] = useState<DinoState>("idle_center");
   const [lifecycle, setLifecycle] = useState<TerminalLifecycleState>("spawning");
@@ -160,6 +168,37 @@ export function useTerminalProcess({
 
   const getSessionLogs = useCallback(() => logsRef.current, []);
 
+  const sendInput = useCallback((text: string) => {
+    if (!processAliveRef.current) return;
+    terminalBridge.write(agentId, text).catch(() => {});
+  }, [agentId]);
+
+  const captureSelectedOrLastLines = useCallback((lastLines = 50): string => {
+    const t = termRef.current;
+    if (!t) {
+      const lines = logsRef.current.split("\n");
+      return lines.slice(-lastLines).join("\n");
+    }
+    try {
+      const sel = t.getSelection();
+      if (sel.trim()) return sel;
+    } catch { /* xterm not ready */ }
+    try {
+      const buf   = t.buffer.active;
+      const end   = buf.baseY + buf.cursorY;
+      const start = Math.max(0, end - lastLines + 1);
+      const lines: string[] = [];
+      for (let i = start; i <= end; i++) {
+        const ln = buf.getLine(i);
+        if (ln) lines.push(ln.translateToString(true));
+      }
+      return lines.join("\n").trimEnd();
+    } catch {
+      const lines = logsRef.current.split("\n");
+      return lines.slice(-lastLines).join("\n");
+    }
+  }, []);
+
   const focusTerminal = useCallback(() => {
     requestAnimationFrame(() => termRef.current?.focus());
   }, []);
@@ -231,6 +270,13 @@ export function useTerminalProcess({
   // ── Terminal lifecycle effect ─────────────────────────────────────────────
 
   useEffect(() => {
+    // Dormant: do not spawn PTY. Wait for enabled to flip true.
+    if (!enabled) {
+      setLifecycle("dormant");
+      setDino("idle_center");
+      return;
+    }
+
     const container = containerRef.current;
     if (!container) return;
 
@@ -429,7 +475,7 @@ export function useTerminalProcess({
       try { term.dispose(); } catch { /* already disposed */ }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentId]);
+  }, [agentId, enabled]);
 
   return {
     dinoState,
@@ -440,5 +486,7 @@ export function useTerminalProcess({
     kill,
     getSessionLogs,
     focusTerminal,
+    sendInput,
+    captureSelectedOrLastLines,
   };
 }
