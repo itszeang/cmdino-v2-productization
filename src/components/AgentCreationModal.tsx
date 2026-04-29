@@ -1,24 +1,28 @@
 import { useState } from "react";
 import { AGENT_PRESETS, type AgentPresetId } from "../config/agentPresets";
 import { DINO_OPTIONS } from "../config/dinoOptions";
+import { PRESET_BRAINS, getBrainById, buildBrainAttachments } from "../config/presetBrains";
 import type { AgentKind } from "../domain/agentKind";
+import type { TerminalAttachment } from "../domain/orchestration";
 
 interface FormState {
-  presetId:        AgentPresetId | null;
-  label:           string;
-  command:         string;
-  cwd:             string;
-  dinoId:          string;
-  agentKind:       AgentKind;
-  roleDescription: string;
+  presetId:         AgentPresetId | null;
+  label:            string;
+  command:          string;
+  cwd:              string;
+  dinoId:           string;
+  agentKind:        AgentKind;
+  roleDescription:  string;
+  selectedBrainIds: Set<string>;
 }
 
 interface ConfirmPayload {
-  label:     string;
-  command:   string;
-  cwd:       string;
-  dinoId:    string;
-  agentKind: AgentKind;
+  label:              string;
+  command:            string;
+  cwd:                string;
+  dinoId:             string;
+  agentKind:          AgentKind;
+  initialAttachments: TerminalAttachment[];
 }
 
 interface Props {
@@ -30,13 +34,14 @@ const DEFAULT_CWD = "C:\\Users\\burak";
 
 export function AgentCreationModal({ onConfirm, onCancel }: Props) {
   const [form, setForm] = useState<FormState>({
-    presetId:        null,
-    label:           "",
-    command:         "",
-    cwd:             DEFAULT_CWD,
-    dinoId:          DINO_OPTIONS[0].id,
-    agentKind:       "custom",
-    roleDescription: "",
+    presetId:         null,
+    label:            "",
+    command:          "",
+    cwd:              DEFAULT_CWD,
+    dinoId:           DINO_OPTIONS[0].id,
+    agentKind:        "custom",
+    roleDescription:  "",
+    selectedBrainIds: new Set<string>(),
   });
 
   function applyPreset(presetId: AgentPresetId) {
@@ -45,24 +50,47 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
     setForm((f) => ({
       ...f,
       presetId,
-      label:           preset.defaultLabel,
-      command:         preset.defaultCommand,
-      agentKind:       preset.agentKind,
-      dinoId:          preset.defaultDinoId ?? DINO_OPTIONS[0].id,
-      roleDescription: preset.roleDescription,
+      label:            preset.defaultLabel,
+      command:          preset.defaultCommand,
+      agentKind:        preset.agentKind,
+      dinoId:           preset.defaultDinoId ?? DINO_OPTIONS[0].id,
+      roleDescription:  preset.roleDescription,
+      selectedBrainIds: new Set<string>(preset.defaultBrainIds ?? []),
     }));
+  }
+
+  function toggleBrain(brainId: string, checked: boolean) {
+    setForm((f) => {
+      const next = new Set(f.selectedBrainIds);
+      if (checked) next.add(brainId);
+      else next.delete(brainId);
+      return { ...f, selectedBrainIds: next };
+    });
   }
 
   function handleSubmit() {
     if (!form.label.trim()) return;
+    const initialAttachments = buildBrainAttachments(
+      Array.from(form.selectedBrainIds),
+    );
     onConfirm({
       label:     form.label.trim(),
       command:   form.command.trim(),
       cwd:       form.cwd.trim() || DEFAULT_CWD,
       dinoId:    form.dinoId,
       agentKind: form.agentKind,
+      initialAttachments,
     });
   }
+
+  // Brains visible for current preset
+  const presetBrainIds = form.presetId
+    ? (AGENT_PRESETS.find((p) => p.id === form.presetId)?.defaultBrainIds ?? [])
+    : [];
+  const visibleBrains = presetBrainIds
+    .map((id) => getBrainById(id))
+    .filter(Boolean) as typeof PRESET_BRAINS;
+  const showBrainSection = visibleBrains.length > 0 && form.presetId !== "custom-agent";
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
@@ -90,6 +118,28 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
             ))}
           </div>
         </div>
+
+        {/* Preset brain section — only for presets with brains */}
+        {showBrainSection && (
+          <div className="modal-field-group">
+            <label className="modal-label">Preset Brain</label>
+            {visibleBrains.map((brain) => (
+              <label key={brain.id} className="brain-row">
+                <input
+                  type="checkbox"
+                  checked={form.selectedBrainIds.has(brain.id)}
+                  onChange={(e) => toggleBrain(brain.id, e.target.checked)}
+                  style={{ marginTop: 2, flexShrink: 0 }}
+                />
+                <div className="brain-row-text">
+                  <span className="brain-filename">{brain.fileName}</span>
+                  <span className="brain-desc">{brain.description}</span>
+                </div>
+              </label>
+            ))}
+            <span className="modal-hint">Attached on deploy · sent only when you press SEND</span>
+          </div>
+        )}
 
         {/* Label */}
         <div className="modal-field-group">

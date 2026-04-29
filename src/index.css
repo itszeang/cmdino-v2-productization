@@ -387,6 +387,58 @@ textarea {
   overflow: hidden;
 }
 
+/* ── Preset brain rows (modal) ────────────────────────────────────────────── */
+
+.brain-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  cursor: pointer;
+}
+
+.brain-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.brain-filename {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-main);
+  font-family: "Cascadia Code", "Consolas", monospace;
+}
+
+.brain-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.modal-hint {
+  font-size: 9px;
+  color: var(--text-faint);
+  letter-spacing: 0.3px;
+  padding-top: 2px;
+}
+
+/* ── Preset brain badge (attachment chips) ────────────────────────────────── */
+
+.chip-brain-badge {
+  display: inline-block;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--text-faint);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  padding: 0 3px;
+  margin-right: 4px;
+  vertical-align: middle;
+  line-height: 1.5;
+}
+
 /* ── Modal select ─────────────────────────────────────────────────────────── */
 
 .modal-select {
@@ -962,6 +1014,8 @@ input[type="range"]::-webkit-slider-track {
 
 .terminal-grid[data-view="grid"] .terminal-layout {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--terminal-pane-min-width, 540px)), 1fr));
+  grid-auto-rows: minmax(360px, 1fr);
   gap: 10px;
   padding: 10px;
   box-sizing: border-box;
@@ -969,5 +1023,6 @@ input[type="range"]::-webkit-slider-track {
 }
 
 .terminal-grid[data-view="grid"] .terminal-slot {
+  min-width: 0;
   min-height: 0;
 }

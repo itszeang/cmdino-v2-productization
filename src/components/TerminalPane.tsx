@@ -358,7 +358,7 @@ export function TerminalPane({
 
       {/* ── Header — lifecycle only ── */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 7,
+        display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", rowGap: 6,
         padding: "8px 10px",
         background: "var(--surface-1)", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0,
       }}>
@@ -373,11 +373,10 @@ export function TerminalPane({
         />
         <span style={{
           color: "var(--text-main)", fontWeight: 600, fontSize: 12, letterSpacing: 0,
-          minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          flex: "1 1 150px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         }}>
           {agent.label}
         </span>
-        <span style={{ flex: 1, minWidth: 0 }} />
         {showLifecycle && (
           <span style={{
             color: lcColor,
@@ -417,7 +416,7 @@ export function TerminalPane({
 
       {/* ── Orchestration strip ── */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 5,
+        display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", rowGap: 6,
         padding: "8px 10px",
         background: "var(--surface-0)", borderBottom: "1px solid var(--border-subtle)",
         flexShrink: 0, minHeight: 36,
@@ -431,8 +430,8 @@ export function TerminalPane({
 
         {/* Attachment chips */}
         <div style={{
-          display: "flex", gap: 4, flex: 1,
-          overflowX: "auto", alignItems: "center", minWidth: 0,
+          display: "flex", gap: 4, flex: "1 1 220px",
+          overflowX: "auto", alignItems: "center", minWidth: 140,
         }}>
           {atts.length === 0 ? (
             <span style={{ color: "var(--text-faint)", fontSize: 9, letterSpacing: 0.6, whiteSpace: "nowrap" }}>
@@ -457,7 +456,12 @@ export function TerminalPane({
                       letterSpacing: 0, flexShrink: 0,
                       transition: "background 0.1s, border-color 0.1s, color 0.1s",
                     }}
-                  >{att.fileName}</button>
+                  >
+                    {att.path.startsWith("cmdino-preset://") && (
+                      <span className="chip-brain-badge">BRAIN</span>
+                    )}
+                    {att.fileName}
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onRemoveAttachment(att.id); if (selectedAttId === att.id) { setSelectedAttId(null); setPreview(PREVIEW_IDLE); } }}
                     title="Remove attachment"
@@ -567,7 +571,7 @@ export function TerminalPane({
       {/* ── Add-path row (collapsible) ── */}
       {showAddPath && (
         <div style={{
-          display: "flex", alignItems: "center", gap: 5,
+          display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap",
           padding: "8px 10px",
           background: "var(--surface-0)", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0,
         }}>
@@ -582,6 +586,7 @@ export function TerminalPane({
               border: `1px solid ${addError ? "var(--danger)" : "var(--border-subtle)"}`,
               color: "var(--text-main)", fontSize: 11, padding: "6px 10px",
               borderRadius: 999, fontFamily: "monospace", outline: "none",
+              minWidth: 180,
             }}
           />
           {addError && (

@@ -16,6 +16,15 @@ export const MAX_TERMINALS = 12;
 
 type NewAgent = Omit<TerminalAgent, "id" | "configId" | "attachments">;
 
+function dedupAttachments(atts: TerminalAttachment[]): TerminalAttachment[] {
+  const seen = new Set<string>();
+  return atts.filter((a) => {
+    if (seen.has(a.path)) return false;
+    seen.add(a.path);
+    return true;
+  });
+}
+
 export function useTerminalAgents() {
   const [agents,          setAgents]          = useState<TerminalAgent[]>([]);
   const [workspaceName,   setWorkspaceName]   = useState("Untitled Workspace");
@@ -30,12 +39,16 @@ export function useTerminalAgents() {
 
   // ── Agent CRUD ────────────────────────────────────────────────────────────
 
-  const addAgent = useCallback((newAgent: NewAgent, autoStart = true): string | null => {
+  const addAgent = useCallback((
+    newAgent:           NewAgent,
+    autoStart           = true,
+    initialAttachments: TerminalAttachment[] = [],
+  ): string | null => {
     if (agentsRef.current.length >= MAX_TERMINALS) return null;
     const id = crypto.randomUUID();
     const full: TerminalAgent = {
       configId:    crypto.randomUUID(),
-      attachments: [],
+      attachments: dedupAttachments(initialAttachments),
       ...newAgent,
       id,
     };
@@ -72,11 +85,14 @@ export function useTerminalAgents() {
       path,
       fileName,
       addedAt: Date.now(),
+      source:  "user",
     };
     setAgents((prev) =>
-      prev.map((a) =>
-        a.id === agentId ? { ...a, attachments: [...a.attachments, att] } : a
-      )
+      prev.map((a) => {
+        if (a.id !== agentId) return a;
+        if (a.attachments.some((x) => x.path === path)) return a; // dedup
+        return { ...a, attachments: [...a.attachments, att] };
+      })
     );
   }, []);
 

@@ -1,4 +1,5 @@
 import type { AgentKind } from "../domain/agentKind";
+import type { PresetBrainId } from "../domain/presetBrain";
 
 export type AgentPresetId =
   | "claude-planner"
@@ -15,11 +16,8 @@ export interface AgentPreset {
   defaultCommand:   string;
   defaultDinoId?:   string;
   roleDescription:  string;
-  defaultAttachment?: {
-    path:     string;
-    fileName: string;
-  };
-  accentColor: string;
+  defaultBrainIds?: PresetBrainId[];
+  accentColor:      string;
 }
 
 export const AGENT_PRESETS: AgentPreset[] = [
@@ -31,11 +29,8 @@ export const AGENT_PRESETS: AgentPreset[] = [
     defaultCommand:  "claude",
     defaultDinoId:   "female-cole",
     roleDescription: "Breaks requests into implementation plans.",
-    defaultAttachment: {
-      path:     "cmdino-preset://claude-planner.md",
-      fileName: "claude-planner.md",
-    },
-    accentColor: "#e5e5e5",
+    defaultBrainIds: ["claude-planner-brain"],
+    accentColor:     "#e5e5e5",
   },
   {
     id:              "codex-builder",
@@ -45,11 +40,8 @@ export const AGENT_PRESETS: AgentPreset[] = [
     defaultCommand:  "codex",
     defaultDinoId:   "male-kira",
     roleDescription: "Implements scoped patches.",
-    defaultAttachment: {
-      path:     "cmdino-preset://codex-builder.md",
-      fileName: "codex-builder.md",
-    },
-    accentColor: "#d4d4d4",
+    defaultBrainIds: ["codex-builder-brain"],
+    accentColor:     "#d4d4d4",
   },
   {
     id:              "gemini-reviewer",
@@ -59,11 +51,8 @@ export const AGENT_PRESETS: AgentPreset[] = [
     defaultCommand:  "gemini",
     defaultDinoId:   "female-kira",
     roleDescription: "Reviews architecture, risks, UX, and tests.",
-    defaultAttachment: {
-      path:     "cmdino-preset://gemini-reviewer.md",
-      fileName: "gemini-reviewer.md",
-    },
-    accentColor: "#a3a3a3",
+    defaultBrainIds: ["gemini-reviewer-brain"],
+    accentColor:     "#a3a3a3",
   },
   {
     id:              "ollama-worker",
@@ -73,11 +62,8 @@ export const AGENT_PRESETS: AgentPreset[] = [
     defaultCommand:  "ollama run llama3",
     defaultDinoId:   "female-loki",
     roleDescription: "Local/offline assistant worker.",
-    defaultAttachment: {
-      path:     "cmdino-preset://ollama-worker.md",
-      fileName: "ollama-worker.md",
-    },
-    accentColor: "#737373",
+    defaultBrainIds: ["ollama-worker-brain"],
+    accentColor:     "#737373",
   },
   {
     id:              "custom-agent",

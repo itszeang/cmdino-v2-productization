@@ -5,15 +5,10 @@ import type { TerminalLifecycleState } from "../terminal/useTerminalProcess";
 import type { WorkflowLink, WorkflowLinkKind } from "../domain/workflow";
 import type { AppSettings } from "../domain/appSettings";
 import type { TerminalViewMode } from "../domain/viewMode";
+import type { CSSProperties } from "react";
 
-function getCols(n: number): number {
-  if (n === 1) return 1;
-  if (n <= 2) return 2;
-  if (n <= 3) return 3;
-  if (n <= 4) return 2;
-  if (n <= 9) return 3;
-  return 4;
-}
+// Minimum readable pane width used for browser-measured grid wrapping.
+const GRID_PANE_MIN_WIDTH = 540;
 
 interface Props {
   agents:               TerminalAgent[];
@@ -43,20 +38,13 @@ export function TerminalGrid({
   viewMode, onViewModeChange, activeTerminalId, onActiveTerminalChange,
   lifecycleByAgentId, onFocusPane, workflowLinks, onFocusTarget,
 }: Props) {
-  const n    = agents.length;
-  const cols = getCols(n);
-  const rows = Math.ceil(n / cols);
-  const needsScroll = rows >= 3;
-
   // Grid mode needs dynamic column/row counts — set as inline style only in grid mode.
   // Focus mode: no inline style on layout div (CSS class handles everything).
   // This keeps the JSX structure IDENTICAL between modes. Only the data-view attribute
   // on the root div changes, which CSS selectors use to apply layout differences.
   const layoutStyle = viewMode === "grid" ? {
-    gridTemplateColumns: `repeat(${cols}, 1fr)`,
-    gridTemplateRows:    needsScroll ? `repeat(${rows}, 280px)` : `repeat(${rows}, 1fr)`,
-    height:              needsScroll ? "auto" : "100%",
-  } : undefined;
+    "--terminal-pane-min-width": `${GRID_PANE_MIN_WIDTH}px`,
+  } as CSSProperties : undefined;
 
   return (
     <div className="terminal-grid" data-view={viewMode}>

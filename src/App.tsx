@@ -12,6 +12,7 @@ import { workspaceBridge }     from "./workspace/workspaceBridge";
 import { validateWorkspaceFile, sanitizeWorkspaceFilename } from "./domain/workspace";
 import type { TerminalViewMode } from "./domain/viewMode";
 import type { AgentKind }      from "./domain/agentKind";
+import type { TerminalAttachment } from "./domain/orchestration";
 import type { WorkflowLinkKind } from "./domain/workflow";
 import type { TerminalLifecycleState } from "./terminal/useTerminalProcess";
 import { DEMO_WORKSPACE }      from "./config/demoWorkspace";
@@ -163,6 +164,7 @@ export default function App() {
 
   function handleCreate(form: {
     label: string; command: string; cwd: string; dinoId: string; agentKind: AgentKind;
+    initialAttachments?: TerminalAttachment[];
   }) {
     const id = addAgent(
       {
@@ -173,6 +175,7 @@ export default function App() {
         agentKind:     form.agentKind,
       },
       false,
+      form.initialAttachments ?? [],
     );
     if (id) setActiveTerminalId(id);
     setShowModal(false);
