@@ -6,9 +6,10 @@ import type { TerminalAgent }   from "../domain/terminalAgent";
 import type { TerminalAttachment } from "../domain/orchestration";
 import { attachmentKindFromPath } from "../domain/orchestration";
 import { fileBridge }      from "../orchestration/fileBridge";
-import type { WorkflowLinkKind } from "../domain/workflow";
+import type { WorkflowLink, WorkflowLinkKind } from "../domain/workflow";
 import type { AppSettings } from "../domain/appSettings";
 import type { TerminalViewMode } from "../domain/viewMode";
+import { terminalBridge }  from "../terminal/terminalBridge";
 import {
   useTerminalProcess,
   type TerminalLifecycleState,
@@ -135,6 +136,10 @@ interface Props {
   onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
   settings?:            AppSettings;
   viewMode:             TerminalViewMode;
+  isActive:             boolean;
+  onFocus?:             () => void;
+  workflowLinks:        WorkflowLink[];
+  onFocusTarget:        (id: string) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -144,7 +149,8 @@ export function TerminalPane({
   allAgents, runningAgentIds, onAddAttachment, onRemoveAttachment,
   onLifecycleChange, onRecordWorkflowLink,
   settings,
-  viewMode,
+  viewMode, isActive, onFocus,
+  workflowLinks, onFocusTarget,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -152,7 +158,7 @@ export function TerminalPane({
     dinoState, lifecycle,
     copyVisible, restart, kill,
     getSessionLogs, focusTerminal,
-    sendInput, captureSelectedOrLastLines,
+    sendInput, captureSelectedOrLastLines, captureLastOutputBlock,
   } = useTerminalProcess({
     agentId:   agent.id,
     containerRef,
@@ -217,6 +223,11 @@ export function TerminalPane({
   const [addError,      setAddError]      = useState("");
   const [preview,       setPreview]       = useState<PreviewState>(PREVIEW_IDLE);
 
+  // Forward state
+  const [selectedForwardTargetId, setSelectedForwardTargetId] = useState<string | null>(null);
+  const [fwdError,   setFwdError]   = useState("");
+  const [forwarding, setForwarding] = useState(false);
+
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const color         = dotColor(dinoState);
@@ -237,6 +248,21 @@ export function TerminalPane({
   const hasAtt         = selectedAtt !== null;
 
   const showPreviewArea = preview.loading || preview.content !== null || preview.error !== null;
+
+  // Forward target derivation
+  const otherTerminals = allAgents.filter((a) => a.id !== agent.id);
+  const outgoingLink   = workflowLinks.find(
+    (l) => l.kind === "handoff" && l.sourceConfigId === agent.configId,
+  );
+  const linkedTarget = outgoingLink
+    ? allAgents.find((a) => a.configId === outgoingLink.targetConfigId && a.id !== agent.id) ?? null
+    : null;
+  const effectiveFwdTarget =
+    linkedTarget ??
+    otherTerminals.find((a) => a.id === selectedForwardTargetId) ??
+    otherTerminals[0] ??
+    null;
+  const targetIsRunning = effectiveFwdTarget != null && runningAgentIds.has(effectiveFwdTarget.id);
 
   // ── Strip actions ──────────────────────────────────────────────────────────
 
@@ -287,6 +313,24 @@ export function TerminalPane({
 
   function handleOpenHandoff() {
     setHandoffCapture(captureSelectedOrLastLines(50));
+  }
+
+  async function handleForwardToNext() {
+    if (!effectiveFwdTarget || !isAlive || !targetIsRunning || forwarding) return;
+    setFwdError("");
+    const raw = captureLastOutputBlock().trimEnd();
+    if (!raw) { setFwdError("Nothing clean to forward."); return; }
+    const captured = raw.length > 32768 ? raw.slice(0, 32768) : raw;
+    setForwarding(true);
+    try {
+      await terminalBridge.write(effectiveFwdTarget.id, captured);
+      onRecordWorkflowLink(agent.id, effectiveFwdTarget.id, "handoff");
+      onFocusTarget(effectiveFwdTarget.id);
+    } catch (err) {
+      setFwdError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setForwarding(false);
+    }
   }
 
   // ── Lifecycle header actions ───────────────────────────────────────────────
@@ -347,6 +391,27 @@ export function TerminalPane({
         <HdrBtn title="View session logs" onClick={() => setShowLogs(true)}
           onMouseDown={(e) => e.preventDefault()}>≡</HdrBtn>
         <HdrBtn title="Restart terminal" onClick={() => { void handleRestart(); }}>↺</HdrBtn>
+        {onFocus && (
+          <HdrBtn
+            title={viewMode === "focus" && isActive ? "Restore grid" : "Focus this terminal"}
+            onClick={onFocus}
+          >
+            {viewMode === "focus" && isActive ? (
+              /* restore-to-grid: 2×2 squares */
+              <svg viewBox="0 0 10 10" width="10" height="10" fill="currentColor" style={{ display: "block" }}>
+                <rect x="1"   y="1"   width="3.5" height="3.5" rx="0.5" />
+                <rect x="5.5" y="1"   width="3.5" height="3.5" rx="0.5" />
+                <rect x="1"   y="5.5" width="3.5" height="3.5" rx="0.5" />
+                <rect x="5.5" y="5.5" width="3.5" height="3.5" rx="0.5" />
+              </svg>
+            ) : (
+              /* expand/focus: diagonal arrow with corner brackets */
+              <svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+                <path d="M5.5 1H9v3.5M4.5 9H1V5.5M9 1L1 9"/>
+              </svg>
+            )}
+          </HdrBtn>
+        )}
         <HdrBtn title="Close terminal" onClick={() => { void handleRemove(); }} danger>✕</HdrBtn>
       </div>
 
@@ -443,6 +508,59 @@ export function TerminalPane({
           accent
           title={isAlive ? "Handoff output to another terminal" : "Start terminal first"}
         >HANDOFF</StripBtn>
+
+        {/* ── Auto-forward: FORWARD TO [target] [FORWARD] ── */}
+        <span style={{ color: "var(--border-subtle)", fontSize: 12, flexShrink: 0 }}>|</span>
+        <span style={{ color: "var(--text-faint)", fontSize: 9, letterSpacing: 0.5, flexShrink: 0, whiteSpace: "nowrap" }}>
+          FORWARD TO
+        </span>
+
+        {linkedTarget ? (
+          <span style={{
+            fontSize: 10, color: "var(--text-muted)", flexShrink: 0,
+            maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {linkedTarget.label}
+          </span>
+        ) : otherTerminals.length > 0 ? (
+          <select
+            value={effectiveFwdTarget?.id ?? ""}
+            onChange={(e) => { setSelectedForwardTargetId(e.target.value); setFwdError(""); }}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-muted)",
+              fontSize: 9, padding: "3px 6px",
+              borderRadius: 999, fontFamily: "inherit",
+              maxWidth: 90, flexShrink: 1, minWidth: 0,
+            }}
+          >
+            {otherTerminals.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+          </select>
+        ) : (
+          <span style={{ fontSize: 9, color: "var(--text-faint)", flexShrink: 0 }}>—</span>
+        )}
+
+        <StripBtn
+          onClick={() => { void handleForwardToNext(); }}
+          disabled={!isAlive || !effectiveFwdTarget || !targetIsRunning || forwarding || otherTerminals.length === 0}
+          accent={isAlive && !!effectiveFwdTarget && targetIsRunning && !forwarding}
+          title={
+            !isAlive                                           ? "Start this terminal first" :
+            otherTerminals.length === 0 || !effectiveFwdTarget ? "No targets"               :
+            !targetIsRunning                                   ? "Start target first"        :
+            forwarding                                         ? "Forwarding…"              :
+            `Forward to ${effectiveFwdTarget.label}`
+          }
+        >
+          {forwarding ? "…" : "FORWARD"}
+        </StripBtn>
+
+        {fwdError && (
+          <span style={{ color: "var(--danger)", fontSize: 9, whiteSpace: "nowrap", flexShrink: 0 }}>
+            {fwdError}
+          </span>
+        )}
 
       </div>
 

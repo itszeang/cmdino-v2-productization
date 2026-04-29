@@ -139,6 +139,7 @@ const REGISTRY: Record<AgentKind, AgentStateAdapter> = {
   claude: claudeAdapter,
   codex:  codexAdapter,
   gemini: geminiAdapter,
+  ollama: customAdapter,
   custom: customAdapter,
 };
 

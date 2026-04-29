@@ -7,6 +7,8 @@ import {
   createBurstTracker,
   IDLE_AFTER_MS,
   stripAnsi,
+  cleanForBlock,
+  filterBlockLines,
   type BurstTracker,
 } from "./terminalIntelligence";
 import type { AgentActivity } from "./agentActivity";
@@ -28,6 +30,7 @@ export type TerminalLifecycleState =
 
 const MAX_LOG_CHARS    = 200 * 1024; // ~200 KB cap on raw session buffer
 const RECENT_OUT_MAX   = 6000;       // context window for adapter pattern matching
+const LAST_BLOCK_MAX   = 64  * 1024; // cap on last-output-block buffer for forwarding
 
 const HOLD_ACTIVITIES = new Set<AgentActivity>(["asking_approval", "fatal_error"]);
 
@@ -72,6 +75,8 @@ export interface TerminalProcessHandle {
   sendInput: (text: string) => void;
   /** Return xterm selection if any, else last N lines of buffer. */
   captureSelectedOrLastLines: (lastLines?: number) => string;
+  /** Return xterm selection if any, else stripped output since the last user input. */
+  captureLastOutputBlock: () => string;
 }
 
 export function useTerminalProcess({
@@ -91,6 +96,8 @@ export function useTerminalProcess({
   const fitAddonRef          = useRef<FitAddon | null>(null);
   const logsRef              = useRef<string>("");
   const recentOutputRef      = useRef<string>("");
+  const lastOutputBlockRef   = useRef<string>("");   // stripped output since last user input
+  const resetOnNextChunkRef  = useRef<boolean>(false); // true after user sends input
   const restartInProgressRef = useRef(false);
   const idleTimerRef         = useRef<ReturnType<typeof setTimeout> | null>(null);
   const burstRef             = useRef<BurstTracker>(createBurstTracker());
@@ -120,9 +127,11 @@ export function useTerminalProcess({
 
   const resetIntelligence = useCallback(() => {
     clearIdleTimer();
-    burstRef.current        = createBurstTracker();
-    recentOutputRef.current = "";
-    processAliveRef.current = false;
+    burstRef.current             = createBurstTracker();
+    recentOutputRef.current      = "";
+    lastOutputBlockRef.current   = "";
+    resetOnNextChunkRef.current  = false;
+    processAliveRef.current      = false;
   }, [clearIdleTimer]);
 
   const classifyWithFallback = useCallback((
@@ -199,6 +208,7 @@ export function useTerminalProcess({
   const sendInput = useCallback((text: string) => {
     if (!processAliveRef.current) return;
     terminalBridge.write(agentId, text).catch(() => {});
+    resetOnNextChunkRef.current = true;
   }, [agentId]);
 
   const captureSelectedOrLastLines = useCallback((lastLines = 50): string => {
@@ -225,6 +235,15 @@ export function useTerminalProcess({
       const lines = logsRef.current.split("\n");
       return lines.slice(-lastLines).join("\n");
     }
+  }, []);
+
+  const captureLastOutputBlock = useCallback((): string => {
+    const t = termRef.current;
+    try {
+      const sel = t?.getSelection() ?? "";
+      if (sel.trim()) return sel;
+    } catch { /* xterm not ready */ }
+    return filterBlockLines(lastOutputBlockRef.current);
   }, []);
 
   const focusTerminal = useCallback(() => {
@@ -372,6 +391,9 @@ export function useTerminalProcess({
     const disposeInput = term.onData((data) => {
       if (!active || !processAliveRef.current) return;
       terminalBridge.write(agentId, data).catch(() => {});
+      if (data.includes("\r") || data.includes("\n")) {
+        resetOnNextChunkRef.current = true;
+      }
       if (data.length > 0) {
         setDino("patrol_running");
         scheduleIdle();
@@ -402,6 +424,19 @@ export function useTerminalProcess({
         recentOutputRef.current = nextRecent.length > RECENT_OUT_MAX
           ? nextRecent.slice(nextRecent.length - RECENT_OUT_MAX)
           : nextRecent;
+
+        // Maintain last-output-block: reset on first chunk after user input,
+        // then accumulate cleaned output (no ANSI, no CR artifacts) for forwarding.
+        if (resetOnNextChunkRef.current) {
+          lastOutputBlockRef.current  = "";
+          resetOnNextChunkRef.current = false;
+        }
+        let cleanedChunk = "";
+        try { cleanedChunk = cleanForBlock(rawChunk); } catch { cleanedChunk = rawChunk; }
+        const nextBlock = lastOutputBlockRef.current + cleanedChunk;
+        lastOutputBlockRef.current = nextBlock.length > LAST_BLOCK_MAX
+          ? nextBlock.slice(nextBlock.length - LAST_BLOCK_MAX)
+          : nextBlock;
 
         let normalizedChunk = "";
         let normalizedRecentOutput = "";
@@ -540,5 +575,6 @@ export function useTerminalProcess({
     focusTerminal,
     sendInput,
     captureSelectedOrLastLines,
+    captureLastOutputBlock,
   };
 }

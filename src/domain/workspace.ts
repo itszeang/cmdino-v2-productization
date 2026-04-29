@@ -29,7 +29,7 @@ export interface CmdinoWorkspaceFile {
   workflowLinks: WorkflowLink[];
 }
 
-const VALID_KINDS    = new Set<string>(["claude", "codex", "gemini", "custom"]);
+const VALID_KINDS    = new Set<string>(["claude", "codex", "gemini", "ollama", "custom"]);
 const VALID_DINO_IDS = new Set<string>(["female-cole", "female-kira", "female-loki", "male-cole", "male-kira"]);
 const SUPPORTED_VERSIONS     = new Set([1, 2, 3]);
 const MAX_WORKSPACE_TERMINALS = 12;

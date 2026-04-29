@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { AGENT_PRESETS } from "../config/agentPresets";
+import { AGENT_PRESETS, type AgentPresetId } from "../config/agentPresets";
 import { DINO_OPTIONS } from "../config/dinoOptions";
 import type { AgentKind } from "../domain/agentKind";
 
 interface FormState {
-  presetId: AgentKind;
-  label: string;
-  command: string;
-  cwd: string;
-  dinoId: string;
+  presetId:        AgentPresetId | null;
+  label:           string;
+  command:         string;
+  cwd:             string;
+  dinoId:          string;
+  agentKind:       AgentKind;
+  roleDescription: string;
 }
 
 interface ConfirmPayload {
@@ -21,28 +23,33 @@ interface ConfirmPayload {
 
 interface Props {
   onConfirm: (form: ConfirmPayload) => void;
-  onCancel: () => void;
+  onCancel:  () => void;
 }
 
 const DEFAULT_CWD = "C:\\Users\\burak";
 
 export function AgentCreationModal({ onConfirm, onCancel }: Props) {
   const [form, setForm] = useState<FormState>({
-    presetId: "claude",
-    label: "Claude Builder",
-    command: "claude",
-    cwd: DEFAULT_CWD,
-    dinoId: "female-cole",
+    presetId:        null,
+    label:           "",
+    command:         "",
+    cwd:             DEFAULT_CWD,
+    dinoId:          DINO_OPTIONS[0].id,
+    agentKind:       "custom",
+    roleDescription: "",
   });
 
-  function applyPreset(presetId: AgentKind) {
+  function applyPreset(presetId: AgentPresetId) {
     const preset = AGENT_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
     setForm((f) => ({
       ...f,
       presetId,
-      label: preset.defaultLabel,
-      command: preset.defaultCommand,
+      label:           preset.defaultLabel,
+      command:         preset.defaultCommand,
+      agentKind:       preset.agentKind,
+      dinoId:          preset.defaultDinoId ?? DINO_OPTIONS[0].id,
+      roleDescription: preset.roleDescription,
     }));
   }
 
@@ -53,33 +60,32 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
       command:   form.command.trim(),
       cwd:       form.cwd.trim() || DEFAULT_CWD,
       dinoId:    form.dinoId,
-      agentKind: form.presetId,
+      agentKind: form.agentKind,
     });
   }
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
-      <div
-        className="modal-box"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Modal header */}
+      <div className="modal-box modal-box--agent" onClick={(e) => e.stopPropagation()}>
+
         <div className="modal-header">
-          <span className="modal-title">New Dino Terminal</span>
-          <button className="modal-close-btn" onClick={onCancel}>x</button>
+          <span className="modal-title">Deploy Agent</span>
+          <button className="modal-close-btn" onClick={onCancel}>×</button>
         </div>
 
-        {/* Preset row */}
+        {/* Preset cards */}
         <div className="modal-field-group">
           <label className="modal-label">Preset</label>
-          <div className="preset-row">
+          <div className="preset-card-grid">
             {AGENT_PRESETS.map((p) => (
               <button
                 key={p.id}
-                className={`preset-btn${form.presetId === p.id ? " preset-btn--active" : ""}`}
+                className={`preset-card${form.presetId === p.id ? " preset-card--active" : ""}`}
+                style={{ "--preset-accent": p.accentColor } as React.CSSProperties}
                 onClick={() => applyPreset(p.id)}
               >
-                {p.label}
+                <span className="preset-card-title">{p.title}</span>
+                <span className="preset-card-role">{p.roleDescription}</span>
               </button>
             ))}
           </div>
@@ -93,9 +99,32 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
             className="modal-input"
             value={form.label}
             onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
-            placeholder="Terminal label"
+            placeholder="Agent label"
             autoFocus
           />
+        </div>
+
+        {/* Agent Kind */}
+        <div className="modal-field-group">
+          <label className="modal-label" htmlFor="modal-kind">Agent Kind</label>
+          <select
+            id="modal-kind"
+            className="modal-input modal-select"
+            value={form.agentKind}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                agentKind: e.target.value as AgentKind,
+                presetId:  null,
+              }))
+            }
+          >
+            <option value="claude">Claude</option>
+            <option value="codex">Codex</option>
+            <option value="gemini">Gemini</option>
+            <option value="ollama">Ollama</option>
+            <option value="custom">Custom</option>
+          </select>
         </div>
 
         {/* Launch command */}
@@ -133,7 +162,6 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
                 onClick={() => setForm((f) => ({ ...f, dinoId: opt.id }))}
                 title={opt.label}
               >
-                {/* First frame of idle sprite via CSS background clip */}
                 <span
                   className="dino-sprite"
                   style={{ backgroundImage: `url("${opt.idlePath}")` }}
@@ -154,7 +182,7 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
             onClick={handleSubmit}
             disabled={!form.label.trim()}
           >
-            Create Terminal
+            Deploy Agent
           </button>
         </div>
       </div>

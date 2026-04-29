@@ -129,9 +129,9 @@ export function AppSidebar({
           className="sidebar-cta"
           onClick={onAddTerminal}
           disabled={maxReached}
-          title={maxReached ? `Maximum ${maxTerminals} terminals reached` : "Create a new Dino Terminal"}
+          title={maxReached ? `Maximum ${maxTerminals} agents reached` : "Deploy a new agent"}
         >
-          + Terminal
+          + Agent
         </button>
       </div>
 

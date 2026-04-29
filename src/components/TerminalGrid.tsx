@@ -2,7 +2,7 @@ import { TerminalPane } from "./TerminalPane";
 import { TerminalTabs } from "./TerminalTabs";
 import type { TerminalAgent } from "../domain/terminalAgent";
 import type { TerminalLifecycleState } from "../terminal/useTerminalProcess";
-import type { WorkflowLinkKind } from "../domain/workflow";
+import type { WorkflowLink, WorkflowLinkKind } from "../domain/workflow";
 import type { AppSettings } from "../domain/appSettings";
 import type { TerminalViewMode } from "../domain/viewMode";
 
@@ -26,9 +26,13 @@ interface Props {
   onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
   settings?:            AppSettings;
   viewMode:             TerminalViewMode;
+  onViewModeChange:     (mode: TerminalViewMode) => void;
   activeTerminalId:     string | null;
   onActiveTerminalChange: (id: string) => void;
   lifecycleByAgentId:   Record<string, string>;
+  onFocusPane:          (id: string) => void;
+  workflowLinks:        WorkflowLink[];
+  onFocusTarget:        (id: string) => void;
 }
 
 export function TerminalGrid({
@@ -36,8 +40,8 @@ export function TerminalGrid({
   onAddAttachment, onRemoveAttachment,
   onLifecycleChange, onRecordWorkflowLink,
   settings,
-  viewMode, activeTerminalId, onActiveTerminalChange,
-  lifecycleByAgentId,
+  viewMode, onViewModeChange, activeTerminalId, onActiveTerminalChange,
+  lifecycleByAgentId, onFocusPane, workflowLinks, onFocusTarget,
 }: Props) {
   const n    = agents.length;
   const cols = getCols(n);
@@ -62,7 +66,10 @@ export function TerminalGrid({
         agents={agents}
         activeTerminalId={activeTerminalId}
         lifecycleByAgentId={lifecycleByAgentId}
-        onTabClick={onActiveTerminalChange}
+        onTabClick={(id) => {
+          onActiveTerminalChange(id);
+          if (viewMode === "grid") onViewModeChange("focus");
+        }}
       />
 
       {/*
@@ -102,6 +109,10 @@ export function TerminalGrid({
                   onRecordWorkflowLink={onRecordWorkflowLink}
                   settings={settings}
                   viewMode={viewMode}
+                  isActive={isActive}
+                  onFocus={() => onFocusPane(agent.id)}
+                  workflowLinks={workflowLinks}
+                  onFocusTarget={onFocusTarget}
                 />
               </div>
             );

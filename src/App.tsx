@@ -3,7 +3,6 @@ import { TerminalGrid }        from "./components/TerminalGrid";
 import { AgentCreationModal }  from "./components/AgentCreationModal";
 import { AppSidebar }          from "./components/AppSidebar";
 import { MainHeader }          from "./components/MainHeader";
-import { EmptyStateMascot }    from "./components/EmptyStateMascot";
 import { WorkflowPanel }       from "./components/WorkflowPanel";
 import { SettingsPanel }       from "./components/SettingsPanel";
 import { WelcomeModal }        from "./components/WelcomeModal";
@@ -148,6 +147,20 @@ export default function App() {
 
   // ── Terminal creation ─────────────────────────────────────────────────────
 
+  function handleFocusPane(id: string) {
+    if (viewMode === "focus" && activeTerminalId === id) {
+      setViewMode("grid");
+    } else {
+      setActiveTerminalId(id);
+      setViewMode("focus");
+    }
+  }
+
+  function handleFocusTarget(id: string) {
+    setActiveTerminalId(id);
+    setViewMode("focus");
+  }
+
   function handleCreate(form: {
     label: string; command: string; cwd: string; dinoId: string; agentKind: AgentKind;
   }) {
@@ -202,10 +215,10 @@ export default function App() {
           {count === 0 ? (
             /* Empty state */
             <div className="empty-workspace">
-              <EmptyStateMascot size={72} />
-              <div className="empty-workspace-title">Create Your First Dino Terminal</div>
+              <img src="/icon.png" className="empty-icon" alt="CMDino" />
+              <div className="empty-workspace-title">Deploy Your First Agent</div>
               <div className="empty-workspace-sub">
-                Up to {MAX_TERMINALS} concurrent terminals · Real PTY · Dino state feedback
+                Up to {MAX_TERMINALS} concurrent agents · Real PTY · Dino state feedback
               </div>
               <div className="empty-workspace-actions">
                 <button
@@ -213,7 +226,7 @@ export default function App() {
                   onClick={() => setShowModal(true)}
                   disabled={maxReached}
                 >
-                  + New Terminal
+                  Deploy Agent
                 </button>
                 <button
                   className="empty-cta-secondary"
@@ -235,8 +248,12 @@ export default function App() {
               onRecordWorkflowLink={handleRecordWorkflowLink}
               settings={settings}
               viewMode={viewMode}
+              onViewModeChange={setViewMode}
               activeTerminalId={activeTerminalId}
               onActiveTerminalChange={setActiveTerminalId}
+              onFocusPane={handleFocusPane}
+              workflowLinks={workflowLinks}
+              onFocusTarget={handleFocusTarget}
               lifecycleByAgentId={lifecycleByAgentId}
             />
           )}
