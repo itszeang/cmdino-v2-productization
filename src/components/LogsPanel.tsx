@@ -9,12 +9,12 @@ function stripAnsi(s: string): string {
 }
 
 const LIFECYCLE_COLORS: Record<TerminalLifecycleState, string> = {
-  dormant:  "#1e3a4a",
-  spawning: "#facc15",
-  running:  "#00c8ff",
+  dormant:  "#737373",
+  spawning: "#fbbf24",
+  running:  "#e5e5e5",
   exited:   "#6b7280",
   killed:   "#6b7280",
-  error:    "#f87171",
+  error:    "#fca5a5",
 };
 
 interface Props {
@@ -71,7 +71,7 @@ export function LogsPanel({ label, lifecycle, getLogs, onClose }: Props) {
               COPY ALL
             </button>
             <button className="logs-btn logs-btn--close" onClick={onClose}>
-              ✕
+              x
             </button>
           </div>
         </div>

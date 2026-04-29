@@ -14,6 +14,8 @@ import { activityToDinoState } from "./agentActivity";
 import { classifyAgentOutput } from "./agentStateAdapters";
 import type { AgentKind } from "../domain/agentKind";
 import { inferAgentKind } from "../domain/agentKind";
+import type { ThemeMode } from "../domain/appSettings";
+import { getXtermTheme } from "../config/themeTokens";
 import type { DinoState } from "./dinoStateMachine";
 
 export type TerminalLifecycleState =
@@ -29,29 +31,11 @@ const RECENT_OUT_MAX   = 6000;       // context window for adapter pattern match
 
 const HOLD_ACTIVITIES = new Set<AgentActivity>(["asking_approval", "fatal_error"]);
 
-const XTERM_THEME = {
-  background:          "#070b0e",
-  foreground:          "#c8d8e8",
-  cursor:              "#00c8ff",
-  cursorAccent:        "#070b0e",
-  selectionBackground: "#00c8ff33",
-  black:               "#0d1117",
-  red:                 "#f87171",
-  green:               "#4ade80",
-  yellow:              "#facc15",
-  blue:                "#60a5fa",
-  magenta:             "#c084fc",
-  cyan:                "#22d3ee",
-  white:               "#e2e8f0",
-  brightBlack:         "#374151",
-  brightRed:           "#fca5a5",
-  brightGreen:         "#86efac",
-  brightYellow:        "#fde68a",
-  brightBlue:          "#93c5fd",
-  brightMagenta:       "#d8b4fe",
-  brightCyan:          "#67e8f9",
-  brightWhite:         "#f8fafc",
-};
+// Module-level set of agentIds that have active PTY sessions.
+// Guards against duplicate spawn caused by accidental TerminalPane remounts:
+// if the PTY backend returns "already running" and this set contains agentId,
+// treat it as already attached rather than a fatal error.
+const _spawnedAgentIds = new Set<string>();
 
 interface Options {
   agentId: string;
@@ -63,6 +47,13 @@ interface Options {
   enabled?: boolean;
   /** Terminal font size multiplier. Updates live without PTY restart. Default 1. */
   fontScale?: number;
+}
+
+function readThemeMode(container: HTMLElement | null): ThemeMode {
+  const root =
+    container?.closest<HTMLElement>("[data-theme]")
+    ?? document.querySelector<HTMLElement>("[data-theme]");
+  return root?.dataset.theme === "light" ? "light" : "dark";
 }
 
 export interface TerminalProcessHandle {
@@ -181,6 +172,26 @@ export function useTerminalProcess({
     });
   }, [fontScale]);
 
+  // Theme live update. This observes the app root only and never respawns PTY.
+  useEffect(() => {
+    const applyTheme = () => {
+      const t = termRef.current;
+      if (!t) return;
+      t.options.theme = getXtermTheme(readThemeMode(containerRef.current));
+    };
+
+    applyTheme();
+
+    const root =
+      containerRef.current?.closest<HTMLElement>("[data-theme]")
+      ?? document.querySelector<HTMLElement>("[data-theme]");
+    if (!root) return;
+
+    const mo = new MutationObserver(applyTheme);
+    mo.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => mo.disconnect();
+  }, [containerRef]);
+
   // ── Stable actions ────────────────────────────────────────────────────────
 
   const getSessionLogs = useCallback(() => logsRef.current, []);
@@ -240,6 +251,7 @@ export function useTerminalProcess({
   const kill = useCallback(async () => {
     clearIdleTimer();
     processAliveRef.current = false;
+    _spawnedAgentIds.delete(agentId);
     await terminalBridge.kill(agentId).catch(() => {});
     setLifecycle("killed");
     setDino("terminal_dead");
@@ -252,6 +264,7 @@ export function useTerminalProcess({
     const t = termRef.current;
     try {
       resetIntelligence();
+      _spawnedAgentIds.delete(agentId);
       await terminalBridge.kill(agentId).catch(() => {});
       logsRef.current = "";
       t?.clear();
@@ -263,13 +276,16 @@ export function useTerminalProcess({
       if (!t) throw new Error("terminal not mounted");
 
       const { cols, rows } = t;
-      await terminalBridge.spawn(agentId, cwd ?? ".", cols, rows);
+      const spawnResult = await terminalBridge.spawn(agentId, cwd ?? ".", cols, rows);
 
+      _spawnedAgentIds.add(agentId);
       processAliveRef.current = true;
       setLifecycle("running");
       t.focus();
 
-      if (launchCommand?.trim()) {
+      // restart() explicitly kills first, so spawn always returns "spawned".
+      // Guard here anyway for correctness.
+      if (spawnResult === "spawned" && launchCommand?.trim()) {
         setTimeout(() => {
           terminalBridge.write(agentId, launchCommand.trim() + "\r").catch(() => {});
         }, 300);
@@ -307,7 +323,7 @@ export function useTerminalProcess({
     const resolvedKind: AgentKind = agentKind ?? inferAgentKind(launchCommand);
 
     const term = new Terminal({
-      theme: XTERM_THEME,
+      theme: getXtermTheme(readThemeMode(container)),
       fontFamily: '"Cascadia Code", "JetBrains Mono", "Fira Code", "Consolas", monospace',
       fontSize: 12,
       lineHeight: 1.4,
@@ -454,13 +470,27 @@ export function useTerminalProcess({
       if (!active) return;
       fitAddon.fit();
       const { cols, rows } = term;
+
+      // Pre-spawn guard: if this agentId is already tracked (e.g. StrictMode
+      // double-mount, or any accidental remount), the PTY is still alive in
+      // the Rust backend. Skip the spawn call entirely and reconnect xterm.
+      if (_spawnedAgentIds.has(agentId)) {
+        processAliveRef.current = true;
+        setLifecycle("running");
+        return;
+      }
+
       terminalBridge
         .spawn(agentId, cwd ?? ".", cols, rows)
-        .then(() => {
+        .then((result) => {
           if (!active) return;
+          _spawnedAgentIds.add(agentId);
           processAliveRef.current = true;
           setLifecycle("running");
-          if (launchCommand?.trim()) {
+          // Only send launchCommand on a genuinely new PTY.
+          // "already_running" means a live session is being reattached —
+          // resending the command would duplicate work in the agent.
+          if (result === "spawned" && launchCommand?.trim()) {
             setTimeout(() => {
               if (active) {
                 terminalBridge.write(agentId, launchCommand.trim() + "\r").catch(() => {});
@@ -482,6 +512,9 @@ export function useTerminalProcess({
 
     return () => {
       active = false;
+      // _spawnedAgentIds is intentionally NOT cleared here.
+      // The PTY remains alive in the Rust backend after xterm is disposed.
+      // Only kill() and restart() should remove from this set.
       clearIdleTimer();
       processAliveRef.current = false;
       try { disposeInput.dispose(); } catch { /* already disposed */ }

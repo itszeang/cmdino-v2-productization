@@ -13,11 +13,12 @@ interface Props {
   flipX?:         boolean;
   animationSpeed?: number; // multiplier on fps, default 1
   displayScale?:  number;  // CSS size multiplier, default 1
+  freezeFrame?:   number;  // fixed frame render for static states
 }
 
 export function SpriteAnimator({
   dinoId, category, animName, flipX = false,
-  animationSpeed = 1, displayScale = 1,
+  animationSpeed = 1, displayScale = 1, freezeFrame,
 }: Props) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const rafRef      = useRef(0);
@@ -43,8 +44,11 @@ export function SpriteAnimator({
     if (!animConfig) return;
 
     const { frames, fps, loop } = animConfig;
+    const fixedFrame = typeof freezeFrame === "number"
+      ? Math.max(0, Math.min(frames - 1, Math.floor(freezeFrame)))
+      : null;
 
-    let frameIndex    = 0;
+    let frameIndex    = fixedFrame ?? 0;
     let lastFrameTime = 0;
     let image: HTMLImageElement | null = null;
     let cancelled     = false;
@@ -61,7 +65,9 @@ export function SpriteAnimator({
         const effectiveFps   = fps * speedRef.current;
         const frameInterval  = 1000 / Math.max(effectiveFps, 0.1);
 
-        if (now - lastFrameTime >= frameInterval) {
+        if (fixedFrame !== null) {
+          frameIndex = fixedFrame;
+        } else if (now - lastFrameTime >= frameInterval) {
           if (loop) {
             frameIndex = (frameIndex + 1) % frames;
           } else {
@@ -97,7 +103,7 @@ export function SpriteAnimator({
       cancelled = true;
       cancelAnimationFrame(rafRef.current);
     };
-  }, [dinoId, category, animName, flipX]);
+  }, [dinoId, category, animName, flipX, freezeFrame]);
 
   const displayPx = Math.round(FRAME_PX * displayScale);
 

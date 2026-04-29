@@ -30,8 +30,8 @@ export function useTerminalAgents() {
 
   // ── Agent CRUD ────────────────────────────────────────────────────────────
 
-  const addAgent = useCallback((newAgent: NewAgent, autoStart = true) => {
-    if (agentsRef.current.length >= MAX_TERMINALS) return;
+  const addAgent = useCallback((newAgent: NewAgent, autoStart = true): string | null => {
+    if (agentsRef.current.length >= MAX_TERMINALS) return null;
     const id = crypto.randomUUID();
     const full: TerminalAgent = {
       configId:    crypto.randomUUID(),
@@ -46,6 +46,7 @@ export function useTerminalAgents() {
     if (autoStart) {
       setRunningAgentIds((ids) => new Set([...ids, id]));
     }
+    return id;
   }, []);
 
   const removeAgent = useCallback((id: string) => {

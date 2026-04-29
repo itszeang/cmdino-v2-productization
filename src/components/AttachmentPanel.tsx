@@ -41,12 +41,12 @@ export function AttachmentPanel({ onAdd, onClose }: Props) {
           placeholder="Paste .md or .txt file path…"
           style={{
             flex:         1,
-            background:   "#0d1520",
-            border:       `1px solid ${error ? "#f8717155" : "#1a3a4a"}`,
-            color:        "#c8d8e8",
-            fontSize:     10,
-            padding:      "3px 7px",
-            borderRadius: 2,
+            background:   "var(--input-bg)",
+            border:       `1px solid ${error ? "var(--danger)" : "var(--border-subtle)"}`,
+            color:        "var(--text-main)",
+            fontSize:     11,
+            padding:      "6px 10px",
+            borderRadius: 999,
             fontFamily:   "monospace",
             outline:      "none",
           }}
@@ -54,12 +54,12 @@ export function AttachmentPanel({ onAdd, onClose }: Props) {
         <button
           onClick={handleAdd}
           style={{
-            background:   "none",
-            border:       "1px solid #00c8ff33",
-            color:        "#00c8ff",
-            fontSize:     9,
-            padding:      "2px 8px",
-            borderRadius: 2,
+            background:   "var(--accent)",
+            border:       "1px solid transparent",
+            color:        "var(--app-bg)",
+            fontSize:     11,
+            padding:      "6px 10px",
+            borderRadius: 999,
             fontFamily:   "inherit",
             fontWeight:   700,
             cursor:       "pointer",
@@ -68,18 +68,18 @@ export function AttachmentPanel({ onAdd, onClose }: Props) {
         <button
           onClick={onClose}
           style={{
-            background:   "none",
-            border:       "1px solid #162a3a",
-            color:        "#3a6a8a",
-            fontSize:     9,
-            padding:      "2px 6px",
-            borderRadius: 2,
+            background:   "transparent",
+            border:       "1px solid transparent",
+            color:        "var(--text-muted)",
+            fontSize:     11,
+            padding:      "6px 8px",
+            borderRadius: 999,
             fontFamily:   "inherit",
             cursor:       "pointer",
           }}
-        >✕</button>
+        >x</button>
       </div>
-      {error && <span style={{ color: "#f87171", fontSize: 9 }}>{error}</span>}
+      {error && <span style={{ color: "var(--danger)", fontSize: 11 }}>{error}</span>}
     </div>
   );
 }

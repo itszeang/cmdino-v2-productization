@@ -49,7 +49,8 @@ export function WelcomeModal({ onDismiss, onLoadDemo }: Props) {
       style={{
         position:       "fixed",
         inset:          0,
-        background:     "rgba(0,0,0,0.82)",
+        background:     "var(--overlay-bg)",
+        backdropFilter:  "blur(8px)",
         display:        "flex",
         alignItems:     "center",
         justifyContent: "center",
@@ -61,31 +62,42 @@ export function WelcomeModal({ onDismiss, onLoadDemo }: Props) {
           width:         580,
           maxWidth:      "96vw",
           maxHeight:     "90vh",
-          background:    "#090d12",
-          border:        "1px solid #0e2233",
-          borderRadius:  8,
+          background:    "var(--surface-1)",
+          border:        "1px solid var(--border-subtle)",
+          borderRadius:  12,
           display:       "flex",
           flexDirection: "column",
           overflow:      "hidden",
-          boxShadow:     "0 0 80px rgba(0,200,255,0.07)",
+          boxShadow:     "var(--shadow-panel)",
         }}
       >
         {/* ── Header ── */}
         <div style={{
           padding:      "14px 18px 12px",
-          borderBottom: "1px solid #0e2233",
-          background:   "#0b0f14",
+          borderBottom: "1px solid var(--border-subtle)",
+          background:   "var(--surface-1)",
           flexShrink:   0,
         }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span style={{ color: "#00c8ff", fontWeight: 700, fontSize: 13, letterSpacing: 2.5 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img
+              src="/app-icon.png"
+              alt=""
+              aria-hidden="true"
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                display: "block",
+              }}
+            />
+            <span style={{ color: "var(--text-main)", fontWeight: 700, fontSize: 15, letterSpacing: 0 }}>
               CMDino
             </span>
-            <span style={{ color: "#1a3a4a", fontSize: 10, letterSpacing: 1 }}>
-              MISSION BRIEFING
+            <span style={{ color: "var(--text-muted)", fontSize: 12, letterSpacing: 0 }}>
+              Mission briefing
             </span>
           </div>
-          <div style={{ color: "#334455", fontSize: 9, marginTop: 4, letterSpacing: 0.8 }}>
+          <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 5, letterSpacing: 0 }}>
             Visual command center for multi-agent AI CLI workflows.
           </div>
         </div>
@@ -95,7 +107,7 @@ export function WelcomeModal({ onDismiss, onLoadDemo }: Props) {
           display:  "flex",
           gap:      0,
           flexShrink: 0,
-          borderBottom: "1px solid #0e2233",
+          borderBottom: "1px solid var(--border-subtle)",
         }}>
           {CARDS.map((card, i) => (
             <div
@@ -103,7 +115,7 @@ export function WelcomeModal({ onDismiss, onLoadDemo }: Props) {
               style={{
                 flex:         1,
                 padding:      "14px 14px 16px",
-                borderRight:  i < CARDS.length - 1 ? "1px solid #0e2233" : "none",
+                borderRight:  i < CARDS.length - 1 ? "1px solid var(--border-subtle)" : "none",
                 display:      "flex",
                 flexDirection: "column",
                 gap:          8,
@@ -111,7 +123,7 @@ export function WelcomeModal({ onDismiss, onLoadDemo }: Props) {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{
-                  color:         "#00c8ff33",
+                  color:         "var(--text-faint)",
                   fontSize:      18,
                   fontWeight:    700,
                   letterSpacing: 1,
@@ -121,10 +133,10 @@ export function WelcomeModal({ onDismiss, onLoadDemo }: Props) {
                   {card.index}
                 </span>
                 <span style={{
-                  color:         "#4a7a9a",
-                  fontSize:      9,
-                  fontWeight:    700,
-                  letterSpacing: 1.2,
+                  color:         "var(--text-main)",
+                  fontSize:      11,
+                  fontWeight:    650,
+                  letterSpacing: 0,
                   lineHeight:    1.3,
                 }}>
                   {card.title}
@@ -135,12 +147,12 @@ export function WelcomeModal({ onDismiss, onLoadDemo }: Props) {
                   <li
                     key={li}
                     style={{
-                      color:        "#3a5a6a",
-                      fontSize:     9,
-                      letterSpacing: 0.3,
+                      color:        "var(--text-muted)",
+                      fontSize:     11,
+                      letterSpacing: 0,
                       lineHeight:   1.5,
                       paddingLeft:  10,
-                      borderLeft:   "1px solid #0e2233",
+                      borderLeft:   "1px solid var(--border-subtle)",
                     }}
                   >
                     {line}
@@ -172,9 +184,9 @@ export function WelcomeModal({ onDismiss, onLoadDemo }: Props) {
               type="checkbox"
               checked={dontShow}
               onChange={(e) => setDontShow(e.target.checked)}
-              style={{ accentColor: "#00c8ff", cursor: "pointer" }}
+              style={{ accentColor: "var(--accent)", cursor: "pointer" }}
             />
-            <span style={{ color: "#334455", fontSize: 9, letterSpacing: 0.6 }}>
+            <span style={{ color: "var(--text-muted)", fontSize: 12, letterSpacing: 0 }}>
               Don't show this again
             </span>
           </label>
@@ -185,24 +197,24 @@ export function WelcomeModal({ onDismiss, onLoadDemo }: Props) {
               onClick={() => { onLoadDemo(); onDismiss(dontShow); }}
               style={{
                 background:   "none",
-                border:       "1px solid #1a3a4a",
-                color:        "#334455",
-                fontSize:     10,
-                padding:      "5px 12px",
-                borderRadius: 4,
+                border:       "1px solid transparent",
+                color:        "var(--text-muted)",
+                fontSize:     12,
+                padding:      "8px 14px",
+                borderRadius: 999,
                 fontFamily:   "inherit",
-                fontWeight:   700,
-                letterSpacing: 0.8,
+                fontWeight:   600,
+                letterSpacing: 0,
                 cursor:       "pointer",
                 transition:   "color 0.12s, border-color 0.12s",
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = "#7dd3fc";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "#00c8ff44";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-main)";
+                (e.currentTarget as HTMLButtonElement).style.background = "var(--button-bg)";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = "#334455";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a3a4a";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
               }}
             >
               LOAD DEMO
@@ -210,20 +222,20 @@ export function WelcomeModal({ onDismiss, onLoadDemo }: Props) {
             <button
               onClick={() => onDismiss(dontShow)}
               style={{
-                background:   "#00c8ff0f",
-                border:       "1px solid #00c8ff44",
-                color:        "#00c8ff",
-                fontSize:     10,
-                padding:      "5px 16px",
-                borderRadius: 4,
+                background:   "var(--accent)",
+                border:       "1px solid transparent",
+                color:        "var(--app-bg)",
+                fontSize:     12,
+                padding:      "8px 16px",
+                borderRadius: 999,
                 fontFamily:   "inherit",
-                fontWeight:   700,
-                letterSpacing: 0.8,
+                fontWeight:   650,
+                letterSpacing: 0,
                 cursor:       "pointer",
-                transition:   "background 0.12s",
+                transition:   "opacity 0.12s",
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#00c8ff1a"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#00c8ff0f"; }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.88"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
             >
               START EMPTY
             </button>

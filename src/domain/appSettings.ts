@@ -3,8 +3,10 @@ export interface AppSettings {
   dinoScale:           number;  // 0.75 – 1.25, default 1
   terminalFontScale:   number;  // 0.85 – 1.25, default 1
   onboardingDismissed: boolean;
-  themeMode:           "dark" | "light";
+  themeMode:           ThemeMode;
 }
+
+export type ThemeMode = "dark" | "light";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   animationSpeed:      1,

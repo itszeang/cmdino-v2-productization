@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
-import { TerminalGrid }       from "./components/TerminalGrid";
-import { AgentCreationModal } from "./components/AgentCreationModal";
-import { WorkspaceToolbar }   from "./components/WorkspaceToolbar";
-import { WorkflowPanel }      from "./components/WorkflowPanel";
-import { SettingsPanel }      from "./components/SettingsPanel";
-import { WelcomeModal }       from "./components/WelcomeModal";
+import { TerminalGrid }        from "./components/TerminalGrid";
+import { AgentCreationModal }  from "./components/AgentCreationModal";
+import { AppSidebar }          from "./components/AppSidebar";
+import { MainHeader }          from "./components/MainHeader";
+import { EmptyStateMascot }    from "./components/EmptyStateMascot";
+import { WorkflowPanel }       from "./components/WorkflowPanel";
+import { SettingsPanel }       from "./components/SettingsPanel";
+import { WelcomeModal }        from "./components/WelcomeModal";
 import { useTerminalAgents, MAX_TERMINALS } from "./state/useTerminalAgents";
-import { useAppSettings }     from "./state/useAppSettings";
-import { workspaceBridge }    from "./workspace/workspaceBridge";
+import { useAppSettings }      from "./state/useAppSettings";
+import { workspaceBridge }     from "./workspace/workspaceBridge";
 import { validateWorkspaceFile, sanitizeWorkspaceFilename } from "./domain/workspace";
-import type { AgentKind }     from "./domain/agentKind";
+import type { TerminalViewMode } from "./domain/viewMode";
+import type { AgentKind }      from "./domain/agentKind";
 import type { WorkflowLinkKind } from "./domain/workflow";
 import type { TerminalLifecycleState } from "./terminal/useTerminalProcess";
-import { DEMO_WORKSPACE }     from "./config/demoWorkspace";
+import { DEMO_WORKSPACE }      from "./config/demoWorkspace";
 
 const isTauri = Boolean(
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
@@ -47,6 +50,24 @@ export default function App() {
   const [showSettings,        setShowSettings]        = useState(false);
   const [savedWorkspaces,     setSavedWorkspaces]     = useState<string[]>([]);
   const [lifecycleByAgentId,  setLifecycleByAgentId]  = useState<Record<string, string>>({});
+
+  // ── View mode (UI-only, never persisted) ───────────────────────────────────
+  const [viewMode,         setViewMode]         = useState<TerminalViewMode>("focus");
+  const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
+
+  // Active terminal safety: keep activeTerminalId valid as agents change
+  useEffect(() => {
+    if (agents.length === 0) {
+      setActiveTerminalId(null);
+      return;
+    }
+    if (activeTerminalId === null || !agents.find((a) => a.id === activeTerminalId)) {
+      setActiveTerminalId(agents[0].id);
+    }
+  }, [agents, activeTerminalId]);
+
+  // Derived active label for header
+  const activeTerminalLabel = agents.find((a) => a.id === activeTerminalId)?.label;
 
   // ── Lifecycle tracking ─────────────────────────────────────────────────────
 
@@ -125,12 +146,12 @@ export default function App() {
     loadWorkspaceConfig(DEMO_WORKSPACE);
   }
 
-  // ── Terminal creation ──────────────────────────────────────────────────────
+  // ── Terminal creation ─────────────────────────────────────────────────────
 
   function handleCreate(form: {
     label: string; command: string; cwd: string; dinoId: string; agentKind: AgentKind;
   }) {
-    addAgent(
+    const id = addAgent(
       {
         label:         form.label,
         dinoId:        form.dinoId,
@@ -138,94 +159,89 @@ export default function App() {
         cwd:           form.cwd    || undefined,
         agentKind:     form.agentKind,
       },
-      true,
+      false,
     );
+    if (id) setActiveTerminalId(id);
     setShowModal(false);
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+
   return (
-    <div style={{
-      width: "100vw", height: "100vh", background: "#080b0f",
-      display: "flex", flexDirection: "column", overflow: "hidden",
-    }}>
-      {/* Toolbar */}
-      <WorkspaceToolbar
-        workspaceName={workspaceName}
-        onNameChange={setWorkspaceName}
+    <div className="app-shell" data-theme={settings.themeMode}>
+
+      {/* Left sidebar */}
+      <AppSidebar
+        onAddTerminal={() => setShowModal(true)}
+        onLoadDemo={loadDemoWorkspace}
+        onOpenWorkflow={() => setShowWorkflow(true)}
         onNew={handleNew}
         onSave={() => { void handleSave(); }}
         onLoad={(name) => { void handleLoad(name); }}
         onRefreshList={() => { void refreshList(); }}
         savedWorkspaces={savedWorkspaces}
-        onStartAll={startAll}
-        onLoadDemo={loadDemoWorkspace}
-        onOpenWorkflow={() => setShowWorkflow(true)}
         onOpenSettings={() => setShowSettings(true)}
-        onAddTerminal={() => setShowModal(true)}
+        onStartAll={startAll}
         terminalCount={count}
         maxTerminals={MAX_TERMINALS}
         maxReached={maxReached}
       />
 
-      {/* Main content */}
-      <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
-        {count === 0 ? (
-          <div style={{
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            height: "100%", gap: 20, color: "#1e3a4a", userSelect: "none",
-          }}>
-            <div style={{
-              width: 144, height: 144,
-              backgroundImage: 'url("/female/cole/base/idle.png")',
-              backgroundSize: "432px 144px", backgroundPosition: "0 0",
-              backgroundRepeat: "no-repeat", imageRendering: "pixelated", opacity: 0.25,
-            }} />
-            <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: 1, color: "#2a4a5a" }}>
-              Create Your First Dino Terminal
+      {/* Main workspace column */}
+      <main className="workspace-shell">
+
+        <MainHeader
+          workspaceName={workspaceName}
+          onNameChange={setWorkspaceName}
+          viewMode={viewMode}
+          onToggleViewMode={() => setViewMode((m) => m === "focus" ? "grid" : "focus")}
+          activeTerminalLabel={activeTerminalLabel}
+        />
+
+        <section className="workspace-body">
+          {count === 0 ? (
+            /* Empty state */
+            <div className="empty-workspace">
+              <EmptyStateMascot size={72} />
+              <div className="empty-workspace-title">Create Your First Dino Terminal</div>
+              <div className="empty-workspace-sub">
+                Up to {MAX_TERMINALS} concurrent terminals · Real PTY · Dino state feedback
+              </div>
+              <div className="empty-workspace-actions">
+                <button
+                  className="empty-cta-primary"
+                  onClick={() => setShowModal(true)}
+                  disabled={maxReached}
+                >
+                  + New Terminal
+                </button>
+                <button
+                  className="empty-cta-secondary"
+                  onClick={loadDemoWorkspace}
+                >
+                  Load Demo
+                </button>
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: "#1a3040" }}>
-              Up to {MAX_TERMINALS} concurrent terminals · Real PTY · Dino state feedback
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-              <button
-                onClick={() => setShowModal(true)}
-                style={{
-                  padding: "10px 24px", background: "#00c8ff0f",
-                  border: "1px solid #00c8ff44", borderRadius: 6, color: "#00c8ff",
-                  fontSize: 13, fontFamily: "inherit", fontWeight: 700,
-                  letterSpacing: 1.5, cursor: "pointer", transition: "background 0.15s",
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#00c8ff1a"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#00c8ff0f"; }}
-              >+ NEW TERMINAL</button>
-              <button
-                onClick={loadDemoWorkspace}
-                style={{
-                  padding: "10px 20px", background: "none",
-                  border: "1px solid #1a3a4a", borderRadius: 6, color: "#334455",
-                  fontSize: 13, fontFamily: "inherit", fontWeight: 700,
-                  letterSpacing: 1.5, cursor: "pointer", transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#7dd3fc"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#00c8ff44"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#334455"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a3a4a"; }}
-              >LOAD DEMO</button>
-            </div>
-          </div>
-        ) : (
-          <TerminalGrid
-            agents={agents}
-            onRemove={removeAgent}
-            runningAgentIds={runningAgentIds}
-            onStart={startAgent}
-            onAddAttachment={addAttachment}
-            onRemoveAttachment={removeAttachment}
-            onLifecycleChange={handleLifecycleChange}
-            onRecordWorkflowLink={handleRecordWorkflowLink}
-            settings={settings}
-          />
-        )}
-      </div>
+          ) : (
+            <TerminalGrid
+              agents={agents}
+              onRemove={removeAgent}
+              runningAgentIds={runningAgentIds}
+              onStart={startAgent}
+              onAddAttachment={addAttachment}
+              onRemoveAttachment={removeAttachment}
+              onLifecycleChange={handleLifecycleChange}
+              onRecordWorkflowLink={handleRecordWorkflowLink}
+              settings={settings}
+              viewMode={viewMode}
+              activeTerminalId={activeTerminalId}
+              onActiveTerminalChange={setActiveTerminalId}
+              lifecycleByAgentId={lifecycleByAgentId}
+            />
+          )}
+        </section>
+      </main>
 
       {/* Agent creation modal */}
       {showModal && (

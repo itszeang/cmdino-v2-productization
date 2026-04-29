@@ -59,15 +59,17 @@ pub fn spawn_terminal(
     cwd: String,
     cols: u16,
     rows: u16,
-) -> Result<(), String> {
-    // Reject duplicate active session
+) -> Result<String, String> {
+    // If session already exists, report it as a successful attach — not an error.
+    // The frontend treats "already_running" as a reconnect: lifecycle → running,
+    // no new PTY, no launchCommand resend.
     {
         let inner = state
             .0
             .lock()
             .map_err(|_| "terminal state lock poisoned".to_string())?;
         if inner.sessions.contains_key(&agent_id) {
-            return Err(format!("terminal already running for {agent_id}"));
+            return Ok("already_running".to_string());
         }
     }
 
@@ -172,7 +174,7 @@ pub fn spawn_terminal(
         }
     });
 
-    Ok(())
+    Ok("spawned".to_string())
 }
 
 #[tauri::command]

@@ -37,3 +37,7 @@ export function isCenteringState(s: DinoState): boolean {
 export function isStaticState(s: DinoState): boolean {
   return s === "terminal_error" || s === "terminal_dead" || s === "review_scan";
 }
+
+export function isEggState(s: DinoState): boolean {
+  return s === "spawn_crack" || s === "spawn_hatch" || s === "spawn_move";
+}

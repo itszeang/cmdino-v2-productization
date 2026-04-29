@@ -16,8 +16,9 @@ export interface TerminalExitEvent {
 }
 
 export const terminalBridge = {
-  spawn(agentId: string, cwd: string, cols: number, rows: number): Promise<void> {
-    return invoke("spawn_terminal", { agentId, shell: "cmd.exe", cwd, cols, rows });
+  spawn(agentId: string, cwd: string, cols: number, rows: number): Promise<"spawned" | "already_running"> {
+    return invoke<string>("spawn_terminal", { agentId, shell: "cmd.exe", cwd, cols, rows })
+      .then((r) => r === "already_running" ? "already_running" : "spawned");
   },
 
   write(agentId: string, data: string): Promise<void> {

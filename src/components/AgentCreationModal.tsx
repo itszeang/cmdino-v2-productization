@@ -57,8 +57,6 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
     });
   }
 
-  const activePreset = AGENT_PRESETS.find((p) => p.id === form.presetId);
-
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div
@@ -67,23 +65,18 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
       >
         {/* Modal header */}
         <div className="modal-header">
-          <span className="modal-title">NEW DINO TERMINAL</span>
-          <button className="modal-close-btn" onClick={onCancel}>✕</button>
+          <span className="modal-title">New Dino Terminal</span>
+          <button className="modal-close-btn" onClick={onCancel}>x</button>
         </div>
 
         {/* Preset row */}
         <div className="modal-field-group">
-          <label className="modal-label">PRESET</label>
+          <label className="modal-label">Preset</label>
           <div className="preset-row">
             {AGENT_PRESETS.map((p) => (
               <button
                 key={p.id}
                 className={`preset-btn${form.presetId === p.id ? " preset-btn--active" : ""}`}
-                style={{
-                  borderColor: form.presetId === p.id ? p.accentColor : undefined,
-                  color: form.presetId === p.id ? p.accentColor : undefined,
-                  background: form.presetId === p.id ? `${p.accentColor}12` : undefined,
-                }}
                 onClick={() => applyPreset(p.id)}
               >
                 {p.label}
@@ -94,7 +87,7 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
 
         {/* Label */}
         <div className="modal-field-group">
-          <label className="modal-label" htmlFor="modal-label">LABEL</label>
+          <label className="modal-label" htmlFor="modal-label">Label</label>
           <input
             id="modal-label"
             className="modal-input"
@@ -107,7 +100,7 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
 
         {/* Launch command */}
         <div className="modal-field-group">
-          <label className="modal-label" htmlFor="modal-cmd">LAUNCH COMMAND</label>
+          <label className="modal-label" htmlFor="modal-cmd">Launch Command</label>
           <input
             id="modal-cmd"
             className="modal-input modal-input--mono"
@@ -119,7 +112,7 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
 
         {/* Working directory */}
         <div className="modal-field-group">
-          <label className="modal-label" htmlFor="modal-cwd">WORKING DIRECTORY</label>
+          <label className="modal-label" htmlFor="modal-cwd">Working Directory</label>
           <input
             id="modal-cwd"
             className="modal-input modal-input--mono"
@@ -131,17 +124,12 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
 
         {/* Dino selector */}
         <div className="modal-field-group">
-          <label className="modal-label">DINO</label>
+          <label className="modal-label">Dino</label>
           <div className="dino-row">
             {DINO_OPTIONS.map((opt) => (
               <button
                 key={opt.id}
                 className={`dino-btn${form.dinoId === opt.id ? " dino-btn--active" : ""}`}
-                style={{
-                  borderColor: form.dinoId === opt.id
-                    ? (activePreset?.accentColor ?? "#00c8ff")
-                    : undefined,
-                }}
                 onClick={() => setForm((f) => ({ ...f, dinoId: opt.id }))}
                 title={opt.label}
               >
@@ -159,15 +147,14 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
         {/* Actions */}
         <div className="modal-actions">
           <button className="modal-btn modal-btn--cancel" onClick={onCancel}>
-            CANCEL
+            Cancel
           </button>
           <button
             className="modal-btn modal-btn--create"
-            style={{ borderColor: activePreset?.accentColor, color: activePreset?.accentColor }}
             onClick={handleSubmit}
             disabled={!form.label.trim()}
           >
-            CREATE TERMINAL
+            Create Terminal
           </button>
         </div>
       </div>

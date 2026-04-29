@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { DinoLane }        from "../dino/DinoLane";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { DinoLane, type DinoVisualPhase } from "../dino/DinoLane";
 import { LogsPanel }       from "./LogsPanel";
 import { HandoffModal }    from "./HandoffModal";
 import type { TerminalAgent }   from "../domain/terminalAgent";
@@ -8,6 +8,7 @@ import { attachmentKindFromPath } from "../domain/orchestration";
 import { fileBridge }      from "../orchestration/fileBridge";
 import type { WorkflowLinkKind } from "../domain/workflow";
 import type { AppSettings } from "../domain/appSettings";
+import type { TerminalViewMode } from "../domain/viewMode";
 import {
   useTerminalProcess,
   type TerminalLifecycleState,
@@ -16,26 +17,31 @@ import {
 // ── Colour maps ───────────────────────────────────────────────────────────────
 
 const STATE_COLORS: Record<string, string> = {
-  patrol_running:   "#00c8ff",
-  heavy_processing: "#a855f7",
-  review_scan:      "#facc15",
-  success_signal:   "#22c55e",
-  handoff_signal:   "#22c55e",
-  terminal_error:   "#f87171",
+  patrol_running:   "#e5e5e5",
+  heavy_processing: "#d4d4d4",
+  review_scan:      "#fbbf24",
+  success_signal:   "#86efac",
+  handoff_signal:   "#86efac",
+  terminal_error:   "#fca5a5",
   terminal_dead:    "#6b7280",
-  idle_center:      "#1e3a4a",
+  idle_center:      "#737373",
 };
 
 const LIFECYCLE_COLORS: Record<TerminalLifecycleState, string> = {
-  dormant:  "#1e3a4a",
-  spawning: "#facc15",
-  running:  "#00c8ff",
+  dormant:  "#737373",
+  spawning: "#fbbf24",
+  running:  "#e5e5e5",
   exited:   "#6b7280",
   killed:   "#6b7280",
-  error:    "#f87171",
+  error:    "#fca5a5",
 };
 
-function dotColor(s: string) { return STATE_COLORS[s] ?? "#1e3a4a"; }
+const VIEW_MODE_DINO_SCALE: Record<TerminalViewMode, number> = {
+  focus: 1.25,
+  grid: 0.85,
+};
+
+function dotColor(s: string) { return STATE_COLORS[s] ?? "#737373"; }
 function lcLabel(lc: TerminalLifecycleState) { return lc.toUpperCase(); }
 
 // ── Shared button primitives ──────────────────────────────────────────────────
@@ -50,11 +56,19 @@ function HdrBtn({
   return (
     <button
       title={title} onClick={onClick} onMouseDown={onMouseDown}
-      style={{ background: "none", border: "none", color: "#2a3a4a", fontSize: 12,
-        lineHeight: 1, cursor: "pointer", padding: "2px 5px", borderRadius: 3,
-        fontFamily: "inherit", transition: "color 0.12s", flexShrink: 0 }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = danger ? "#f87171" : "#7dd3fc"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#2a3a4a"; }}
+      style={{ background: "transparent", border: "none", color: "var(--text-faint)", fontSize: 12,
+        lineHeight: 1, cursor: "pointer", padding: "4px 6px", borderRadius: 999,
+        fontFamily: "inherit", transition: "background 0.12s, color 0.12s", flexShrink: 0 }}
+      onMouseEnter={(e) => {
+        const b = e.currentTarget as HTMLButtonElement;
+        b.style.background = "var(--button-bg)";
+        b.style.color = danger ? "var(--danger)" : "var(--text-main)";
+      }}
+      onMouseLeave={(e) => {
+        const b = e.currentTarget as HTMLButtonElement;
+        b.style.background = "transparent";
+        b.style.color = "var(--text-faint)";
+      }}
     >{children}</button>
   );
 }
@@ -65,30 +79,32 @@ function StripBtn({
   onClick: () => void; disabled?: boolean; accent?: boolean;
   title?: string; children: React.ReactNode;
 }) {
-  const base  = accent ? "#00c8ff" : "#3a6a8a";
-  const bdBase = accent ? "#00c8ff33" : "#162a3a";
+  const base  = accent ? "var(--accent)" : "var(--text-muted)";
+  const bdBase = accent ? "var(--border-strong)" : "var(--border-subtle)";
   return (
     <button
       onClick={onClick} disabled={disabled} title={title}
       style={{
-        background: "none",
-        border: `1px solid ${disabled ? "#0d1a22" : bdBase}`,
-        color: disabled ? "#1a3040" : base,
-        fontSize: 9, padding: "1px 6px", borderRadius: 2,
-        fontFamily: "inherit", fontWeight: 700, letterSpacing: 0.8,
+        background: accent && !disabled ? "var(--button-bg)" : "transparent",
+        border: `1px solid ${disabled ? "transparent" : bdBase}`,
+        color: disabled ? "var(--text-faint)" : base,
+        fontSize: 10, padding: "4px 9px", borderRadius: 999,
+        fontFamily: "inherit", fontWeight: 600, letterSpacing: 0,
         cursor: disabled ? "not-allowed" : "pointer",
-        flexShrink: 0, whiteSpace: "nowrap", transition: "color 0.1s, border-color 0.1s",
+        flexShrink: 0, whiteSpace: "nowrap", transition: "background 0.1s, color 0.1s, border-color 0.1s",
       }}
       onMouseEnter={(e) => {
         if (disabled) return;
         const b = e.currentTarget as HTMLButtonElement;
-        b.style.color = "#7dd3fc";
-        b.style.borderColor = "#00c8ff55";
+        b.style.background = "var(--button-hover)";
+        b.style.color = "var(--text-main)";
+        b.style.borderColor = "var(--border-strong)";
       }}
       onMouseLeave={(e) => {
         const b = e.currentTarget as HTMLButtonElement;
-        b.style.color = disabled ? "#1a3040" : base;
-        b.style.borderColor = disabled ? "#0d1a22" : bdBase;
+        b.style.background = accent && !disabled ? "var(--button-bg)" : "transparent";
+        b.style.color = disabled ? "var(--text-faint)" : base;
+        b.style.borderColor = disabled ? "var(--border-subtle)" : bdBase;
       }}
     >{children}</button>
   );
@@ -118,6 +134,7 @@ interface Props {
   onLifecycleChange:    (agentId: string, lifecycle: TerminalLifecycleState) => void;
   onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
   settings?:            AppSettings;
+  viewMode:             TerminalViewMode;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -127,6 +144,7 @@ export function TerminalPane({
   allAgents, runningAgentIds, onAddAttachment, onRemoveAttachment,
   onLifecycleChange, onRecordWorkflowLink,
   settings,
+  viewMode,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -150,6 +168,43 @@ export function TerminalPane({
     onLifecycleChange(agent.id, lifecycle);
   }, [agent.id, lifecycle, onLifecycleChange]);
 
+  // ── Egg → hatch → dino spawn sequence ─────────────────────────────────────
+  // Tracks which visual phase we're in so DinoLane shows egg assets before
+  // the PTY is live, then briefly plays the hatch animation on first spawn.
+  const lifecycleRef = useRef<TerminalLifecycleState>(lifecycle);
+  const [dinoVisualPhase, setDinoVisualPhase] = useState<DinoVisualPhase>("egg_idle");
+
+  useEffect(() => {
+    lifecycleRef.current = lifecycle;
+
+    if (lifecycle === "dormant") {
+      setDinoVisualPhase("egg_idle");
+      return;
+    }
+
+    if (lifecycle === "spawning") {
+      setDinoVisualPhase((phase) => phase === "dino" ? "dino" : "egg_hatching");
+      return;
+    }
+
+    if (lifecycle === "running") {
+      setDinoVisualPhase((phase) => phase === "egg_idle" ? "egg_hatching" : phase);
+      return;
+    }
+
+    if (lifecycle === "error" || lifecycle === "exited" || lifecycle === "killed") {
+      setDinoVisualPhase("dino");
+    }
+  }, [lifecycle]);
+
+  const handleEggHatchComplete = useCallback(() => {
+    if (lifecycleRef.current === "running") {
+      setDinoVisualPhase("dino");
+    }
+  }, []);
+
+  // Derived dino state passed to DinoLane — overrides runtime dinoState
+  // while dormant/spawning so the egg asset is shown instead of the dino.
   // ── UI state ───────────────────────────────────────────────────────────────
 
   const [showLogs,       setShowLogs]       = useState(false);
@@ -167,6 +222,8 @@ export function TerminalPane({
   const color         = dotColor(dinoState);
   const lcColor       = LIFECYCLE_COLORS[lifecycle];
   const pulse         = dinoState === "patrol_running" || dinoState === "heavy_processing";
+  const showLifecycle = lifecycle !== "running";
+  const dinoScale     = (settings?.dinoScale ?? 1) * VIEW_MODE_DINO_SCALE[viewMode];
   // isAlive: lifecycle-based, from useTerminalProcess — use this for all action enable checks
   const isAlive        = lifecycle === "running" || lifecycle === "spawning";
   const runningTargets = allAgents.filter((a) => a.id !== agent.id && runningAgentIds.has(a.id));
@@ -250,36 +307,42 @@ export function TerminalPane({
   return (
     <div style={{
       display: "flex", flexDirection: "column",
-      background: "#0b0f14", border: "1px solid #0e2233",
-      borderRadius: 6, overflow: "hidden", height: "100%",
-      boxShadow: "0 0 32px rgba(0,200,255,0.05)", position: "relative",
+      background: "var(--surface-1)", border: "1px solid var(--border-subtle)",
+      borderRadius: 12, overflow: "hidden", height: "100%",
+      boxShadow: "none", position: "relative",
     }}>
 
       {/* ── Header — lifecycle only ── */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 6,
-        padding: "5px 8px 5px 12px",
-        background: "#0d1520", borderBottom: "1px solid #0e2233", flexShrink: 0,
+        display: "flex", alignItems: "center", gap: 7,
+        padding: "8px 10px",
+        background: "var(--surface-1)", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0,
       }}>
         <div
           className={pulse ? "status-dot-pulse" : undefined}
           style={{
-            width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0,
+            width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0,
             boxShadow: dinoState !== "terminal_dead" && dinoState !== "idle_center"
-              ? `0 0 8px ${color}, 0 0 16px ${color}40` : "none",
+              ? `0 0 0 2px ${color}1f` : "none",
             transition: "background 0.25s, box-shadow 0.25s",
           }}
         />
-        <span style={{ color: "#7dd3fc", fontWeight: 700, fontSize: 12, letterSpacing: 0.5 }}>
+        <span style={{
+          color: "var(--text-main)", fontWeight: 600, fontSize: 12, letterSpacing: 0,
+          minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
           {agent.label}
         </span>
-        <span style={{
-          marginLeft: "auto", color: lcColor,
-          fontSize: 10, letterSpacing: 1.5, fontWeight: 600,
-          transition: "color 0.25s", flexShrink: 0,
-        }}>
-          {lcLabel(lifecycle)}
-        </span>
+        <span style={{ flex: 1, minWidth: 0 }} />
+        {showLifecycle && (
+          <span style={{
+            color: lcColor,
+            fontSize: 10, letterSpacing: 0, fontWeight: 600,
+            transition: "color 0.25s", flexShrink: 0,
+          }}>
+            {lcLabel(lifecycle).toLowerCase()}
+          </span>
+        )}
         <HdrBtn title="Copy visible output" onClick={() => { void copyVisible(); }}>⎘</HdrBtn>
         <HdrBtn title="View session logs" onClick={() => setShowLogs(true)}
           onMouseDown={(e) => e.preventDefault()}>≡</HdrBtn>
@@ -290,16 +353,16 @@ export function TerminalPane({
       {/* ── Orchestration strip ── */}
       <div style={{
         display: "flex", alignItems: "center", gap: 5,
-        padding: "3px 8px",
-        background: "#090d12", borderBottom: "1px solid #0c1a24",
-        flexShrink: 0, minHeight: 24,
+        padding: "8px 10px",
+        background: "var(--surface-0)", borderBottom: "1px solid var(--border-subtle)",
+        flexShrink: 0, minHeight: 36,
       }}>
         {/* Attach skill button */}
         <StripBtn onClick={() => { setShowAddPath((v) => !v); setAddError(""); }} title="Attach a .md or .txt skill file">
           + ATTACH
         </StripBtn>
 
-        <span style={{ color: "#0d1e2a", fontSize: 11, flexShrink: 0 }}>│</span>
+        <span style={{ color: "var(--border-subtle)", fontSize: 12, flexShrink: 0 }}>|</span>
 
         {/* Attachment chips */}
         <div style={{
@@ -307,7 +370,7 @@ export function TerminalPane({
           overflowX: "auto", alignItems: "center", minWidth: 0,
         }}>
           {atts.length === 0 ? (
-            <span style={{ color: "#1a3040", fontSize: 9, letterSpacing: 0.6, whiteSpace: "nowrap" }}>
+            <span style={{ color: "var(--text-faint)", fontSize: 9, letterSpacing: 0.6, whiteSpace: "nowrap" }}>
               no attachments
             </span>
           ) : (
@@ -319,14 +382,14 @@ export function TerminalPane({
                     onClick={() => selectChip(att)}
                     title={att.path}
                     style={{
-                      background: active ? "#00c8ff14" : "none",
-                      border: `1px solid ${active ? "#00c8ff44" : "#162a3a"}`,
+                      background: active ? "var(--button-bg)" : "transparent",
+                      border: `1px solid ${active ? "var(--border-strong)" : "transparent"}`,
                       borderRight: "none",
-                      color: active ? "#7dd3fc" : "#3a6a8a",
-                      fontSize: 9, padding: "1px 5px",
-                      borderRadius: "2px 0 0 2px",
+                      color: active ? "var(--text-main)" : "var(--text-muted)",
+                      fontSize: 10, padding: "4px 7px",
+                      borderRadius: "999px 0 0 999px",
                       cursor: "pointer", fontFamily: "inherit",
-                      letterSpacing: 0.4, flexShrink: 0,
+                      letterSpacing: 0, flexShrink: 0,
                       transition: "background 0.1s, border-color 0.1s, color 0.1s",
                     }}
                   >{att.fileName}</button>
@@ -334,25 +397,25 @@ export function TerminalPane({
                     onClick={(e) => { e.stopPropagation(); onRemoveAttachment(att.id); if (selectedAttId === att.id) { setSelectedAttId(null); setPreview(PREVIEW_IDLE); } }}
                     title="Remove attachment"
                     style={{
-                      background: active ? "#00c8ff14" : "none",
-                      border: `1px solid ${active ? "#00c8ff44" : "#162a3a"}`,
-                      color: "#1a3040",
-                      fontSize: 8, padding: "1px 3px",
-                      borderRadius: "0 2px 2px 0",
+                      background: active ? "var(--button-bg)" : "transparent",
+                      border: `1px solid ${active ? "var(--border-strong)" : "transparent"}`,
+                      color: "var(--text-faint)",
+                      fontSize: 10, padding: "4px 6px",
+                      borderRadius: "0 999px 999px 0",
                       cursor: "pointer", fontFamily: "inherit",
                       flexShrink: 0, lineHeight: 1,
                       transition: "color 0.1s",
                     }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#1a3040"; }}
-                  >×</button>
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--danger)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)"; }}
+                  >x</button>
                 </div>
               );
             })
           )}
         </div>
 
-        <span style={{ color: "#0d1e2a", fontSize: 11, flexShrink: 0 }}>│</span>
+        <span style={{ color: "var(--border-subtle)", fontSize: 12, flexShrink: 0 }}>|</span>
 
         {/* Action buttons */}
         <StripBtn
@@ -368,7 +431,7 @@ export function TerminalPane({
           title={!hasAtt ? "No attachment" : isAlive ? `Send ${selectedAtt!.fileName} to terminal` : "Start terminal first"}
         >SEND</StripBtn>
         {hasAtt && !isAlive && (
-          <span style={{ color: "#f8717188", fontSize: 8, letterSpacing: 0.5, whiteSpace: "nowrap", flexShrink: 0 }}>
+          <span style={{ color: "var(--danger)", fontSize: 10, letterSpacing: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
             start first
           </span>
         )}
@@ -379,7 +442,7 @@ export function TerminalPane({
           disabled={!isAlive}
           accent
           title={isAlive ? "Handoff output to another terminal" : "Start terminal first"}
-        >HANDOFF ⇒</StripBtn>
+        >HANDOFF</StripBtn>
 
       </div>
 
@@ -387,8 +450,8 @@ export function TerminalPane({
       {showAddPath && (
         <div style={{
           display: "flex", alignItems: "center", gap: 5,
-          padding: "4px 8px",
-          background: "#07090e", borderBottom: "1px solid #0c1a24", flexShrink: 0,
+          padding: "8px 10px",
+          background: "var(--surface-0)", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0,
         }}>
           <input
             autoFocus
@@ -397,24 +460,24 @@ export function TerminalPane({
             onKeyDown={(e) => { if (e.key === "Enter") handleAddPath(); if (e.key === "Escape") { setShowAddPath(false); setAddInput(""); setAddError(""); } }}
             placeholder="Paste .md or .txt file path…"
             style={{
-              flex: 1, background: "#0d1520",
-              border: `1px solid ${addError ? "#f8717155" : "#162a3a"}`,
-              color: "#c8d8e8", fontSize: 10, padding: "2px 6px",
-              borderRadius: 2, fontFamily: "monospace", outline: "none",
+              flex: 1, background: "var(--surface-1)",
+              border: `1px solid ${addError ? "var(--danger)" : "var(--border-subtle)"}`,
+              color: "var(--text-main)", fontSize: 11, padding: "6px 10px",
+              borderRadius: 999, fontFamily: "monospace", outline: "none",
             }}
           />
           {addError && (
-            <span style={{ color: "#f87171", fontSize: 9, whiteSpace: "nowrap" }}>{addError}</span>
+            <span style={{ color: "var(--danger)", fontSize: 9, whiteSpace: "nowrap" }}>{addError}</span>
           )}
           <StripBtn onClick={handleAddPath} accent>ADD</StripBtn>
-          <StripBtn onClick={() => { setShowAddPath(false); setAddInput(""); setAddError(""); }}>✕</StripBtn>
+          <StripBtn onClick={() => { setShowAddPath(false); setAddInput(""); setAddError(""); }}>x</StripBtn>
         </div>
       )}
 
       {/* ── Preview area (collapsible) ── */}
       {showPreviewArea && (
         <div style={{
-          background: "#070b0e", borderBottom: "1px solid #0c1a24",
+          background: "var(--surface-0)", borderBottom: "1px solid var(--border-subtle)",
           flexShrink: 0, maxHeight: 110, overflowY: "auto", position: "relative",
         }}>
           <button
@@ -422,28 +485,28 @@ export function TerminalPane({
             title="Close preview"
             style={{
               position: "absolute", top: 3, right: 5,
-              background: "none", border: "none", color: "#1a3040",
+              background: "none", border: "none", color: "var(--text-faint)",
               fontSize: 10, cursor: "pointer", padding: 0, lineHeight: 1,
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#1a3040"; }}
-          >✕</button>
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--danger)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)"; }}
+          >x</button>
 
           {preview.loading && (
-            <div style={{ padding: "6px 8px", color: "#3a6a8a", fontSize: 9 }}>Loading…</div>
+            <div style={{ padding: "6px 8px", color: "var(--text-muted)", fontSize: 9 }}>Loading…</div>
           )}
           {preview.error && (
-            <div style={{ padding: "6px 8px", color: "#f87171", fontSize: 9 }}>{preview.error}</div>
+            <div style={{ padding: "6px 8px", color: "var(--danger)", fontSize: 9 }}>{preview.error}</div>
           )}
           {preview.content !== null && !preview.loading && (
             <>
               {preview.truncated && (
-                <div style={{ padding: "2px 8px", background: "#1a250a", color: "#facc15", fontSize: 8, borderBottom: "1px solid #0c1a24" }}>
+                <div style={{ padding: "2px 8px", background: "var(--accent-soft)", color: "var(--warning)", fontSize: 8, borderBottom: "1px solid var(--border-subtle)" }}>
                   truncated at 256 KB
                 </div>
               )}
               <pre style={{
-                margin: 0, padding: "5px 8px", color: "#c8d8e8",
+                margin: 0, padding: "5px 8px", color: "var(--text-main)",
                 fontSize: 10, fontFamily: "monospace",
                 whiteSpace: "pre-wrap", wordBreak: "break-word",
               }}>{preview.content}</pre>
@@ -452,37 +515,49 @@ export function TerminalPane({
         </div>
       )}
 
-      {/* ── Terminal area ── */}
-      {isRunning ? (
-        <div ref={containerRef} style={{ flex: 1, overflow: "hidden", background: "#070b0e", minHeight: 0 }} />
-      ) : (
-        <div style={{
-          flex: 1, display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          background: "#070b0e", gap: 12, minHeight: 0,
-        }}>
-          <span style={{ color: "#1a3a4a", fontSize: 10, letterSpacing: 2 }}>DORMANT</span>
-          <button
-            onClick={onStart}
-            style={{
-              padding: "6px 20px", background: "#00c8ff0f",
-              border: "1px solid #00c8ff44", borderRadius: 4,
-              color: "#00c8ff", fontSize: 11, fontFamily: "inherit",
-              fontWeight: 700, letterSpacing: 1, cursor: "pointer", transition: "background 0.15s",
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#00c8ff1a"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#00c8ff0f"; }}
-          >▶ START</button>
-        </div>
-      )}
+      <div style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+        background: "var(--terminal-bg)",
+      }}>
+        {isRunning ? (
+          <div ref={containerRef} style={{ flex: 1, overflow: "hidden", minHeight: 0 }} />
+        ) : (
+          <div style={{
+            flex: 1, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            gap: 8, minHeight: 0,
+          }}>
+            <span style={{ color: "var(--text-faint)", fontSize: 12, letterSpacing: 0 }}>Dormant</span>
+            <span style={{ color: "var(--text-faint)", fontSize: 10, letterSpacing: 0, opacity: 0.7 }}>
+              Start when ready
+            </span>
+            <button
+              onClick={onStart}
+              style={{
+                marginTop: 4,
+                padding: "7px 18px", background: "var(--accent)",
+                border: "1px solid transparent", borderRadius: 999,
+                color: "var(--app-bg)", fontSize: 12, fontFamily: "inherit",
+                fontWeight: 650, letterSpacing: 0, cursor: "pointer", transition: "opacity 0.15s",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.88"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
+            >START</button>
+          </div>
+        )}
 
-      {/* ── DinoLane ── */}
-      <DinoLane
-        dinoId={agent.dinoId}
-        state={dinoState}
-        animationSpeed={settings?.animationSpeed ?? 1}
-        dinoScale={settings?.dinoScale ?? 1}
-      />
+        <DinoLane
+          dinoId={agent.dinoId}
+          state={dinoState}
+          animationSpeed={settings?.animationSpeed ?? 1}
+          dinoScale={dinoScale}
+          visualPhase={dinoVisualPhase}
+          onEggHatchComplete={handleEggHatchComplete}
+        />
+      </div>
 
       {/* ── Logs overlay ── */}
       {showLogs && (

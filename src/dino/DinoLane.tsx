@@ -6,15 +6,19 @@ import {
   type DinoState,
   isPatrolState,
   isCenteringState,
+  isEggState,
 } from "../terminal/dinoStateMachine";
 
-const BASE_LANE_HEIGHT = 92;
+const FLOOR_BREATHING_PX = 24;
 const PATROL_SPEED     = 90;  // px/sec at speed 1×
 const CENTER_SPEED     = 70;  // px/sec at speed 1×
 const PATROL_MIN       = 0.10;
 const PATROL_MAX       = 0.90;
 const STATE_COOLDOWN_MS         = 1200;
 const CENTER_ARRIVE_THRESHOLD   = 0.025;
+
+export type DinoVisualPhase = "egg_idle" | "egg_hatching" | "dino";
+type EggHatchAnim = "crack" | "hatch";
 
 function needsCenterSequence(s: DinoState): boolean {
   return s === "success_signal" || s === "handoff_signal";
@@ -35,9 +39,18 @@ interface Props {
   state:           DinoState;
   animationSpeed?: number; // default 1
   dinoScale?:      number; // default 1
+  visualPhase?:    DinoVisualPhase;
+  onEggHatchComplete?: () => void;
 }
 
-export function DinoLane({ dinoId, state, animationSpeed = 1, dinoScale = 1 }: Props) {
+export function DinoLane({
+  dinoId,
+  state,
+  animationSpeed = 1,
+  dinoScale = 1,
+  visualPhase = "dino",
+  onEggHatchComplete,
+}: Props) {
   const laneRef      = useRef<HTMLDivElement>(null);
   const spriteWrapRef = useRef<HTMLDivElement>(null);
 
@@ -46,10 +59,12 @@ export function DinoLane({ dinoId, state, animationSpeed = 1, dinoScale = 1 }: P
 
   const [activeState, setActiveState] = useState<DinoState>("idle_center");
   const [flipX,       setFlipX]       = useState(false);
+  const [eggAnim,     setEggAnim]     = useState<EggHatchAnim>("crack");
 
   const [centerPhase, setCenterPhase] = useState<CenterPhase>("idle");
   const centerPhaseRef  = useRef<CenterPhase>("idle");
   const centerTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const eggTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const lastChangeRef   = useRef(0);
   const pendingRef      = useRef<DinoState | null>(null);
@@ -58,8 +73,42 @@ export function DinoLane({ dinoId, state, animationSpeed = 1, dinoScale = 1 }: P
   // Keep refs current for use inside RAF without restarting the loop
   const speedRef = useRef(animationSpeed);
   const scaleRef = useRef(dinoScale);
+  const visualPhaseRef = useRef<DinoVisualPhase>(visualPhase);
   useEffect(() => { speedRef.current = animationSpeed; }, [animationSpeed]);
   useEffect(() => { scaleRef.current = dinoScale;      }, [dinoScale]);
+  useEffect(() => { visualPhaseRef.current = visualPhase; }, [visualPhase]);
+
+  useEffect(() => {
+    if (eggTimerRef.current) {
+      clearTimeout(eggTimerRef.current);
+      eggTimerRef.current = null;
+    }
+
+    if (visualPhase === "egg_idle") {
+      setEggAnim("crack");
+      setFlipX(false);
+      return;
+    }
+
+    if (visualPhase !== "egg_hatching") return;
+
+    setEggAnim("crack");
+    setFlipX(false);
+
+    const crackMs = getAnimDuration(dinoId, "spawn_crack");
+    const hatchMs = getAnimDuration(dinoId, "spawn_hatch");
+
+    eggTimerRef.current = setTimeout(() => {
+      setEggAnim("hatch");
+      eggTimerRef.current = setTimeout(() => {
+        onEggHatchComplete?.();
+      }, hatchMs);
+    }, crackMs);
+
+    return () => {
+      if (eggTimerRef.current) clearTimeout(eggTimerRef.current);
+    };
+  }, [dinoId, onEggHatchComplete, visualPhase]);
 
   // ── External state transitions ────────────────────────────────────────────
   useEffect(() => {
@@ -67,7 +116,7 @@ export function DinoLane({ dinoId, state, animationSpeed = 1, dinoScale = 1 }: P
       clearTimeout(pendingTimerRef.current);
       pendingTimerRef.current = null;
     }
-    if (state === "terminal_dead") {
+    if (state === "terminal_dead" || isEggState(state)) {
       setActiveState(state);
       lastChangeRef.current = Date.now();
       return;
@@ -134,6 +183,13 @@ export function DinoLane({ dinoId, state, animationSpeed = 1, dinoScale = 1 }: P
       const maxX     = laneW - displayPx;
       if (maxX <= 0) { rafId = requestAnimationFrame(loop); return; }
 
+      if (visualPhaseRef.current !== "dino") {
+        xRef.current = 0.5;
+        wrap.style.transform = `translateX(${Math.round(maxX / 2)}px)`;
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
+
       const phase         = centerPhaseRef.current;
       const patrolSpeed   = PATROL_SPEED * speedRef.current;
       const centerSpeed   = CENTER_SPEED  * speedRef.current;
@@ -174,6 +230,12 @@ export function DinoLane({ dinoId, state, animationSpeed = 1, dinoScale = 1 }: P
           dirRef.current = newDir;
           setFlipX(newDir < 0);
         }
+      } else if (isEggState(activeState)) {
+        // Egg sits centered on the floor — drift there quietly.
+        const diff = 0.5 - xRef.current;
+        if (Math.abs(diff) > 0.005) {
+          xRef.current += (Math.sign(diff) * centerSpeed * dt) / maxX;
+        }
       }
 
       wrap.style.transform = `translateX(${Math.round(xRef.current * maxX)}px)`;
@@ -190,9 +252,11 @@ export function DinoLane({ dinoId, state, animationSpeed = 1, dinoScale = 1 }: P
     needsCenterSequence(activeState) && centerPhase === "centering"
       ? ({ category: "base" as const, name: "move" })
       : stateAnimRef;
+  const isEggPhase = visualPhase !== "dino";
 
-  const laneHeight = Math.round(BASE_LANE_HEIGHT * dinoScale);
   const displayPx  = Math.round(FRAME_PX * dinoScale);
+  const laneHeight = displayPx + Math.round(FLOOR_BREATHING_PX * dinoScale);
+  const spriteBottom = Math.round(8 * dinoScale);
 
   return (
     <div
@@ -201,43 +265,38 @@ export function DinoLane({ dinoId, state, animationSpeed = 1, dinoScale = 1 }: P
         position:        "relative",
         width:           "100%",
         height:          laneHeight,
-        background:      "rgba(0,0,0,0.65)",
-        backgroundImage: [
-          "repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,200,255,0.018) 3px, rgba(0,200,255,0.018) 4px)",
-          "repeating-linear-gradient(90deg, transparent, transparent 24px, rgba(0,200,255,0.012) 24px, rgba(0,200,255,0.012) 25px)",
+        marginTop:        0,
+        paddingTop:       Math.round(10 * dinoScale),
+        background:      [
+          "linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.008) 48%, var(--terminal-floor) 100%)",
+          "radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.026), transparent 66%)",
         ].join(", "),
-        borderTop:  "1px solid rgba(0,200,255,0.12)",
-        boxShadow:  "inset 0 1px 0 rgba(0,200,255,0.06)",
-        overflow:   "hidden",
+        borderTop:       "none",
+        boxShadow:       "none",
+        overflow:        "visible",
         flexShrink: 0,
       }}
     >
       <div
-        style={{
-          position: "absolute",
-          bottom: 0, left: 0, right: 0,
-          height:     1,
-          background: "rgba(0,200,255,0.08)",
-        }}
-      />
-      <div
         ref={spriteWrapRef}
         style={{
           position:    "absolute",
-          bottom:      Math.round(6 * dinoScale),
+          bottom:      spriteBottom,
           left:        0,
           width:       displayPx,
           height:      displayPx,
           willChange:  "transform",
+          overflow:    "visible",
         }}
       >
         <SpriteAnimator
           dinoId={dinoId}
-          category={displayAnimRef.category}
-          animName={displayAnimRef.name}
-          flipX={flipX}
+          category={isEggPhase ? "egg" : displayAnimRef.category}
+          animName={isEggPhase ? eggAnim : displayAnimRef.name}
+          flipX={isEggPhase ? false : flipX}
           animationSpeed={animationSpeed}
           displayScale={dinoScale}
+          freezeFrame={visualPhase === "egg_idle" ? 0 : undefined}
         />
       </div>
     </div>

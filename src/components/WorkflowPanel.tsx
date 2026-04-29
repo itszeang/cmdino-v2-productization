@@ -11,15 +11,15 @@ const CX      = PANEL_W / 2;
 const CY      = (PANEL_H - 40) / 2 + 20; // offset for header
 
 const LC_COLORS: Record<string, string> = {
-  dormant:  "#1e3a4a",
-  spawning: "#facc15",
-  running:  "#00c8ff",
+  dormant:  "#737373",
+  spawning: "#fbbf24",
+  running:  "#e5e5e5",
   exited:   "#6b7280",
   killed:   "#6b7280",
-  error:    "#f87171",
+  error:    "#fca5a5",
 };
 
-function lcColor(lc: string) { return LC_COLORS[lc] ?? "#1e3a4a"; }
+function lcColor(lc: string) { return LC_COLORS[lc] ?? "#737373"; }
 
 function dinoIdleSprite(dinoId: string): string {
   const p = dinoId.split("-");
@@ -100,7 +100,8 @@ export function WorkflowPanel({
       style={{
         position:       "fixed",
         inset:          0,
-        background:     "rgba(0,0,0,0.78)",
+        background:     "var(--overlay-bg)",
+        backdropFilter:  "blur(8px)",
         display:        "flex",
         alignItems:     "center",
         justifyContent: "center",
@@ -114,13 +115,13 @@ export function WorkflowPanel({
           maxWidth:       "96vw",
           height:         PANEL_H,
           maxHeight:      "90vh",
-          background:     "#090d12",
-          border:         "1px solid #0e2233",
-          borderRadius:   10,
+          background:     "var(--surface-1)",
+          border:         "1px solid var(--border-subtle)",
+          borderRadius:   12,
           overflow:       "hidden",
           display:        "flex",
           flexDirection:  "column",
-          boxShadow:      "0 0 80px rgba(0,200,255,0.07)",
+          boxShadow:      "var(--shadow-panel)",
           position:       "relative",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -130,37 +131,38 @@ export function WorkflowPanel({
           display:       "flex",
           alignItems:    "center",
           gap:           10,
-          padding:       "9px 14px",
-          borderBottom:  "1px solid #0e2233",
+          padding:       "14px 16px",
+          borderBottom:  "1px solid var(--border-subtle)",
           flexShrink:    0,
-          background:    "#0b0f14",
+          background:    "var(--surface-1)",
         }}>
-          <span style={{ color: "#00c8ff", fontWeight: 700, fontSize: 11, letterSpacing: 2 }}>
-            WORKFLOW VIEW
+          <span style={{ color: "var(--text-main)", fontWeight: 650, fontSize: 13, letterSpacing: 0 }}>
+            Workflow
           </span>
-          <span style={{ color: "#1a3a4a", fontSize: 10 }}>
+          <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
             {agents.length} terminal{agents.length !== 1 ? "s" : ""}
-            {drawLinks.length > 0 ? ` · ${drawLinks.length} link${drawLinks.length !== 1 ? "s" : ""}` : ""}
+            {drawLinks.length > 0 ? ` - ${drawLinks.length} link${drawLinks.length !== 1 ? "s" : ""}` : ""}
           </span>
           <button
             onClick={onClose}
             style={{
               marginLeft:   "auto",
-              background:   "none",
+              background:   "transparent",
               border:       "none",
-              color:        "#2a3a4a",
+              color:        "var(--text-muted)",
               fontSize:     15,
               cursor:       "pointer",
-              padding:      "0 2px",
+              padding:      "4px 7px",
               lineHeight:   1,
+              borderRadius: 999,
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#2a3a4a"; }}
-          >✕</button>
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--button-bg)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text-main)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)"; }}
+          >x</button>
         </div>
 
         {/* ── Canvas ── */}
-        <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "var(--surface-0)" }}>
 
           {/* Empty states */}
           {agents.length === 0 && (
@@ -170,9 +172,9 @@ export function WorkflowPanel({
               display:        "flex",
               alignItems:     "center",
               justifyContent: "center",
-              color:          "#1a3a4a",
-              fontSize:       12,
-              letterSpacing:  1,
+              color:          "var(--text-muted)",
+              fontSize:       13,
+              letterSpacing:  0,
             }}>
               No Dino terminals
             </div>
@@ -184,11 +186,11 @@ export function WorkflowPanel({
               left:      0,
               right:     0,
               textAlign: "center",
-              color:     "#162a38",
-              fontSize:  9,
-              letterSpacing: 0.8,
+              color:     "var(--text-faint)",
+              fontSize:  11,
+              letterSpacing: 0,
             }}>
-              No manual handoffs recorded yet — send a handoff to create a link
+              No manual handoffs recorded yet
             </div>
           )}
 
@@ -205,7 +207,7 @@ export function WorkflowPanel({
                 markerWidth="5" markerHeight="5"
                 orient="auto"
               >
-                <path d="M 0 0 L 10 5 L 0 10 z" fill="#00c8ff55" />
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--text-faint)" />
               </marker>
             </defs>
 
@@ -222,7 +224,7 @@ export function WorkflowPanel({
                 <g key={link.id}>
                   <line
                     x1={x1} y1={y1} x2={x2} y2={y2}
-                    stroke="#00c8ff44"
+                    stroke="var(--border-strong)"
                     strokeWidth={sw}
                     markerEnd="url(#wf-arrow)"
                   />
@@ -240,14 +242,14 @@ export function WorkflowPanel({
                         alignItems:     "center",
                         justifyContent: "center",
                         gap:            4,
-                        background:     "#09131a",
-                        border:         "1px solid #0e2030",
-                        borderRadius:   3,
-                        padding:        "1px 4px",
+                        background:     "var(--surface-1)",
+                        border:         "1px solid var(--border-subtle)",
+                        borderRadius:   999,
+                        padding:        "3px 7px",
                         whiteSpace:     "nowrap",
                       }}
                     >
-                      <span style={{ color: "#3a6a8a", fontSize: 8, letterSpacing: 0.5 }}>
+                      <span style={{ color: "var(--text-muted)", fontSize: 10, letterSpacing: 0 }}>
                         {label}
                       </span>
                       <button
@@ -255,16 +257,16 @@ export function WorkflowPanel({
                         style={{
                           background:   "none",
                           border:       "none",
-                          color:        "#1a3040",
-                          fontSize:     9,
+                          color:        "var(--text-faint)",
+                          fontSize:     10,
                           cursor:       "pointer",
                           padding:      0,
                           lineHeight:   1,
                           flexShrink:   0,
                         }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#1a3040"; }}
-                      >×</button>
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--danger)"; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)"; }}
+                      >x</button>
                     </div>
                   </foreignObject>
                 </g>
@@ -288,14 +290,14 @@ export function WorkflowPanel({
                   top:           pos.y,
                   width:         NODE_W,
                   height:        NODE_H,
-                  background:    "#0d1520",
-                  border:        `1px solid ${lc === "running" ? "#00c8ff22" : "#0e2030"}`,
-                  borderRadius:  6,
+                  background:    "var(--surface-1)",
+                  border:        `1px solid ${lc === "running" ? "var(--border-strong)" : "var(--border-subtle)"}`,
+                  borderRadius:  12,
                   display:       "flex",
                   alignItems:    "center",
                   gap:           8,
                   padding:       "8px 10px",
-                  boxShadow:     lc === "running" ? "0 0 20px rgba(0,200,255,0.05)" : "none",
+                  boxShadow:     "none",
                 }}
               >
                 {/* Dino avatar */}
@@ -318,10 +320,10 @@ export function WorkflowPanel({
                 {/* Text info */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
                   <span style={{
-                    color:         "#7dd3fc",
-                    fontSize:      10,
-                    fontWeight:    700,
-                    letterSpacing: 0.4,
+                    color:         "var(--text-main)",
+                    fontSize:      11,
+                    fontWeight:    650,
+                    letterSpacing: 0,
                     overflow:      "hidden",
                     textOverflow:  "ellipsis",
                     whiteSpace:    "nowrap",
@@ -330,27 +332,27 @@ export function WorkflowPanel({
                   </span>
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                     <span style={{
-                      color:         "#1e4a5a",
-                      fontSize:      8,
-                      letterSpacing: 0.6,
-                      background:    "#0a1a24",
-                      padding:       "0 3px",
-                      borderRadius:  2,
+                      color:         "var(--text-muted)",
+                      fontSize:      9,
+                      letterSpacing: 0,
+                      background:    "var(--button-bg)",
+                      padding:       "2px 6px",
+                      borderRadius:  999,
                     }}>
                       {kind}
                     </span>
                     <span style={{
                       color:         lcColor(lc),
-                      fontSize:      8,
-                      letterSpacing: 0.8,
+                      fontSize:      9,
+                      letterSpacing: 0,
                       fontWeight:    600,
                     }}>
                       {lc.toUpperCase()}
                     </span>
                   </div>
                   <span style={{
-                    color:         "#162a38",
-                    fontSize:      8,
+                    color:         "var(--text-faint)",
+                    fontSize:      9,
                     overflow:      "hidden",
                     textOverflow:  "ellipsis",
                     whiteSpace:    "nowrap",
