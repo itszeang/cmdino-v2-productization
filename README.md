@@ -171,6 +171,7 @@ flowchart LR
 
     Intelligence --> Dino
     State --> Workspace[Local .cmdino.json Files]
+
 Runtime Flow
 User deploys an AI agent preset or custom shell worker.
 CMDino creates a PTY-backed terminal config.
@@ -365,17 +366,3 @@ License
 No license file has been published yet.
 
 Until then, all code and assets should be considered all rights reserved.
-
-
----
-
-Bu README artık:
-- daha launch-grade,
-- daha scan edilebilir,
-- daha product hissiyatlı.
-
-### Sana dürüst söyleyeyim:
-GitHub reposunda çok iyi durur.
-
-Bir sonraki mantıklı adım:
-istersen buna uygun **repo için profesyonel screenshot/gif placeholder assetlerini de üretelim** ki README gerçekten dolu görünsün.
