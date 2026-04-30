@@ -20,8 +20,8 @@ export const DEMO_WORKSPACE: CmdinoWorkspaceFile = {
       attachments: [
         {
           id:       "demo-att-claude-01",
-          path:     "cmdino-preset://claude-planner.md",
-          fileName: "claude-planner.md",
+          path:     "cmdino-preset://claude",
+          fileName: "CLAUDE.md",
         },
       ],
     },
@@ -36,8 +36,8 @@ export const DEMO_WORKSPACE: CmdinoWorkspaceFile = {
       attachments: [
         {
           id:       "demo-att-codex-01",
-          path:     "cmdino-preset://codex-builder.md",
-          fileName: "codex-builder.md",
+          path:     "cmdino-preset://codex",
+          fileName: "CODEX.md",
         },
       ],
     },
@@ -52,8 +52,8 @@ export const DEMO_WORKSPACE: CmdinoWorkspaceFile = {
       attachments: [
         {
           id:       "demo-att-gemini-01",
-          path:     "cmdino-preset://gemini-reviewer.md",
-          fileName: "gemini-reviewer.md",
+          path:     "cmdino-preset://gemini",
+          fileName: "GEMINI.md",
         },
       ],
     },

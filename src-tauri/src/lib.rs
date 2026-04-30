@@ -6,7 +6,7 @@ use terminal::{
     kill_terminal, resize_terminal, spawn_terminal, write_terminal, TerminalState,
 };
 use workspace::{list_workspace_files, load_workspace_file, save_workspace_file};
-use files::read_file_preview;
+use files::{read_file_preview, read_preset_brain};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -21,6 +21,7 @@ pub fn run() {
             load_workspace_file,
             list_workspace_files,
             read_file_preview,
+            read_preset_brain,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
