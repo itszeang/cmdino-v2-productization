@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { TerminalGrid }        from "./components/TerminalGrid";
-import { AgentCreationModal }  from "./components/AgentCreationModal";
-import { AgentEditModal }      from "./components/AgentEditModal";
-import { AppSidebar }          from "./components/AppSidebar";
+import { TerminalGrid }           from "./components/TerminalGrid";
+import { AgentCreationModal }     from "./components/AgentCreationModal";
+import { AgentEditModal }         from "./components/AgentEditModal";
+import { EmptyWorkspaceState }    from "./components/EmptyWorkspaceState";
+import { AppSidebar }             from "./components/AppSidebar";
 import { MainHeader }          from "./components/MainHeader";
 import { WorkflowPanel }       from "./components/WorkflowPanel";
 import { SettingsPanel }       from "./components/SettingsPanel";
@@ -226,29 +227,11 @@ export default function App() {
 
         <section className="workspace-body">
           {count === 0 ? (
-            /* Empty state */
-            <div className="empty-workspace">
-              <img src="/icon.png" className="empty-icon" alt="CMDino" />
-              <div className="empty-workspace-title">Deploy Your First Agent</div>
-              <div className="empty-workspace-sub">
-                Up to {MAX_TERMINALS} concurrent agents · Real PTY · Dino state feedback
-              </div>
-              <div className="empty-workspace-actions">
-                <button
-                  className="empty-cta-primary"
-                  onClick={() => setShowModal(true)}
-                  disabled={maxReached}
-                >
-                  Deploy Agent
-                </button>
-                <button
-                  className="empty-cta-secondary"
-                  onClick={loadDemoWorkspace}
-                >
-                  Load Demo
-                </button>
-              </div>
-            </div>
+            <EmptyWorkspaceState
+              maxTerminals={MAX_TERMINALS}
+              onDeployAgent={() => setShowModal(true)}
+              onLoadDemo={loadDemoWorkspace}
+            />
           ) : (
             <TerminalGrid
               agents={agents}
@@ -296,14 +279,15 @@ export default function App() {
         );
       })()}
 
-      {/* First-launch mission briefing */}
-      {!settings.onboardingDismissed && (
+      {/* First-launch mission briefing — only when no agents are loaded */}
+      {!settings.onboardingDismissed && count === 0 && (
         <WelcomeModal
           onDismiss={(dontShow) => updateSettings({ onboardingDismissed: dontShow })}
           onLoadDemo={() => {
             loadDemoWorkspace();
             updateSettings({ onboardingDismissed: true });
           }}
+          onDeployAgent={() => setShowModal(true)}
         />
       )}
 

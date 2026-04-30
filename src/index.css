@@ -927,91 +927,146 @@ input[type="range"]::-webkit-slider-track {
 
 /* ── Empty workspace state ───────────────────────────────────────────────── */
 
-.empty-workspace {
+/* ── Empty workspace state ────────────────────────────────────────────────── */
+
+.empty-ws {
   height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  padding: 32px 24px;
+}
+
+.empty-ws-inner {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
-  user-select: none;
+  gap: 18px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
 }
 
-.empty-workspace-title {
-  font-size: 17px;
+.empty-ws-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: block;
+  object-fit: contain;
+  opacity: 0.9;
+}
+
+.empty-ws-headline {
+  font-size: 18px;
   font-weight: 700;
+  color: var(--text-main);
   letter-spacing: 0;
-  color: var(--text-muted);
+  line-height: 1.25;
+  margin: 0;
 }
 
-.empty-workspace-sub {
+.empty-ws-desc {
   font-size: 12px;
-  color: var(--text-faint);
-  letter-spacing: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0;
+  max-width: 340px;
 }
 
-.empty-workspace-actions {
+.empty-ws-actions {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 10px;
-  margin-top: 6px;
+  width: 100%;
 }
 
-.empty-cta-primary {
-  padding: 9px 20px;
+.empty-ws-primary {
+  padding: 10px 28px;
   background: var(--accent);
   border: 1px solid transparent;
   border-radius: 999px;
   color: var(--app-bg);
-  font-size: 12px;
+  font-size: 13px;
   font-family: inherit;
   font-weight: 650;
-  letter-spacing: 0;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.14s;
 }
-.empty-cta-primary:hover:not(:disabled) { opacity: 0.88; }
-.empty-cta-primary:disabled {
-  background: var(--button-bg);
-  color: var(--text-faint);
-  cursor: not-allowed;
+.empty-ws-primary:hover { opacity: 0.88; }
+
+.empty-ws-demo-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
 }
 
-.empty-cta-secondary {
-  padding: 9px 18px;
+.empty-ws-secondary {
+  padding: 9px 20px;
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-subtle);
   border-radius: 999px;
   color: var(--text-muted);
   font-size: 12px;
   font-family: inherit;
-  font-weight: 650;
-  letter-spacing: 0;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
 }
-.empty-cta-secondary:hover {
+.empty-ws-secondary:hover {
   background: var(--button-bg);
   color: var(--text-main);
+  border-color: var(--border-strong);
 }
 
-/* ── Empty state app icon ─────────────────────────────────────────────────── */
-
-.empty-icon {
-  width: 100px;
-  height: 100px;
-  display: block;
-  object-fit: contain;
-  border-radius: 22px;
-  /* Dark theme: invert so black-on-white becomes white-on-dark */
-  filter: invert(1) brightness(0.82);
-  user-select: none;
-  pointer-events: none;
+.empty-ws-demo-hint {
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: 0;
 }
 
-[data-theme="light"] .empty-icon {
-  /* Light theme: multiply removes the white bg, black strokes stay */
-  filter: none;
-  mix-blend-mode: multiply;
+.empty-ws-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.empty-ws-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.empty-ws-step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  font-size: 10px;
+  font-weight: 650;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.empty-ws-step-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.empty-ws-step-sep {
+  font-size: 11px;
+  color: var(--text-faint);
+  flex-shrink: 0;
 }
 
 /* ── Terminal Grid Layout ──────────────────────────────────────────────────── */
