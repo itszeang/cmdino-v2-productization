@@ -19,6 +19,7 @@ interface Props {
   onRemoveAttachment:   (agentId: string, attachmentId: string) => void;
   onLifecycleChange:    (agentId: string, lifecycle: TerminalLifecycleState) => void;
   onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
+  onEditAgent:          (id: string) => void;
   settings?:            AppSettings;
   viewMode:             TerminalViewMode;
   onViewModeChange:     (mode: TerminalViewMode) => void;
@@ -33,7 +34,7 @@ interface Props {
 export function TerminalGrid({
   agents, onRemove, runningAgentIds, onStart,
   onAddAttachment, onRemoveAttachment,
-  onLifecycleChange, onRecordWorkflowLink,
+  onLifecycleChange, onRecordWorkflowLink, onEditAgent,
   settings,
   viewMode, onViewModeChange, activeTerminalId, onActiveTerminalChange,
   lifecycleByAgentId, onFocusPane, workflowLinks, onFocusTarget,
@@ -95,6 +96,7 @@ export function TerminalGrid({
                   onRemoveAttachment={(attId) => onRemoveAttachment(agent.id, attId)}
                   onLifecycleChange={onLifecycleChange}
                   onRecordWorkflowLink={onRecordWorkflowLink}
+                  onEditAgent={onEditAgent}
                   settings={settings}
                   viewMode={viewMode}
                   isActive={isActive}

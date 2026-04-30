@@ -517,6 +517,53 @@ textarea {
   cursor: not-allowed;
 }
 
+/* ── Agent edit modal ─────────────────────────────────────────────────────── */
+
+.edit-running-notice {
+  margin: 12px 18px 0;
+  padding: 8px 12px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 8px;
+  color: var(--warning);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.edit-att-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.edit-att-name {
+  flex: 1;
+  font-size: 11px;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  color: var(--text-main);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-att-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 999px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.edit-att-remove:hover {
+  color: var(--danger);
+  background: var(--button-bg);
+}
+
 input[type="range"] {
   -webkit-appearance: none;
   height: 3px;

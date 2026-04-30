@@ -4,7 +4,17 @@ import type { CmdinoWorkspaceFile } from "../domain/workspace";
 import { WORKSPACE_SCHEMA_VERSION } from "../domain/workspace";
 import type { TerminalAttachment } from "../domain/orchestration";
 import { attachmentKindFromPath } from "../domain/orchestration";
+import type { AgentKind } from "../domain/agentKind";
 import type { WorkflowLink, WorkflowLinkKind } from "../domain/workflow";
+
+export interface AgentConfigUpdate {
+  label:          string;
+  dinoId:         string;
+  launchCommand?: string;
+  cwd?:           string;
+  agentKind:      AgentKind;
+  attachments:    TerminalAttachment[];
+}
 import {
   upsertWorkflowLink,
   removeWorkflowLink  as wfRemoveLink,
@@ -60,6 +70,22 @@ export function useTerminalAgents() {
       setRunningAgentIds((ids) => new Set([...ids, id]));
     }
     return id;
+  }, []);
+
+  const updateAgent = useCallback((agentId: string, update: AgentConfigUpdate) => {
+    setAgents((prev) =>
+      prev.map((a) =>
+        a.id !== agentId ? a : {
+          ...a,
+          label:         update.label.trim() || a.label,
+          dinoId:        update.dinoId,
+          launchCommand: update.launchCommand?.trim() || undefined,
+          cwd:           update.cwd?.trim()           || undefined,
+          agentKind:     update.agentKind,
+          attachments:   dedupAttachments(update.attachments),
+        }
+      )
+    );
   }, []);
 
   const removeAgent = useCallback((id: string) => {
@@ -160,6 +186,7 @@ export function useTerminalAgents() {
         path:     pa.path,
         fileName: pa.fileName,
         addedAt:  Date.now(),
+        source:   pa.path.startsWith("cmdino-preset://") ? "preset" as const : "user" as const,
       })),
     }));
     setAgents(newAgents);
@@ -200,6 +227,7 @@ export function useTerminalAgents() {
     runningAgentIds,
     workflowLinks,
     addAgent,
+    updateAgent,
     removeAgent,
     addAttachment,
     removeAttachment,

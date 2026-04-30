@@ -134,6 +134,7 @@ interface Props {
   onRemoveAttachment:   (attachmentId: string) => void;
   onLifecycleChange:    (agentId: string, lifecycle: TerminalLifecycleState) => void;
   onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
+  onEditAgent:          (id: string) => void;
   settings?:            AppSettings;
   viewMode:             TerminalViewMode;
   isActive:             boolean;
@@ -147,7 +148,7 @@ interface Props {
 export function TerminalPane({
   agent, onRemove, isRunning, onStart,
   allAgents, runningAgentIds, onAddAttachment, onRemoveAttachment,
-  onLifecycleChange, onRecordWorkflowLink,
+  onLifecycleChange, onRecordWorkflowLink, onEditAgent,
   settings,
   viewMode, isActive, onFocus,
   workflowLinks, onFocusTarget,
@@ -411,6 +412,11 @@ export function TerminalPane({
             )}
           </HdrBtn>
         )}
+        <HdrBtn title="Agent Settings" onClick={() => onEditAgent(agent.id)}>
+          <svg viewBox="0 0 10 10" width="10" height="10" fill="currentColor" style={{ display: "block" }}>
+            <path d="M5 3.2a1.8 1.8 0 1 0 0 3.6A1.8 1.8 0 0 0 5 3.2zm3.7-.5-.5-.87-.87.5A3.2 3.2 0 0 0 6 2.02V1h-2v1.02a3.2 3.2 0 0 0-1.33.31l-.87-.5-.5.87.87.5A3.2 3.2 0 0 0 1.83 5H.8v1h1.03a3.2 3.2 0 0 0 .31 1.33l-.87.5.5.87.87-.5A3.2 3.2 0 0 0 4 9.17V10h2V9.17a3.2 3.2 0 0 0 1.33-.3l.87.5.5-.87-.87-.5A3.2 3.2 0 0 0 8.17 7H9.2V6H8.17A3.2 3.2 0 0 0 7.87 4.7l.83-.5z"/>
+          </svg>
+        </HdrBtn>
         <HdrBtn title="Close terminal" onClick={() => { void handleRemove(); }} danger>✕</HdrBtn>
       </div>
 

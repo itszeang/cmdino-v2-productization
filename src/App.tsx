@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { TerminalGrid }        from "./components/TerminalGrid";
 import { AgentCreationModal }  from "./components/AgentCreationModal";
+import { AgentEditModal }      from "./components/AgentEditModal";
 import { AppSidebar }          from "./components/AppSidebar";
 import { MainHeader }          from "./components/MainHeader";
 import { WorkflowPanel }       from "./components/WorkflowPanel";
@@ -29,6 +30,7 @@ export default function App() {
     runningAgentIds,
     workflowLinks,
     addAgent,
+    updateAgent,
     removeAgent,
     addAttachment,
     removeAttachment,
@@ -50,6 +52,7 @@ export default function App() {
   const [showSettings,        setShowSettings]        = useState(false);
   const [savedWorkspaces,     setSavedWorkspaces]     = useState<string[]>([]);
   const [lifecycleByAgentId,  setLifecycleByAgentId]  = useState<Record<string, string>>({});
+  const [editingAgentId,      setEditingAgentId]      = useState<string | null>(null);
 
   // ── View mode (UI-only, never persisted) ───────────────────────────────────
   const [viewMode,         setViewMode]         = useState<TerminalViewMode>("focus");
@@ -65,6 +68,13 @@ export default function App() {
       setActiveTerminalId(agents[0].id);
     }
   }, [agents, activeTerminalId]);
+
+  // Close edit modal if target agent was removed
+  useEffect(() => {
+    if (editingAgentId && !agents.find((a) => a.id === editingAgentId)) {
+      setEditingAgentId(null);
+    }
+  }, [agents, editingAgentId]);
 
   // Derived active label for header
   const activeTerminalLabel = agents.find((a) => a.id === activeTerminalId)?.label;
@@ -249,6 +259,7 @@ export default function App() {
               onRemoveAttachment={removeAttachment}
               onLifecycleChange={handleLifecycleChange}
               onRecordWorkflowLink={handleRecordWorkflowLink}
+              onEditAgent={setEditingAgentId}
               settings={settings}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
@@ -270,6 +281,20 @@ export default function App() {
           onCancel={() => setShowModal(false)}
         />
       )}
+
+      {/* Agent edit modal */}
+      {editingAgentId && (() => {
+        const editAgent = agents.find((a) => a.id === editingAgentId);
+        if (!editAgent) return null;
+        return (
+          <AgentEditModal
+            agent={editAgent}
+            isRunning={runningAgentIds.has(editingAgentId)}
+            onConfirm={(agentId, update) => { updateAgent(agentId, update); setEditingAgentId(null); }}
+            onCancel={() => setEditingAgentId(null)}
+          />
+        );
+      })()}
 
       {/* First-launch mission briefing */}
       {!settings.onboardingDismissed && (
