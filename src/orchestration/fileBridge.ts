@@ -33,7 +33,12 @@ export const fileBridge = {
   async readPreview(path: string): Promise<ReadFileResult> {
     if (path.startsWith(PRESET_PREFIX)) {
       const id = path.slice(PRESET_PREFIX.length);
-      return invoke<ReadFileResult>("read_preset_brain", { id });
+      try {
+        return await invoke<ReadFileResult>("read_preset_brain", { id });
+      } catch (err) {
+        // Tauri throws the Rust error string — surface it as a proper Error.
+        throw new Error(String(err));
+      }
     }
     if (path.startsWith(DEMO_PREFIX)) {
       const name = path.slice(DEMO_PREFIX.length);

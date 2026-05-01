@@ -10,6 +10,7 @@ interface AppSidebarProps {
   onRefreshList:   () => void;
   savedWorkspaces: string[];
   onOpenSettings:  () => void;
+  onOpenHistory:   () => void;
   onStartAll:      () => void;
   terminalCount:   number;
   maxTerminals:    number;
@@ -23,7 +24,8 @@ type SidebarIconName =
   | "new"
   | "save"
   | "load"
-  | "settings";
+  | "settings"
+  | "history";
 
 function SidebarIcon({ name }: { name: SidebarIconName }) {
   const common = {
@@ -88,6 +90,12 @@ function SidebarIcon({ name }: { name: SidebarIconName }) {
           <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.1 2.1-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-3v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-2.1-2.1.1-.1A1.7 1.7 0 0 0 7 15a1.7 1.7 0 0 0-1.6-1h-.2v-3h.2A1.7 1.7 0 0 0 7 10a1.7 1.7 0 0 0-.3-1.9l-.1-.1 2.1-2.1.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.2h3v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 2.1 2.1-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v3H21a1.7 1.7 0 0 0-1.6 1z" {...common} />
         </>
       )}
+      {name === "history" && (
+        <>
+          <circle cx="12" cy="12" r="9" {...common} />
+          <path d="M12 7v5l3 3" {...common} />
+        </>
+      )}
     </svg>
   );
 }
@@ -117,6 +125,7 @@ export function AppSidebar({
   onRefreshList,
   savedWorkspaces,
   onOpenSettings,
+  onOpenHistory,
   onStartAll,
   terminalCount,
   maxTerminals,
@@ -183,6 +192,13 @@ export function AppSidebar({
               )}
             </select>
           </div>
+        </div>
+
+        <div className="sidebar-section">
+          <div className="sidebar-label">Session</div>
+          <SidebarRow icon="history" onClick={onOpenHistory} title="View session event history">
+            History
+          </SidebarRow>
         </div>
       </div>
 

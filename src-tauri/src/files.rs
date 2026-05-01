@@ -1,5 +1,6 @@
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use tauri::Manager;
 
 const PREVIEW_LIMIT: usize = 262_144; // 256 KiB
 
@@ -39,13 +40,10 @@ pub fn read_file_preview(path: String) -> Result<ReadFileResult, String> {
     read_path(PathBuf::from(path))
 }
 
-/// Walk up from `start` looking for a directory that contains `.agents/`.
-/// Tauri on Windows sets CWD to the exe dir (target/debug/), not the project root,
-/// so we climb the tree until we find the marker.
-fn find_agents_root(start: PathBuf) -> Option<PathBuf> {
+fn find_upward(start: PathBuf, marker: &str) -> Option<PathBuf> {
     let mut dir = start.as_path();
     loop {
-        if dir.join(".agents").is_dir() {
+        if dir.join(marker).is_dir() {
             return Some(dir.to_path_buf());
         }
         match dir.parent() {
@@ -55,18 +53,11 @@ fn find_agents_root(start: PathBuf) -> Option<PathBuf> {
     }
 }
 
-/// Whitelisted preset brain IDs → relative paths under .agents/.
-/// No path traversal possible — only known IDs are accepted.
-#[tauri::command]
-pub fn read_preset_brain(id: String) -> Result<ReadFileResult, String> {
-    let rel: &str = match id.as_str() {
-        "claude" => ".agents/claude/CLAUDE.md",
-        "codex"  => ".agents/codex/CODEX.md",
-        "gemini" => ".agents/gemini/GEMINI.md",
-        other    => return Err(format!("Preset brain file not found: {other}")),
-    };
+fn existing_file(path: PathBuf) -> Option<PathBuf> {
+    path.is_file().then_some(path)
+}
 
-    // Try CWD first, then climb from the executable's location.
+fn runtime_starts() -> Vec<PathBuf> {
     let start = std::env::current_dir()
         .or_else(|_| std::env::current_exe().map(|e| e.parent().unwrap_or(&e).to_path_buf()))
         .unwrap_or_else(|_| PathBuf::from("."));
@@ -75,9 +66,74 @@ pub fn read_preset_brain(id: String) -> Result<ReadFileResult, String> {
         .map(|e| e.parent().unwrap_or(&e).to_path_buf())
         .unwrap_or_else(|_| start.clone());
 
-    let root = find_agents_root(start.clone())
-        .or_else(|| find_agents_root(exe_start))
-        .ok_or_else(|| format!("Cannot find .agents directory (searched from {start:?})"))?;
+    vec![start, exe_start]
+}
 
-    read_path(root.join(rel))
+fn resource_candidates(resource_dir: &Path, agents_rel: &str, bundled_rel: &str) -> Vec<PathBuf> {
+    let bundled_file = Path::new(bundled_rel)
+        .file_name()
+        .unwrap_or_default();
+
+    vec![
+        resource_dir.join(agents_rel),
+        resource_dir.join(".agents").join(agents_rel.trim_start_matches(".agents/")),
+        resource_dir.join(bundled_rel),
+        resource_dir.join("preset-brains").join(bundled_file),
+        resource_dir.join("public").join(bundled_rel),
+        resource_dir.join("_up_").join(agents_rel),
+        resource_dir.join("_up_").join(".agents").join(agents_rel.trim_start_matches(".agents/")),
+        resource_dir.join("_up_").join(bundled_rel),
+        resource_dir.join("_up_").join("preset-brains").join(bundled_file),
+        resource_dir.join("_up_").join("public").join(bundled_rel),
+    ]
+}
+
+/// Whitelisted preset brain IDs -> source and bundled fallback paths.
+/// No path traversal is possible because only known IDs are accepted.
+#[tauri::command]
+pub fn read_preset_brain(app: tauri::AppHandle, id: String) -> Result<ReadFileResult, String> {
+    let (agents_rel, bundled_rel): (&str, &str) = match id.as_str() {
+        "claude" => (".agents/claude/CLAUDE.md", "preset-brains/claude-planner.md"),
+        "codex"  => (".agents/codex/CODEX.md", "preset-brains/codex-builder.md"),
+        "gemini" => (".agents/gemini/GEMINI.md", "preset-brains/gemini-reviewer.md"),
+        "ollama" => (".agents/ollama/OLLAMA.md", "preset-brains/ollama-worker.md"),
+        other    => return Err(format!("Preset brain is not registered: {other}")),
+    };
+
+    let mut candidates: Vec<PathBuf> = runtime_starts()
+        .into_iter()
+        .filter_map(|start| find_upward(start, ".agents"))
+        .map(|root| root.join(agents_rel))
+        .collect();
+
+    candidates.extend(
+        runtime_starts()
+            .into_iter()
+            .filter_map(|start| find_upward(start, "public"))
+            .map(|root| root.join("public").join(bundled_rel)),
+    );
+
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        candidates.extend(resource_candidates(&resource_dir, agents_rel, bundled_rel));
+    }
+
+    let full = candidates
+        .into_iter()
+        .find_map(existing_file)
+        .ok_or_else(|| {
+            "Preset brain file was not found. Reinstall CMDino preset brains or remove this attachment.".to_string()
+        })?;
+
+    let file_name = full.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(agents_rel)
+        .to_string();
+
+    read_path(full).map_err(|e| {
+        if e.contains("Cannot open") || e.contains("Cannot read") {
+            format!("Preset brain file could not be read: {file_name}")
+        } else {
+            e
+        }
+    })
 }

@@ -5,6 +5,8 @@ import type { TerminalLifecycleState } from "../terminal/useTerminalProcess";
 import type { WorkflowLink, WorkflowLinkKind } from "../domain/workflow";
 import type { AppSettings } from "../domain/appSettings";
 import type { TerminalViewMode } from "../domain/viewMode";
+import type { ReadinessFailure } from "../domain/readiness";
+import type { SessionLogEvent } from "../domain/sessionLog";
 import type { CSSProperties } from "react";
 
 // Minimum readable pane width used for browser-measured grid wrapping.
@@ -20,6 +22,8 @@ interface Props {
   onLifecycleChange:    (agentId: string, lifecycle: TerminalLifecycleState) => void;
   onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
   onEditAgent:          (id: string) => void;
+  readinessErrors:      Record<string, ReadinessFailure | null>;
+  onReadinessError:     (agentId: string, failure: ReadinessFailure | null) => void;
   settings?:            AppSettings;
   viewMode:             TerminalViewMode;
   onViewModeChange:     (mode: TerminalViewMode) => void;
@@ -29,15 +33,18 @@ interface Props {
   onFocusPane:          (id: string) => void;
   workflowLinks:        WorkflowLink[];
   onFocusTarget:        (id: string) => void;
+  onEvent?:             (event: SessionLogEvent) => void;
 }
 
 export function TerminalGrid({
   agents, onRemove, runningAgentIds, onStart,
   onAddAttachment, onRemoveAttachment,
   onLifecycleChange, onRecordWorkflowLink, onEditAgent,
+  readinessErrors, onReadinessError,
   settings,
   viewMode, onViewModeChange, activeTerminalId, onActiveTerminalChange,
   lifecycleByAgentId, onFocusPane, workflowLinks, onFocusTarget,
+  onEvent,
 }: Props) {
   // Grid mode needs dynamic column/row counts — set as inline style only in grid mode.
   // Focus mode: no inline style on layout div (CSS class handles everything).
@@ -97,12 +104,15 @@ export function TerminalGrid({
                   onLifecycleChange={onLifecycleChange}
                   onRecordWorkflowLink={onRecordWorkflowLink}
                   onEditAgent={onEditAgent}
+                  readinessError={readinessErrors[agent.id] ?? null}
+                  onReadinessError={onReadinessError}
                   settings={settings}
                   viewMode={viewMode}
                   isActive={isActive}
                   onFocus={() => onFocusPane(agent.id)}
                   workflowLinks={workflowLinks}
                   onFocusTarget={onFocusTarget}
+                  onEvent={onEvent}
                 />
               </div>
             );

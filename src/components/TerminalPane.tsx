@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import type { SessionLogEvent, SessionLogEventType } from "../domain/sessionLog";
 import { DinoLane, type DinoVisualPhase } from "../dino/DinoLane";
 import { LogsPanel }       from "./LogsPanel";
 import { HandoffModal }    from "./HandoffModal";
@@ -9,6 +10,8 @@ import { fileBridge }      from "../orchestration/fileBridge";
 import type { WorkflowLink, WorkflowLinkKind } from "../domain/workflow";
 import type { AppSettings } from "../domain/appSettings";
 import type { TerminalViewMode } from "../domain/viewMode";
+import type { ReadinessFailure } from "../domain/readiness";
+import { validateAgentReadiness } from "../readiness/readinessBridge";
 import { terminalBridge }  from "../terminal/terminalBridge";
 import {
   useTerminalProcess,
@@ -135,12 +138,15 @@ interface Props {
   onLifecycleChange:    (agentId: string, lifecycle: TerminalLifecycleState) => void;
   onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
   onEditAgent:          (id: string) => void;
+  readinessError:       ReadinessFailure | null;
+  onReadinessError:     (agentId: string, failure: ReadinessFailure | null) => void;
   settings?:            AppSettings;
   viewMode:             TerminalViewMode;
   isActive:             boolean;
   onFocus?:             () => void;
   workflowLinks:        WorkflowLink[];
   onFocusTarget:        (id: string) => void;
+  onEvent?:             (event: SessionLogEvent) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -149,11 +155,15 @@ export function TerminalPane({
   agent, onRemove, isRunning, onStart,
   allAgents, runningAgentIds, onAddAttachment, onRemoveAttachment,
   onLifecycleChange, onRecordWorkflowLink, onEditAgent,
+  readinessError, onReadinessError,
   settings,
   viewMode, isActive, onFocus,
   workflowLinks, onFocusTarget,
+  onEvent,
 }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef      = useRef<HTMLDivElement>(null);
+  const prevLifecycleRef  = useRef<TerminalLifecycleState | null>(null);
+  const isRestartingRef   = useRef(false);
 
   const {
     dinoState, lifecycle,
@@ -170,10 +180,39 @@ export function TerminalPane({
     fontScale: settings?.terminalFontScale ?? 1,
   });
 
-  // Report lifecycle changes upward for WorkflowPanel display
+  // Report lifecycle changes upward; log session events on meaningful transitions
   useEffect(() => {
     onLifecycleChange(agent.id, lifecycle);
-  }, [agent.id, lifecycle, onLifecycleChange]);
+
+    const prev = prevLifecycleRef.current;
+    prevLifecycleRef.current = lifecycle;
+    if (prev === null || prev === lifecycle) return;
+
+    function makeEv(type: SessionLogEventType): SessionLogEvent {
+      return {
+        id: crypto.randomUUID(),
+        ts: Date.now(),
+        workspaceId: "",
+        agentConfigId: agent.configId,
+        agentLabel: agent.label,
+        type,
+        payload: {},
+      };
+    }
+
+    if (lifecycle === "running") {
+      const type: SessionLogEventType = isRestartingRef.current ? "terminal_restart" : "terminal_start";
+      isRestartingRef.current = false;
+      onEvent?.(makeEv(type));
+    } else if (lifecycle === "killed") {
+      onEvent?.(makeEv("terminal_kill"));
+    } else if (lifecycle === "exited") {
+      onEvent?.(makeEv("terminal_exited"));
+    } else if (lifecycle === "error" && prev !== "dormant") {
+      onEvent?.(makeEv("terminal_error"));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agent.id, agent.configId, agent.label, lifecycle, onLifecycleChange, onEvent]);
 
   // ── Egg → hatch → dino spawn sequence ─────────────────────────────────────
   // Tracks which visual phase we're in so DinoLane shows egg assets before
@@ -214,8 +253,9 @@ export function TerminalPane({
   // while dormant/spawning so the egg asset is shown instead of the dino.
   // ── UI state ───────────────────────────────────────────────────────────────
 
-  const [showLogs,       setShowLogs]       = useState(false);
-  const [handoffCapture, setHandoffCapture] = useState<string | null>(null);
+  const [showLogs,          setShowLogs]          = useState(false);
+  const [handoffCapture,    setHandoffCapture]    = useState<string | null>(null);
+  const [readinessChecking, setReadinessChecking] = useState(false);
 
   // Orchestration strip state
   const [selectedAttId, setSelectedAttId] = useState<string | null>(null);
@@ -307,6 +347,12 @@ export function TerminalPane({
     try {
       const r = await fileBridge.readPreview(selectedAtt.path);
       sendInput(r.content);
+      onEvent?.({
+        id: crypto.randomUUID(), ts: Date.now(), workspaceId: "",
+        agentConfigId: agent.configId, agentLabel: agent.label,
+        type: "preset_brain_send",
+        payload: { filename: selectedAtt.path },
+      });
     } catch (err) {
       alert(`Read failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -326,6 +372,12 @@ export function TerminalPane({
     try {
       await terminalBridge.write(effectiveFwdTarget.id, captured);
       onRecordWorkflowLink(agent.id, effectiveFwdTarget.id, "handoff");
+      onEvent?.({
+        id: crypto.randomUUID(), ts: Date.now(), workspaceId: "",
+        agentConfigId: agent.configId, agentLabel: agent.label,
+        type: "manual_handoff",
+        payload: { target: effectiveFwdTarget.label },
+      });
       onFocusTarget(effectiveFwdTarget.id);
     } catch (err) {
       setFwdError(err instanceof Error ? err.message : String(err));
@@ -339,12 +391,45 @@ export function TerminalPane({
   async function handleRemove() {
     if (isAlive && !window.confirm(`Kill "${agent.label}"?`)) return;
     await kill();
+    onEvent?.({
+      id: crypto.randomUUID(), ts: Date.now(), workspaceId: "",
+      agentConfigId: agent.configId, agentLabel: agent.label,
+      type: "terminal_removed", payload: {},
+    });
     onRemove(agent.id);
+  }
+
+  async function runReadinessAndStart() {
+    setReadinessChecking(true);
+    try {
+      const result = await validateAgentReadiness(agent);
+      if (!result.ok) {
+        onReadinessError(agent.id, result.failure);
+        return false;
+      }
+      onReadinessError(agent.id, null);
+      return true;
+    } finally {
+      setReadinessChecking(false);
+    }
+  }
+
+  async function handleStart() {
+    const ok = await runReadinessAndStart();
+    if (ok) onStart();
   }
 
   async function handleRestart() {
     if (isAlive && !window.confirm(`Restart "${agent.label}"?`)) return;
-    await restart();
+    isRestartingRef.current = true;
+    // Validate before killing the current session.
+    const ok = await runReadinessAndStart();
+    if (ok) {
+      await restart();
+    } else {
+      isRestartingRef.current = false;
+    }
+    // If !ok: error is shown; current running PTY stays alive.
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -390,7 +475,7 @@ export function TerminalPane({
         <HdrBtn title="Copy visible output" onClick={() => { void copyVisible(); }}>⎘</HdrBtn>
         <HdrBtn title="View session logs" onClick={() => setShowLogs(true)}
           onMouseDown={(e) => e.preventDefault()}>≡</HdrBtn>
-        <HdrBtn title="Restart terminal" onClick={() => { void handleRestart(); }}>↺</HdrBtn>
+        <HdrBtn title={readinessChecking ? "Checking…" : "Restart terminal"} onClick={() => { if (!readinessChecking) void handleRestart(); }}>↺</HdrBtn>
         {onFocus && (
           <HdrBtn
             title={viewMode === "focus" && isActive ? "Restore grid" : "Focus this terminal"}
@@ -651,8 +736,57 @@ export function TerminalPane({
         minHeight: 0,
         background: "var(--terminal-bg)",
       }}>
+        {/* Readiness error — shown as compact strip for running terminals */}
+        {readinessError && isRunning && (
+          <div className="readiness-error readiness-error--strip">
+            <div className="readiness-error-body">
+              <span className="readiness-error-title">Restart blocked</span>
+              <span className="readiness-error-msg">{readinessError.message}</span>
+            </div>
+            <div className="readiness-error-actions">
+              <button className="readiness-error-btn" onClick={() => onEditAgent(agent.id)}>Settings</button>
+              <button
+                className="readiness-error-btn"
+                onClick={() => { void handleRestart(); }}
+                disabled={readinessChecking}
+              >
+                {readinessChecking ? "…" : "Retry"}
+              </button>
+              <button
+                className="readiness-error-dismiss"
+                onClick={() => onReadinessError(agent.id, null)}
+                title="Dismiss"
+              >×</button>
+            </div>
+          </div>
+        )}
+
         {isRunning ? (
           <div ref={containerRef} style={{ flex: 1, overflow: "hidden", minHeight: 0 }} />
+        ) : readinessError ? (
+          /* Dormant + readiness error: show error panel in place of normal dormant view */
+          <div style={{
+            flex: 1, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            gap: 0, minHeight: 0, padding: "0 16px",
+          }}>
+            <div className="readiness-error readiness-error--panel">
+              <span className="readiness-error-title">Agent not ready</span>
+              <span className="readiness-error-msg">{readinessError.message}</span>
+              <div className="readiness-error-actions" style={{ marginTop: 10 }}>
+                <button className="readiness-error-btn" onClick={() => onEditAgent(agent.id)}>
+                  Agent Settings
+                </button>
+                <button
+                  className="readiness-error-btn readiness-error-btn--accent"
+                  onClick={() => { void handleStart(); }}
+                  disabled={readinessChecking}
+                >
+                  {readinessChecking ? "Checking…" : "Retry"}
+                </button>
+              </div>
+            </div>
+          </div>
         ) : (
           <div style={{
             flex: 1, display: "flex", flexDirection: "column",
@@ -664,17 +798,23 @@ export function TerminalPane({
               Start when ready
             </span>
             <button
-              onClick={onStart}
+              onClick={() => { void handleStart(); }}
+              disabled={readinessChecking}
               style={{
                 marginTop: 4,
-                padding: "7px 18px", background: "var(--accent)",
+                padding: "7px 18px",
+                background: readinessChecking ? "var(--button-bg)" : "var(--accent)",
                 border: "1px solid transparent", borderRadius: 999,
-                color: "var(--app-bg)", fontSize: 12, fontFamily: "inherit",
-                fontWeight: 650, letterSpacing: 0, cursor: "pointer", transition: "opacity 0.15s",
+                color: readinessChecking ? "var(--text-muted)" : "var(--app-bg)",
+                fontSize: 12, fontFamily: "inherit",
+                fontWeight: 650, letterSpacing: 0,
+                cursor: readinessChecking ? "default" : "pointer", transition: "opacity 0.15s",
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.88"; }}
+              onMouseEnter={(e) => { if (!readinessChecking) (e.currentTarget as HTMLButtonElement).style.opacity = "0.88"; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
-            >START</button>
+            >
+              {readinessChecking ? "CHECKING…" : "START"}
+            </button>
           </div>
         )}
 

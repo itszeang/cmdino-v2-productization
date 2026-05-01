@@ -8,8 +8,10 @@ import { MainHeader }          from "./components/MainHeader";
 import { WorkflowPanel }       from "./components/WorkflowPanel";
 import { SettingsPanel }       from "./components/SettingsPanel";
 import { WelcomeModal }        from "./components/WelcomeModal";
+import { HistoryDrawer }       from "./components/HistoryDrawer";
 import { useTerminalAgents, MAX_TERMINALS } from "./state/useTerminalAgents";
 import { useAppSettings }      from "./state/useAppSettings";
+import { useSessionLog }       from "./state/useSessionLog";
 import { workspaceBridge }     from "./workspace/workspaceBridge";
 import { validateWorkspaceFile, sanitizeWorkspaceFilename } from "./domain/workspace";
 import type { TerminalViewMode } from "./domain/viewMode";
@@ -18,6 +20,8 @@ import type { TerminalAttachment } from "./domain/orchestration";
 import type { WorkflowLinkKind } from "./domain/workflow";
 import type { TerminalLifecycleState } from "./terminal/useTerminalProcess";
 import { DEMO_WORKSPACE }      from "./config/demoWorkspace";
+import type { ReadinessFailure } from "./domain/readiness";
+import { validateAgentReadiness } from "./readiness/readinessBridge";
 
 const isTauri = Boolean(
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
@@ -38,7 +42,6 @@ export default function App() {
     recordWorkflowLink,
     removeWorkflowLink,
     startAgent,
-    startAll,
     resetWorkspace,
     loadWorkspaceConfig,
     buildWorkspaceFile,
@@ -47,13 +50,16 @@ export default function App() {
   } = useTerminalAgents();
 
   const { settings, updateSettings, resetSettings } = useAppSettings();
+  const { entries: sessionEntries, appendEvent, clearLog } = useSessionLog();
 
   const [showModal,           setShowModal]           = useState(false);
   const [showWorkflow,        setShowWorkflow]        = useState(false);
   const [showSettings,        setShowSettings]        = useState(false);
+  const [showHistory,         setShowHistory]         = useState(false);
   const [savedWorkspaces,     setSavedWorkspaces]     = useState<string[]>([]);
   const [lifecycleByAgentId,  setLifecycleByAgentId]  = useState<Record<string, string>>({});
   const [editingAgentId,      setEditingAgentId]      = useState<string | null>(null);
+  const [readinessErrors,     setReadinessErrors]     = useState<Record<string, ReadinessFailure | null>>({});
 
   // ── View mode (UI-only, never persisted) ───────────────────────────────────
   const [viewMode,         setViewMode]         = useState<TerminalViewMode>("focus");
@@ -76,6 +82,46 @@ export default function App() {
       setEditingAgentId(null);
     }
   }, [agents, editingAgentId]);
+
+  // ── Readiness errors ───────────────────────────────────────────────────────
+
+  const handleReadinessError = useCallback((agentId: string, failure: ReadinessFailure | null) => {
+    setReadinessErrors((prev) => {
+      if (prev[agentId] === failure) return prev;
+      return { ...prev, [agentId]: failure };
+    });
+  }, []);
+
+  // Prune stale readiness errors when agents are removed.
+  useEffect(() => {
+    const ids = new Set(agents.map((a) => a.id));
+    setReadinessErrors((prev) => {
+      const stale = Object.keys(prev).filter((id) => !ids.has(id));
+      if (stale.length === 0) return prev;
+      const next = { ...prev };
+      for (const id of stale) delete next[id];
+      return next;
+    });
+  }, [agents]);
+
+  // Readiness-aware Start All: validate dormant agents; only start valid ones.
+  const handleStartAll = useCallback(async () => {
+    const dormant = agents.filter((a) => !runningAgentIds.has(a.id));
+    if (dormant.length === 0) return;
+    const results = await Promise.all(
+      dormant.map(async (a) => ({ id: a.id, result: await validateAgentReadiness(a) }))
+    );
+    const newErrors: Record<string, ReadinessFailure | null> = {};
+    for (const { id, result } of results) {
+      if (result.ok) {
+        startAgent(id);
+        newErrors[id] = null;
+      } else {
+        newErrors[id] = result.failure;
+      }
+    }
+    setReadinessErrors((prev) => ({ ...prev, ...newErrors }));
+  }, [agents, runningAgentIds, startAgent]);
 
   // Derived active label for header
   const activeTerminalLabel = agents.find((a) => a.id === activeTerminalId)?.label;
@@ -125,6 +171,8 @@ export default function App() {
       const fileName = sanitizeWorkspaceFilename(workspaceName);
       await workspaceBridge.save(fileName, json);
       await refreshList();
+      appendEvent({ id: crypto.randomUUID(), ts: Date.now(), workspaceId: workspaceName,
+        agentConfigId: "", agentLabel: "", type: "workspace_saved", payload: { name: workspaceName } });
     } catch (err) {
       alert(`Save failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -142,6 +190,8 @@ export default function App() {
       const parsed    = JSON.parse(raw) as unknown;
       const validated = validateWorkspaceFile(parsed);
       loadWorkspaceConfig(validated);
+      appendEvent({ id: crypto.randomUUID(), ts: Date.now(), workspaceId: name,
+        agentConfigId: "", agentLabel: "", type: "workspace_loaded", payload: { name } });
     } catch (err) {
       alert(`Load failed: ${err instanceof Error ? err.message : String(err)}`);
       await refreshList();
@@ -188,7 +238,11 @@ export default function App() {
       false,
       form.initialAttachments ?? [],
     );
-    if (id) setActiveTerminalId(id);
+    if (id) {
+      setActiveTerminalId(id);
+      appendEvent({ id: crypto.randomUUID(), ts: Date.now(), workspaceId: workspaceName,
+        agentConfigId: "", agentLabel: form.label, type: "agent_created", payload: {} });
+    }
     setShowModal(false);
   }
 
@@ -208,7 +262,8 @@ export default function App() {
         onRefreshList={() => { void refreshList(); }}
         savedWorkspaces={savedWorkspaces}
         onOpenSettings={() => setShowSettings(true)}
-        onStartAll={startAll}
+        onOpenHistory={() => setShowHistory(true)}
+        onStartAll={() => { void handleStartAll(); }}
         terminalCount={count}
         maxTerminals={MAX_TERMINALS}
         maxReached={maxReached}
@@ -252,6 +307,9 @@ export default function App() {
               workflowLinks={workflowLinks}
               onFocusTarget={handleFocusTarget}
               lifecycleByAgentId={lifecycleByAgentId}
+              readinessErrors={readinessErrors}
+              onReadinessError={handleReadinessError}
+              onEvent={appendEvent}
             />
           )}
         </section>
@@ -313,6 +371,15 @@ export default function App() {
           lifecycleByAgentId={lifecycleByAgentId}
           onRemoveLink={removeWorkflowLink}
           onClose={() => setShowWorkflow(false)}
+        />
+      )}
+
+      {/* History drawer overlay */}
+      {showHistory && (
+        <HistoryDrawer
+          entries={sessionEntries}
+          onClear={clearLog}
+          onClose={() => setShowHistory(false)}
         />
       )}
     </div>
