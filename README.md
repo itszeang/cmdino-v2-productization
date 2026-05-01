@@ -1,368 +1,300 @@
 # CMDino
 
-> Run Claude, Codex, Gemini, Ollama, and custom AI coding agents inside one living desktop command center.
+> A local-first desktop command center for running multiple AI CLI agents in parallel.
 
 <p align="center">
-  <img alt="Status" src="https://img.shields.io/badge/status-alpha-f59e0b">
-  <img alt="Desktop" src="https://img.shields.io/badge/runtime-Tauri%20Desktop-24c8db">
+  <img alt="Status" src="https://img.shields.io/badge/status-V1%20Alpha-f59e0b">
+  <img alt="Package" src="https://img.shields.io/badge/package-0.1.0--alpha.1-71717a">
+  <img alt="Runtime" src="https://img.shields.io/badge/runtime-Tauri%20v2-24c8db">
   <img alt="Frontend" src="https://img.shields.io/badge/frontend-React%20%2B%20TypeScript-61dafb">
+  <img alt="Backend" src="https://img.shields.io/badge/backend-Rust%20PTY-10b981">
   <img alt="Terminal" src="https://img.shields.io/badge/terminal-xterm.js-111827">
-  <img alt="PTY" src="https://img.shields.io/badge/backend-Rust%20PTY-10b981">
-  <img alt="Storage" src="https://img.shields.io/badge/storage-local%20JSON-64748b">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.5%20alpha-71717a">
 </p>
 
----
+CMDino is a native desktop workspace for developers who use several AI coding tools at once. It launches real local CLI processes, renders them as managed terminal panes, and adds orchestration features around them: preset roles, attachable brain files, handoffs, workflow mapping, readiness checks, workspace persistence, and visual lifecycle feedback.
 
-## At a Glance
+It is not a chatbot wrapper. The agents are still your local tools: `claude`, `codex`, `gemini`, `ollama`, or any custom shell command.
 
-CMDino is a **local-first native desktop orchestration workspace** for developers running multiple AI CLI agents in parallel.
+## Current Alpha
 
-Instead of juggling disconnected terminal tabs, CMDino gives every AI agent:
+CMDino is currently in **V1 Alpha**. The app is usable for local multi-agent terminal workflows, but installer QA, edge-case hardening, and broader platform testing are still in progress.
 
-- a persistent PTY-backed terminal session,
-- a visual identity,
-- manual and rapid handoff controls,
-- workflow relationship tracking,
-- preset role brains,
-- and real-time lifecycle feedback.
+Working in this alpha:
 
-This is **not** another chatbot wrapper.
+| Area | Status |
+| --- | --- |
+| Native desktop shell | Tauri v2 app with Windows installer output |
+| Real terminal runtime | Rust `portable-pty` process manager |
+| Terminal UI | xterm.js panes with copy, logs, restart, kill, focus, and grid modes |
+| Agent presets | Claude Planner, Codex Builder, Gemini Reviewer, Ollama Worker, Custom Agent |
+| Preset brains | Role markdown files attached on deploy and sent only when the user presses SEND |
+| Custom attachments | `.md` and `.txt` path attach, preview, remove, and send |
+| Handoff flow | Capture terminal output, edit it, send it to another running agent |
+| Auto forward lite | Forward cleaned recent output to a linked or selected target |
+| Workflow view | Directional handoff graph with link counts and removable edges |
+| Workspace files | Save/load local `.cmdino.json` workspaces, schema validation, demo workspace |
+| Agent management | Post-deploy edit flow for label, command, working directory, dino, kind, attachments |
+| Readiness checks | CWD existence and executable availability checks before start/restart/start all |
+| Lifecycle visuals | Egg, hatch, running, scan, dash, success, handoff, error, dead states |
+| Settings | Theme, animation speed, dino scale, terminal font scale, onboarding reset |
+| Packaging resources | `.agents` and fallback `public/preset-brains` bundled as Tauri resources |
 
-This is a **multi-agent AI command center**.
+## Screenshots
 
----
-
-## Preview
-
-> Replace with latest captures / GIFs as the alpha evolves.
+The repository keeps final screenshot slots under `docs/screenshots/`. Replace these with current captures before a public release.
 
 ### Main Workspace
-![CMDino Workspace](./docs/screenshots/workspace-main.png)
+
+![CMDino main workspace](./docs/screenshots/workspace-main.png)
+
+(Use a screenshot of the main app with 2-3 running terminals, visible header, terminal tabs, attachment chips, SEND, HANDOFF, FORWARD, and the dino lanes.)
 
 ### Workflow View
-![CMDino Workflow](./docs/screenshots/workflow-view.png)
+
+![CMDino workflow view](./docs/screenshots/workflow-view.png)
+
+(Use a screenshot of the Workflow overlay showing Claude, Codex, Gemini, and directional handoff arrows with counts.)
 
 ### Deploy Agent
-![CMDino Deploy Agent](./docs/screenshots/deploy-agent.png)
 
-### Dino Terminal Lifecycle
-![CMDino Dino Lifecycle](./docs/screenshots/dino-lifecycle.png)
+![CMDino deploy agent modal](./docs/screenshots/deploy-agent.png)
 
----
+(Use a screenshot of the Deploy Agent modal with preset cards, preset brain checkbox, command field, working directory field, and dino selector.)
 
-## Why CMDino Exists
+### Dino Lifecycle
 
-Modern AI coding workflows are no longer:
+![CMDino dino lifecycle](./docs/screenshots/dino-lifecycle.png)
 
-> one assistant, one chat, one prompt.
+(Use a screenshot where at least one terminal is running and the bottom dino lane is visible. A good capture shows active output plus a dino state change.)
 
-They are becoming:
+Optional public launch captures:
 
-- Claude planning architecture,
-- Codex implementing patches,
-- Gemini reviewing edge cases,
-- Ollama handling local/offline tasks,
-- plus custom project-specific shell workers.
+- `docs/screenshots/onboarding.png` (Welcome to CMDino modal with Start Empty, Load Demo Workflow, Deploy First Agent)
+- `docs/screenshots/settings.png` (Settings panel showing theme, animation speed, dino scale, terminal font scale)
+- `docs/screenshots/readiness-error.png` (Agent not ready panel or restart blocked strip)
+- `docs/screenshots/agent-edit.png` (Agent settings/edit modal after deployment)
 
-The default experience today is chaos:
+## How It Works
 
-- too many loose terminals,
-- no visible orchestration,
-- context constantly lost,
-- no structured handoff path,
-- no fast understanding of who is working, blocked, idle, or done.
+1. Create an agent from a preset or a custom command.
+2. CMDino stores the agent as a local terminal config with label, command, CWD, kind, dino identity, and attachments.
+3. When started, Tauri asks the Rust backend to spawn a PTY session.
+4. Output streams into xterm.js and is analyzed for lifecycle signals.
+5. Brain files and user attachments can be previewed and explicitly sent into the live terminal.
+6. Handoffs and forwards send captured output to another live terminal and record a workflow edge.
+7. Workspaces can be saved and loaded as local JSON. Live PTY state is never serialized.
 
-CMDino exists to solve that terminal fragmentation.
+## Preset Agents
 
-It keeps every AI CLI local, real, and independently runnable — while adding an orchestration layer around them.
+| Preset | Default command | Purpose | Default brain |
+| --- | --- | --- | --- |
+| Claude Planner | `claude` | Break requests into plans and scopes | `CLAUDE.md` |
+| Codex Builder | `codex` | Implement scoped patches | `CODEX.md` |
+| Gemini Reviewer | `gemini` | Review architecture, risks, UX, and tests | `GEMINI.md` |
+| Ollama Worker | `ollama run llama3` | Local/offline assistant work | `OLLAMA.md` |
+| Custom Agent | user-defined | Any shell process | none |
 
----
+Preset brains are source-controlled under `.agents/` and also bundled as package resources. `public/preset-brains/` remains as a fallback copy for packaged/runtime lookup.
 
-## Core Capabilities
+## Core Workflows
 
-CMDino currently ships with:
+### Deploy and start agents
 
-- Native **Tauri desktop shell**
-- Real **Rust PTY-backed terminal processes**
-- **Claude / Codex / Gemini / Ollama / Custom** agent presets
-- **Preset Brain Files** for role-specific startup context
-- **Deploy Agent** modal for fast terminal provisioning
-- Manual `.md` / `.txt` **attachment preview + send pipeline**
-- Manual **Handoff Modal**
-- **Auto Forward Lite** for rapid selected-output forwarding
-- **Workflow graph visualization** with directional links and counts
-- **Focus / Grid** responsive monitoring modes
-- **Workspace save/load** via local `.cmdino.json`
-- Built-in **Demo Workspace**
-- **Dark / Light themes**
-- Dino-based **terminal lifecycle intelligence**
-- Left sidebar **native command shell UX**
+- Click **Deploy Agent**.
+- Pick a preset or Custom Agent.
+- Confirm label, command, working directory, dino, and brain selection.
+- Start the agent from its pane or use **Start All**.
+- CMDino validates working directory and executable availability before launch.
 
----
+### Attach and send context
 
-## Feature Breakdown
+- Attach a `.md` or `.txt` file to a terminal.
+- Preview up to 256 KB before sending.
+- Press **SEND** to write the content into the running PTY.
+- Preset brain attachments behave the same way: visible, previewable, and user-sent.
 
-| Area | Implementation |
-|------|----------------|
-| Desktop Runtime | Tauri v2 native desktop application |
-| Native Process Layer | Rust + portable-pty |
-| Terminal Rendering | xterm.js + fit addon |
-| Agent Creation | Deploy Agent preset-first modal |
-| Agent Presets | Claude Planner / Codex Builder / Gemini Reviewer / Ollama Worker / Custom |
-| Preset Brains | Role-specific markdown brain attachments |
-| Attachments | Add, preview, remove, explicit send |
-| Manual Handoff | Capture → edit → send to running target PTY |
-| Auto Forward Lite | Selected text or cleaned recent output forwarding |
-| Workflow Map | Recorded directional handoff graph |
-| Layout Modes | Focus mode / Grid mode / per-pane maximize |
-| Persistence | Local JSON workspace schema |
-| Settings | Theme, dino scale, font scale, animation speed |
-| Dino Intelligence | Lifecycle + output-based animated state mapping |
+### Handoff between agents
 
----
+- Press **HANDOFF** from a running terminal.
+- CMDino captures selected output or recent terminal lines.
+- Edit the captured text.
+- Send it to another running agent.
+- The Workflow view records a directional link.
 
-## How CMDino Works
+### Forward recent output
 
-CMDino does **not** replace your AI CLIs.
+- Use **FORWARD TO** for a faster handoff.
+- CMDino captures the latest cleaned output block and writes it to the target terminal.
+- If a workflow link already exists, CMDino prefers that linked target.
 
-It launches the same tools you already use manually:
+### Save and load workspaces
 
-- `claude`
-- `codex`
-- `gemini`
-- `ollama run llama3`
-- any custom shell command
+Saved workspaces include:
 
-Each deployed agent becomes:
+- workspace name
+- terminal labels and order
+- agent kinds
+- launch commands
+- working directories
+- dino identities
+- attachments
+- workflow links
 
-- a named PTY session,
-- a visible Dino Terminal,
-- an addressable orchestration node,
-- a persistent workspace participant.
+Saved workspaces do not include:
 
-You are still working with real local terminals.
+- live PTY state
+- terminal scrollback
+- secrets
+- running processes
 
-CMDino adds:
+## Installation
 
-> structure, visibility, and agent-to-agent flow.
-
----
-
-## Architecture Overview
-
-```mermaid
-flowchart LR
-    User[Developer] --> UI[React + TypeScript UI]
-    UI --> Xterm[xterm.js Terminal Panes]
-    UI --> State[Workspace + Agent State]
-    UI --> Dino[Dino Lifecycle Runtime]
-
-    Xterm --> Bridge[terminalBridge]
-    Bridge --> Tauri[Tauri Invoke/Event Layer]
-    Tauri --> Rust[Rust PTY Manager]
-    Rust --> PTY[portable-pty Sessions]
-    PTY --> CLI[Claude / Codex / Gemini / Ollama / Custom CLI]
-
-    Rust -- terminal:data --> Tauri
-    Tauri -- events --> Bridge
-    Bridge --> Xterm
-    Bridge --> Intelligence[Terminal Intelligence]
-
-    Intelligence --> Dino
-    State --> Workspace[Local .cmdino.json Files]
-
-Runtime Flow
-User deploys an AI agent preset or custom shell worker.
-CMDino creates a PTY-backed terminal config.
-Tauri invokes Rust PTY spawn.
-The local CLI launches inside a real shell.
-Output streams into xterm.js.
-Terminal intelligence classifies activity.
-Dino runtime reflects live terminal state.
-Handoffs and forwards move work between agents.
-Preset Agent System
-
-CMDino ships with five deployable agent types:
-
-Preset	Default Command	Role
-Claude Planner	claude	Breaks requests into implementation plans
-Codex Builder	codex	Implements scoped patches
-Gemini Reviewer	gemini	Reviews architecture, QA, UX, regressions
-Ollama Worker	ollama run llama3	Local/offline lightweight worker
-Custom Agent	user-defined	Any shell process
-
-Preset agents can include attached Brain Files:
-
-claude-planner.md
-codex-builder.md
-gemini-reviewer.md
-ollama-worker.md
-
-These are visible BRAIN attachments — never silently injected.
-
-The user previews and explicitly sends them when needed.
-
-Handoff & Workflow System
-
-CMDino currently favors human-controlled orchestration over blind autonomous automation.
-
-Manual Handoff
-
-Capture terminal output → optionally edit → send to another running agent.
-
-Auto Forward Lite
-
-Quickly forward:
-
-selected output, or
-recent cleaned AI response
-
-to a linked or chosen target terminal.
-
-Every successful transfer records a directional workflow edge.
-
-This creates a persistent visual graph of:
-
-who passed work to whom.
-
-Dino Lifecycle Intelligence
-
-The dinosaur layer is not cosmetic decoration.
-
-It is a process visibility system.
-
-Each agent terminal has:
-
-a Dino identity,
-an animation set,
-and a state machine driven by runtime output.
-Terminal Signal	Dino State
-Dormant	Egg idle
-Starting	Hatch
-Normal output	Patrol
-Heavy output burst	Dash
-Review/scanning	Scan
-Handoff event	Kick
-Success	Jump
-Fatal error	Hurt
-Exited/Killed	Dead
-
-This allows the user to scan the workspace before reading text logs.
-
-Technology Stack
-Layer	Technology
-Desktop Shell	Tauri v2
-Native Backend	Rust
-PTY Engine	portable-pty
-Frontend	React 18
-Language	TypeScript
-Build Tool	Vite
-Terminal Renderer	xterm.js
-Workflow Rendering	Custom SVG/HTML
-Persistence	Local JSON workspace files
-Settings	localStorage
-Styling	Custom CSS shell UI
-Installation
-Prerequisites
+### Prerequisites
 
 Install:
 
-Node.js 18+
-npm
-Rust stable
-Tauri v2 prerequisites
-AI CLI tools you want to orchestrate (claude, codex, gemini, ollama, etc.)
+- Node.js 18+
+- npm
+- Rust stable
+- Tauri v2 prerequisites
+- WebView2 Runtime on Windows
+- Microsoft C++ Build Tools on Windows
+- Any AI CLIs you want to run: `claude`, `codex`, `gemini`, `ollama`, etc.
 
-Windows users should also have:
+### Development
 
-WebView2 Runtime
-Microsoft C++ Build Tools
-Clone & Install
-git clone <repo-url>
-cd cmdino-build
+```powershell
 npm install
-Development
-Frontend only
-npm run dev
-Full desktop PTY runtime
 npm run tauri:dev
-Production frontend build
+```
+
+Frontend-only preview:
+
+```powershell
+npm run dev
+```
+
+Frontend-only preview does not provide the real PTY runtime.
+
+### Production build
+
+```powershell
 npm run build
-Desktop bundle build
 npm run tauri:build
-Workspace Usage
+```
 
-CMDino workspaces store:
+Current Windows build outputs:
 
-agent labels
-commands
-dino identities
-preset brain attachments
-workflow links
-layout order
+```text
+src-tauri/target/release/cmdino.exe
+src-tauri/target/release/bundle/nsis/CMDino_0.1.0_x64-setup.exe
+src-tauri/target/release/bundle/msi/CMDino_0.1.0_x64_en-US.msi
+```
 
-Saved workspaces do not store live PTY state.
+Quick local run without installing:
 
-When loaded, agents return in a dormant configuration and can be started intentionally.
+```powershell
+.\src-tauri\target\release\cmdino.exe
+```
 
-Repository Structure
+## Repository Structure
+
+```text
 .
-├── src/
-│   ├── components/        # UI panels, modals, panes, sidebar
-│   ├── config/            # presets, brains, demo workspace, themes
-│   ├── dino/              # sprite animation runtime
-│   ├── domain/            # types and domain helpers
-│   ├── orchestration/     # file preview / orchestration bridge
-│   ├── state/             # React agent/settings hooks
-│   ├── terminal/          # xterm lifecycle + PTY intelligence
-│   └── workspace/         # workspace persistence bridge
-│
-├── src-tauri/
-│   └── src/               # Rust PTY manager + Tauri commands
-│
-├── public/
-│   └── preset-brains/     # default agent brain markdown files
-│
-├── docs/                  # architecture and product specs
-└── .agents/               # external AI workflow role files
-Current Roadmap
-V0.5 Alpha (current)
-PTY orchestration
-agent presets
-preset brains
-handoff system
-workflow graph
-workspace persistence
-V1 Alpha
-onboarding polish
-stronger logs/history
-richer workflow editing
-installer QA
-safer file UX
-V1.x+
-reusable workflow templates
-deeper agent configuration
-improved local model support
-stronger session intelligence
-Contributing
+├─ .agents/                 # Source preset brain files for AI roles
+├─ assets/                  # Runtime app icon and dino sprite assets
+├─ docs/                    # Architecture notes, product briefs, screenshots
+├─ public/
+│  ├─ demo-skills/          # Demo attachment files
+│  └─ preset-brains/        # Packaged fallback brain files
+├─ src/
+│  ├─ components/           # App shell, modals, panels, terminal panes
+│  ├─ config/               # Presets, demo workspace, dino manifest, themes
+│  ├─ dino/                 # Sprite loading and animation runtime
+│  ├─ domain/               # Typed domain models and validators
+│  ├─ orchestration/        # File preview and preset brain bridge
+│  ├─ readiness/            # Agent start validation bridge
+│  ├─ state/                # React state hooks
+│  ├─ terminal/             # xterm, PTY bridge, lifecycle intelligence
+│  └─ workspace/            # Workspace save/load bridge
+└─ src-tauri/
+   ├─ capabilities/         # Tauri permission capability config
+   ├─ icons/                # Bundle icons
+   └─ src/                  # Rust PTY, files, readiness, workspace commands
+```
 
-CMDino is still in active alpha.
+Generated or local-only folders such as `dist/`, `node_modules/`, `src-tauri/target/`, `.claude/`, `.playwright-mcp/`, and `outputs/` are ignored.
 
-Architecture rule:
+## Architecture
 
-preserve the local-first PTY orchestration spine.
+```mermaid
+flowchart LR
+  User[Developer] --> UI[React + TypeScript UI]
+  UI --> Pane[xterm.js Terminal Pane]
+  UI --> State[Workspace State]
+  UI --> Flow[Workflow Graph]
+  UI --> Dino[Dino Lifecycle Runtime]
 
-Please avoid broad rewrites, cloud assumptions, or provider SDK coupling unless explicitly aligned with roadmap goals.
+  Pane --> Bridge[terminalBridge]
+  Bridge --> Tauri[Tauri Invoke + Events]
+  Tauri --> Rust[Rust Backend]
+  Rust --> PTY[portable-pty Session]
+  PTY --> CLI[Claude / Codex / Gemini / Ollama / Custom CLI]
 
-Read:
+  Rust -- terminal data --> Tauri
+  Tauri -- events --> Bridge
+  Bridge --> Pane
+  Pane --> Intelligence[Terminal Intelligence]
+  Intelligence --> Dino
+  State --> Workspace[Local .cmdino.json]
+```
 
-docs/ARCHITECTURE_RULES.md
+## Packaging Notes
 
-before major changes.
+Packaging needs preset brain files available after installation. CMDino currently handles this in two ways:
 
-License
+- source lookup from `.agents/` during development
+- Tauri resource fallback from bundled `.agents/**/*` and `public/preset-brains/**/*`
 
-No license file has been published yet.
+After creating an installer, verify:
 
-Until then, all code and assets should be considered all rights reserved.
+1. Install the app.
+2. Load the demo workflow.
+3. Preview and SEND each preset brain.
+4. Start an agent with a valid CLI.
+5. Confirm dino assets render.
+6. Use HANDOFF and FORWARD between two running terminals.
+7. Save and reload a workspace.
+
+## Alpha Limitations
+
+- The app assumes local CLI tools are installed and authenticated separately.
+- Frontend-only Vite preview cannot run real PTY sessions.
+- Workspaces restore configuration, not live sessions.
+- Installer QA is still focused on Windows.
+- There is no cloud sync, remote agent execution, or provider SDK integration.
+- No license file has been published yet; treat the repository as all rights reserved until one is added.
+
+## Roadmap
+
+Short term:
+
+- Broader installer verification
+- Cleaner screenshot set for public launch
+- More explicit onboarding around required CLIs
+- Stronger session logs and export options
+- Better workflow editing and templates
+
+Later:
+
+- Reusable workflow presets
+- Richer local model support
+- More configurable readiness checks
+- Improved terminal intelligence and state classification
+- Optional import/export packs for presets and brains
+
+## Development Rule
+
+Keep the core local-first PTY model intact. CMDino should launch and orchestrate real local tools instead of replacing them with a cloud wrapper.
+
+Read `docs/ARCHITECTURE_RULES.md` before broad architectural changes.
