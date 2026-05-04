@@ -1,0 +1,17 @@
+# CMDino Alpha Known Issues
+
+Date: 2026-05-01
+Status: Known issues for V1 Alpha release prep
+
+| Issue | Severity | User impact | Workaround | Status / Recommendation |
+| --- | --- | --- | --- | --- |
+| Session History logs events, not full terminal transcript or output scrollback. | Low | Users can audit actions like deploy, handoff, save/load, and errors, but cannot replay or search full terminal output from history. | Use terminal copy/log controls during the session when full output is needed. | Keep for alpha. Full scrollback persistence should be a later scoped feature. |
+| Auto Forward Lite is best with selected text; raw terminal TUI output may be noisy depending on CLI. | Medium | Forwarded context may include prompts, control text, spinners, or unrelated recent output. | Select the exact terminal text before forwarding, or use manual handoff and edit before send. | Keep for alpha. Improve terminal-output cleaning later. |
+| Drag/drop workflow builder is not implemented yet; current workflow graph is link visualization. | Low | Users can see directional handoff/forward links, but cannot visually author workflows by dragging nodes/edges. | Create workflow links through actual handoff or forward actions. | Expected alpha limitation. Do not add drag/drop before release. |
+| No cloud sync, accounts, or team collaboration. | Low | Workspaces are local to the machine and user. | Save `.cmdino.json` workspaces manually if they need to be moved or shared. | Intentional product boundary for alpha. |
+| No license/payment gate yet. | Low | The alpha is not monetization-ready and access is not gated. | Distribute only through the intended alpha channel. | Defer until paid product phase. |
+| Terminal output depends on installed local CLI tools. | Medium | Preset agents will fail readiness checks or fail to start if `claude`, `codex`, `gemini`, `ollama`, or custom commands are not installed/authenticated. | Install and authenticate required CLIs outside CMDino, or use Custom Agent with an available command. | Expected local-first behavior. Improve onboarding copy later. |
+| Some CLI TUIs may render imperfectly in xterm.js. | Medium | Full-screen TUIs, animations, and complex control sequences may not look identical to a native terminal. | Prefer line-oriented CLI modes where available, or use simpler commands for agent workflows. | Known terminal-emulation limitation. Revisit with focused xterm compatibility testing later. |
+| Large Vite/xterm bundle chunk warning remains. | Low | Build succeeds, but the main JS chunk is larger than Vite's default 500 kB warning threshold. Initial frontend load may be heavier than ideal. | None needed for alpha. | Defer code splitting/manual chunks until after alpha unless load time becomes a real issue. |
+| Tauri bundle identifier ends with `.app`. | Low | Current Windows build succeeds. Tauri warns this is not recommended because it can conflict with macOS app bundle naming. | None needed for Windows alpha. | Rename identifier before macOS distribution. |
+| Interactive installer reinstall flow was not rerun in this pass. | Low | The latest bundles were generated and the release EXE launched, but MSI/NSIS installer UI was not stepped through during this QA pass. | Use the existing installer smoke procedure before public upload. | Keep as release checklist item. |
