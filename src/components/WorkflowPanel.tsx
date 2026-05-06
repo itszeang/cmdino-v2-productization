@@ -141,6 +141,11 @@ export function WorkflowPanel({
     e: React.PointerEvent<HTMLDivElement>,
     configId: string,
   ) => {
+    // In route creation mode skip drag entirely so the click event fires
+    // reliably for target selection. setPointerCapture + any micro-movement
+    // causes the browser to classify the gesture as a drag and suppress click.
+    if (routeSource) return;
+
     const target = e.target as HTMLElement;
     // Ignore clicks on interactive children
     if (target.closest("button, select, input, a")) return;
@@ -153,7 +158,7 @@ export function WorkflowPanel({
       startNx: pos.x,
       startNy: pos.y,
     });
-  }, [posMap]);
+  }, [posMap, routeSource]);
 
   const handlePointerMove = useCallback((
     e: React.PointerEvent,
