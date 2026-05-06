@@ -101,6 +101,20 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
           <button className="modal-close-btn" onClick={onCancel}>×</button>
         </div>
 
+        {/* CLI requirement note */}
+        <div style={{
+          margin:       "0 0 2px 0",
+          padding:      "8px 12px",
+          background:   "var(--surface-0)",
+          borderBottom: "1px solid var(--border-subtle)",
+          fontSize:     11,
+          color:        "var(--text-faint)",
+          lineHeight:   1.5,
+          flexShrink:   0,
+        }}>
+          CMDino runs CLI tools installed on your machine. Preset agents require their CLIs to be installed and authenticated. Custom Agent can run any local shell command or CLI-based tool.
+        </div>
+
         {/* Preset cards */}
         <div className="modal-field-group">
           <label className="modal-label">Preset</label>
@@ -114,6 +128,7 @@ export function AgentCreationModal({ onConfirm, onCancel }: Props) {
               >
                 <span className="preset-card-title">{p.title}</span>
                 <span className="preset-card-role">{p.roleDescription}</span>
+                <span style={{ fontSize: 9, color: "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>{p.cliRequirement}</span>
               </button>
             ))}
           </div>

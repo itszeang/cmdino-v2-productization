@@ -149,6 +149,11 @@ export function AgentEditModal({ agent, isRunning, onConfirm, onCancel }: Props)
               onChange={(e) => setLaunchCommand(e.target.value)}
               placeholder="e.g. claude  (blank = plain shell)"
             />
+            <span className="modal-hint">
+              {agentKind === "custom"
+                ? "Any local command, shell script, or shell builtin."
+                : "Command must be on your PATH. Install and authenticate the CLI before starting."}
+            </span>
           </div>
 
           <div className="modal-field-group">

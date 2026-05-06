@@ -7,6 +7,7 @@ import type { AppSettings } from "../domain/appSettings";
 import type { TerminalViewMode } from "../domain/viewMode";
 import type { ReadinessFailure } from "../domain/readiness";
 import type { SessionLogEvent } from "../domain/sessionLog";
+import type { GeneratedOutputFile } from "../domain/attachments";
 import type { CSSProperties } from "react";
 
 // Minimum readable pane width used for browser-measured grid wrapping.
@@ -17,7 +18,7 @@ interface Props {
   onRemove:             (id: string) => void;
   runningAgentIds:      Set<string>;
   onStart:              (id: string) => void;
-  onAddAttachment:      (agentId: string, path: string) => void;
+  onAddAttachment:      (agentId: string, path: string, source?: "user" | "preset" | "generated") => void;
   onRemoveAttachment:   (agentId: string, attachmentId: string) => void;
   onLifecycleChange:    (agentId: string, lifecycle: TerminalLifecycleState) => void;
   onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
@@ -30,10 +31,14 @@ interface Props {
   activeTerminalId:     string | null;
   onActiveTerminalChange: (id: string) => void;
   lifecycleByAgentId:   Record<string, string>;
-  onFocusPane:          (id: string) => void;
-  workflowLinks:        WorkflowLink[];
-  onFocusTarget:        (id: string) => void;
-  onEvent?:             (event: SessionLogEvent) => void;
+  onFocusPane:                  (id: string) => void;
+  workflowLinks:                WorkflowLink[];
+  onFocusTarget:                (id: string) => void;
+  onEvent?:                     (event: SessionLogEvent) => void;
+  onRegisterTranscriptGetter?:  (agentId: string, getter: (() => string) | null) => void;
+  generatedOutputFiles?:        GeneratedOutputFile[];
+  onRefreshGeneratedOutputs?:   () => void;
+  onRegisterPaneRef?:           (agentId: string, el: HTMLElement | null) => void;
 }
 
 export function TerminalGrid({
@@ -44,7 +49,10 @@ export function TerminalGrid({
   settings,
   viewMode, onViewModeChange, activeTerminalId, onActiveTerminalChange,
   lifecycleByAgentId, onFocusPane, workflowLinks, onFocusTarget,
-  onEvent,
+  onEvent, onRegisterTranscriptGetter,
+  generatedOutputFiles = [],
+  onRefreshGeneratedOutputs,
+  onRegisterPaneRef,
 }: Props) {
   // Grid mode needs dynamic column/row counts — set as inline style only in grid mode.
   // Focus mode: no inline style on layout div (CSS class handles everything).
@@ -99,7 +107,7 @@ export function TerminalGrid({
                   onStart={() => onStart(agent.id)}
                   allAgents={agents}
                   runningAgentIds={runningAgentIds}
-                  onAddAttachment={(path) => onAddAttachment(agent.id, path)}
+                  onAddAttachment={(path, source) => onAddAttachment(agent.id, path, source)}
                   onRemoveAttachment={(attId) => onRemoveAttachment(agent.id, attId)}
                   onLifecycleChange={onLifecycleChange}
                   onRecordWorkflowLink={onRecordWorkflowLink}
@@ -113,6 +121,10 @@ export function TerminalGrid({
                   workflowLinks={workflowLinks}
                   onFocusTarget={onFocusTarget}
                   onEvent={onEvent}
+                  onRegisterTranscriptGetter={onRegisterTranscriptGetter}
+                  generatedOutputFiles={generatedOutputFiles}
+                  onRefreshGeneratedOutputs={onRefreshGeneratedOutputs}
+                  onRegisterPaneRef={onRegisterPaneRef}
                 />
               </div>
             );

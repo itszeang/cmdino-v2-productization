@@ -3,14 +3,14 @@ import type { SessionLogEvent, SessionLogEventType } from "../domain/sessionLog"
 import { DinoLane, type DinoVisualPhase } from "../dino/DinoLane";
 import { LogsPanel }       from "./LogsPanel";
 import { HandoffModal }    from "./HandoffModal";
+import { AttachmentPanel } from "./AttachmentPanel";
 import type { TerminalAgent }   from "../domain/terminalAgent";
-import type { TerminalAttachment } from "../domain/orchestration";
-import { attachmentKindFromPath } from "../domain/orchestration";
 import { fileBridge }      from "../orchestration/fileBridge";
 import type { WorkflowLink, WorkflowLinkKind } from "../domain/workflow";
 import type { AppSettings } from "../domain/appSettings";
 import type { TerminalViewMode } from "../domain/viewMode";
 import type { ReadinessFailure } from "../domain/readiness";
+import type { GeneratedOutputFile } from "../domain/attachments";
 import { validateAgentReadiness } from "../readiness/readinessBridge";
 import { terminalBridge }  from "../terminal/terminalBridge";
 import {
@@ -46,7 +46,6 @@ const VIEW_MODE_DINO_SCALE: Record<TerminalViewMode, number> = {
 };
 
 function dotColor(s: string) { return STATE_COLORS[s] ?? "#737373"; }
-function lcLabel(lc: TerminalLifecycleState) { return lc.toUpperCase(); }
 
 // ── Shared button primitives ──────────────────────────────────────────────────
 
@@ -114,39 +113,33 @@ function StripBtn({
   );
 }
 
-// ── Preview state type ────────────────────────────────────────────────────────
-
-interface PreviewState {
-  content:   string | null;
-  truncated: boolean;
-  loading:   boolean;
-  error:     string | null;
-}
-const PREVIEW_IDLE: PreviewState = { content: null, truncated: false, loading: false, error: null };
-
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  agent:                TerminalAgent;
-  onRemove:             (id: string) => void;
-  isRunning:            boolean;
-  onStart:              () => void;
-  allAgents:            TerminalAgent[];
-  runningAgentIds:      Set<string>;
-  onAddAttachment:      (path: string) => void;
-  onRemoveAttachment:   (attachmentId: string) => void;
-  onLifecycleChange:    (agentId: string, lifecycle: TerminalLifecycleState) => void;
-  onRecordWorkflowLink: (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
-  onEditAgent:          (id: string) => void;
-  readinessError:       ReadinessFailure | null;
-  onReadinessError:     (agentId: string, failure: ReadinessFailure | null) => void;
-  settings?:            AppSettings;
-  viewMode:             TerminalViewMode;
-  isActive:             boolean;
-  onFocus?:             () => void;
-  workflowLinks:        WorkflowLink[];
-  onFocusTarget:        (id: string) => void;
-  onEvent?:             (event: SessionLogEvent) => void;
+  agent:                          TerminalAgent;
+  onRemove:                       (id: string) => void;
+  isRunning:                      boolean;
+  onStart:                        () => void;
+  allAgents:                      TerminalAgent[];
+  runningAgentIds:                Set<string>;
+  onAddAttachment:                (path: string, source?: "user" | "preset" | "generated") => void;
+  onRemoveAttachment:             (attachmentId: string) => void;
+  onLifecycleChange:              (agentId: string, lifecycle: TerminalLifecycleState) => void;
+  onRecordWorkflowLink:           (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
+  onEditAgent:                    (id: string) => void;
+  readinessError:                 ReadinessFailure | null;
+  onReadinessError:               (agentId: string, failure: ReadinessFailure | null) => void;
+  settings?:                      AppSettings;
+  viewMode:                       TerminalViewMode;
+  isActive:                       boolean;
+  onFocus?:                       () => void;
+  workflowLinks:                  WorkflowLink[];
+  onFocusTarget:                  (id: string) => void;
+  onEvent?:                       (event: SessionLogEvent) => void;
+  onRegisterTranscriptGetter?:    (agentId: string, getter: (() => string) | null) => void;
+  generatedOutputFiles?:          GeneratedOutputFile[];
+  onRefreshGeneratedOutputs?:     () => void;
+  onRegisterPaneRef?:             (agentId: string, el: HTMLElement | null) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -160,8 +153,13 @@ export function TerminalPane({
   viewMode, isActive, onFocus,
   workflowLinks, onFocusTarget,
   onEvent,
+  onRegisterTranscriptGetter,
+  generatedOutputFiles = [],
+  onRefreshGeneratedOutputs,
+  onRegisterPaneRef,
 }: Props) {
   const containerRef      = useRef<HTMLDivElement>(null);
+  const paneRootRef       = useRef<HTMLDivElement>(null);
   const prevLifecycleRef  = useRef<TerminalLifecycleState | null>(null);
   const isRestartingRef   = useRef(false);
 
@@ -214,6 +212,24 @@ export function TerminalPane({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent.id, agent.configId, agent.label, lifecycle, onLifecycleChange, onEvent]);
 
+  // Register transcript getter so App-level export can read this pane's buffer
+  useEffect(() => {
+    if (!onRegisterTranscriptGetter) return;
+    onRegisterTranscriptGetter(agent.id, getSessionLogs);
+    return () => {
+      onRegisterTranscriptGetter(agent.id, null);
+    };
+  }, [agent.id, getSessionLogs, onRegisterTranscriptGetter]);
+
+  // Register pane root element for drag-drop hit-testing
+  useEffect(() => {
+    const el = paneRootRef.current;
+    if (!el || !onRegisterPaneRef) return;
+    onRegisterPaneRef(agent.id, el);
+    return () => { onRegisterPaneRef(agent.id, null); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agent.id, onRegisterPaneRef]);
+
   // ── Egg → hatch → dino spawn sequence ─────────────────────────────────────
   // Tracks which visual phase we're in so DinoLane shows egg assets before
   // the PTY is live, then briefly plays the hatch animation on first spawn.
@@ -256,13 +272,7 @@ export function TerminalPane({
   const [showLogs,          setShowLogs]          = useState(false);
   const [handoffCapture,    setHandoffCapture]    = useState<string | null>(null);
   const [readinessChecking, setReadinessChecking] = useState(false);
-
-  // Orchestration strip state
-  const [selectedAttId, setSelectedAttId] = useState<string | null>(null);
-  const [showAddPath,   setShowAddPath]   = useState(false);
-  const [addInput,      setAddInput]      = useState("");
-  const [addError,      setAddError]      = useState("");
-  const [preview,       setPreview]       = useState<PreviewState>(PREVIEW_IDLE);
+  const [showAttPanel,      setShowAttPanel]      = useState(false);
 
   // Forward state
   const [selectedForwardTargetId, setSelectedForwardTargetId] = useState<string | null>(null);
@@ -276,27 +286,23 @@ export function TerminalPane({
   const pulse         = dinoState === "patrol_running" || dinoState === "heavy_processing";
   const showLifecycle = lifecycle !== "running";
   const dinoScale     = (settings?.dinoScale ?? 1) * VIEW_MODE_DINO_SCALE[viewMode];
-  // isAlive: lifecycle-based, from useTerminalProcess — use this for all action enable checks
   const isAlive        = lifecycle === "running" || lifecycle === "spawning";
   const runningTargets = allAgents.filter((a) => a.id !== agent.id && runningAgentIds.has(a.id));
 
   // Defensive: attachments may be undefined on agents created before schema migration
   const atts = agent.attachments ?? [];
 
-  // Auto-select: explicit > first available — never blocked by null selectedAttId
-  const selectedAtt    = atts.find((a) => a.id === selectedAttId) ?? atts[0] ?? null;
-  const effectiveSelId = selectedAtt?.id ?? null;
-  const hasAtt         = selectedAtt !== null;
-
-  const showPreviewArea = preview.loading || preview.content !== null || preview.error !== null;
-
-  // Forward target derivation
+  // Forward target derivation: route > handoff > selected > first
   const otherTerminals = allAgents.filter((a) => a.id !== agent.id);
-  const outgoingLink   = workflowLinks.find(
-    (l) => l.kind === "handoff" && l.sourceConfigId === agent.configId,
-  );
-  const linkedTarget = outgoingLink
-    ? allAgents.find((a) => a.configId === outgoingLink.targetConfigId && a.id !== agent.id) ?? null
+  const outgoingRoute   = workflowLinks
+    .filter((l) => l.kind === "route" && l.sourceConfigId === agent.configId)
+    .sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
+  const outgoingHandoff = workflowLinks
+    .filter((l) => l.kind === "handoff" && l.sourceConfigId === agent.configId)
+    .sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
+  const preferredLink  = outgoingRoute ?? outgoingHandoff ?? null;
+  const linkedTarget   = preferredLink
+    ? allAgents.find((a) => a.configId === preferredLink.targetConfigId && a.id !== agent.id) ?? null
     : null;
   const effectiveFwdTarget =
     linkedTarget ??
@@ -305,57 +311,27 @@ export function TerminalPane({
     null;
   const targetIsRunning = effectiveFwdTarget != null && runningAgentIds.has(effectiveFwdTarget.id);
 
-  // ── Strip actions ──────────────────────────────────────────────────────────
+  // ── Attachment panel actions ───────────────────────────────────────────────
 
-  function selectChip(att: TerminalAttachment) {
-    if (selectedAttId === att.id) {
-      setSelectedAttId(null);
-      setPreview(PREVIEW_IDLE);
-    } else {
-      setSelectedAttId(att.id);
-      setPreview(PREVIEW_IDLE); // clear stale preview on chip change
-    }
-  }
-
-  function handleAddPath() {
-    const p = addInput.trim();
-    if (!p) return;
-    if (!attachmentKindFromPath(p)) {
-      setAddError("Only .md and .txt files allowed.");
-      return;
-    }
-    onAddAttachment(p);
-    setAddInput("");
-    setAddError("");
-    setShowAddPath(false);
-  }
-
-  async function handlePreview() {
-    if (!selectedAtt) return;
-    setPreview({ content: null, truncated: false, loading: true, error: null });
+  async function handleSendAttachment(path: string, fileName: string) {
+    if (!isAlive) return;
     try {
-      const r = await fileBridge.readPreview(selectedAtt.path);
-      setPreview({ content: r.content, truncated: r.truncated, loading: false, error: null });
-    } catch (err) {
-      setPreview({ content: null, truncated: false, loading: false,
-        error: err instanceof Error ? err.message : String(err) });
-    }
-  }
-
-  async function handleSendAtt() {
-    if (!selectedAtt || !isAlive) return;
-    try {
-      const r = await fileBridge.readPreview(selectedAtt.path);
+      const r = await fileBridge.readPreview(path);
       sendInput(r.content);
       onEvent?.({
         id: crypto.randomUUID(), ts: Date.now(), workspaceId: "",
         agentConfigId: agent.configId, agentLabel: agent.label,
         type: "preset_brain_send",
-        payload: { filename: selectedAtt.path },
+        payload: { fileName, path },
       });
     } catch (err) {
       alert(`Read failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  function openAttPanel() {
+    setShowAttPanel(true);
+    onRefreshGeneratedOutputs?.();
   }
 
   function handleOpenHandoff() {
@@ -375,8 +351,8 @@ export function TerminalPane({
       onEvent?.({
         id: crypto.randomUUID(), ts: Date.now(), workspaceId: "",
         agentConfigId: agent.configId, agentLabel: agent.label,
-        type: "manual_handoff",
-        payload: { target: effectiveFwdTarget.label },
+        type: "auto_forward",
+        payload: { targetLabel: effectiveFwdTarget.label, target: effectiveFwdTarget.configId },
       });
       onFocusTarget(effectiveFwdTarget.id);
     } catch (err) {
@@ -435,11 +411,13 @@ export function TerminalPane({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{
+    <div ref={paneRootRef} style={{
       display: "flex", flexDirection: "column",
-      background: "var(--surface-1)", border: "1px solid var(--border-subtle)",
+      background: "var(--surface-1)",
+      border: `1px solid ${isActive && viewMode === "grid" ? "var(--border-strong)" : "var(--border-subtle)"}`,
       borderRadius: 12, overflow: "hidden", height: "100%",
-      boxShadow: "none", position: "relative",
+      boxShadow: isActive && viewMode === "grid" ? "0 0 0 1px var(--border-strong)" : "none",
+      position: "relative",
     }}>
 
       {/* ── Header — lifecycle only ── */}
@@ -464,12 +442,8 @@ export function TerminalPane({
           {agent.label}
         </span>
         {showLifecycle && (
-          <span style={{
-            color: lcColor,
-            fontSize: 10, letterSpacing: 0, fontWeight: 600,
-            transition: "color 0.25s", flexShrink: 0,
-          }}>
-            {lcLabel(lifecycle).toLowerCase()}
+          <span className="lc-pill" style={{ color: lcColor }}>
+            {lifecycle}
           </span>
         )}
         <HdrBtn title="Copy visible output" onClick={() => { void copyVisible(); }}>⎘</HdrBtn>
@@ -508,114 +482,43 @@ export function TerminalPane({
       {/* ── Orchestration strip ── */}
       <div style={{
         display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", rowGap: 6,
-        padding: "8px 10px",
+        padding: "7px 10px",
         background: "var(--surface-0)", borderBottom: "1px solid var(--border-subtle)",
         flexShrink: 0, minHeight: 36,
       }}>
-        {/* Attach skill button */}
-        <StripBtn onClick={() => { setShowAddPath((v) => !v); setAddError(""); }} title="Attach a .md or .txt skill file">
-          + ATTACH
+        {/* Context / Attach toggle — accent when panel is open */}
+        <StripBtn
+          onClick={() => { showAttPanel ? setShowAttPanel(false) : openAttPanel(); }}
+          accent={showAttPanel}
+          title={showAttPanel ? "Close context panel" : "Manage context attachments"}
+        >
+          {atts.length > 0 ? `Context (${atts.length})` : "Attach"}
         </StripBtn>
 
-        <span style={{ color: "var(--border-subtle)", fontSize: 12, flexShrink: 0 }}>|</span>
+        <div className="pane-strip-sep" />
 
-        {/* Attachment chips */}
-        <div style={{
-          display: "flex", gap: 4, flex: "1 1 220px",
-          overflowX: "auto", alignItems: "center", minWidth: 140,
-        }}>
-          {atts.length === 0 ? (
-            <span style={{ color: "var(--text-faint)", fontSize: 9, letterSpacing: 0.6, whiteSpace: "nowrap" }}>
-              no attachments
-            </span>
-          ) : (
-            atts.map((att) => {
-              const active = effectiveSelId === att.id;
-              return (
-                <div key={att.id} style={{ display: "flex", alignItems: "center", gap: 0, flexShrink: 0 }}>
-                  <button
-                    onClick={() => selectChip(att)}
-                    title={att.path}
-                    style={{
-                      background: active ? "var(--button-bg)" : "transparent",
-                      border: `1px solid ${active ? "var(--border-strong)" : "transparent"}`,
-                      borderRight: "none",
-                      color: active ? "var(--text-main)" : "var(--text-muted)",
-                      fontSize: 10, padding: "4px 7px",
-                      borderRadius: "999px 0 0 999px",
-                      cursor: "pointer", fontFamily: "inherit",
-                      letterSpacing: 0, flexShrink: 0,
-                      transition: "background 0.1s, border-color 0.1s, color 0.1s",
-                    }}
-                  >
-                    {att.path.startsWith("cmdino-preset://") && (
-                      <span className="chip-brain-badge">BRAIN</span>
-                    )}
-                    {att.fileName}
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onRemoveAttachment(att.id); if (selectedAttId === att.id) { setSelectedAttId(null); setPreview(PREVIEW_IDLE); } }}
-                    title="Remove attachment"
-                    style={{
-                      background: active ? "var(--button-bg)" : "transparent",
-                      border: `1px solid ${active ? "var(--border-strong)" : "transparent"}`,
-                      color: "var(--text-faint)",
-                      fontSize: 10, padding: "4px 6px",
-                      borderRadius: "0 999px 999px 0",
-                      cursor: "pointer", fontFamily: "inherit",
-                      flexShrink: 0, lineHeight: 1,
-                      transition: "color 0.1s",
-                    }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--danger)"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)"; }}
-                  >x</button>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <span style={{ color: "var(--border-subtle)", fontSize: 12, flexShrink: 0 }}>|</span>
-
-        {/* Action buttons */}
-        <StripBtn
-          onClick={() => { void handlePreview(); }}
-          disabled={!hasAtt}
-          title={hasAtt ? `Preview ${selectedAtt!.fileName}` : "No attachment"}
-        >PREVIEW</StripBtn>
-
-        <StripBtn
-          onClick={() => { void handleSendAtt(); }}
-          disabled={!hasAtt || !isAlive}
-          accent
-          title={!hasAtt ? "No attachment" : isAlive ? `Send ${selectedAtt!.fileName} to terminal` : "Start terminal first"}
-        >SEND</StripBtn>
-        {hasAtt && !isAlive && (
-          <span style={{ color: "var(--danger)", fontSize: 10, letterSpacing: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
-            start first
-          </span>
-        )}
-
-        {/* HANDOFF: enabled whenever terminal is alive — targets shown in modal */}
+        {/* Handoff */}
         <StripBtn
           onClick={handleOpenHandoff}
           disabled={!isAlive}
           accent
           title={isAlive ? "Handoff output to another terminal" : "Start terminal first"}
-        >HANDOFF</StripBtn>
+        >Handoff</StripBtn>
 
-        {/* ── Auto-forward: FORWARD TO [target] [FORWARD] ── */}
-        <span style={{ color: "var(--border-subtle)", fontSize: 12, flexShrink: 0 }}>|</span>
-        <span style={{ color: "var(--text-faint)", fontSize: 9, letterSpacing: 0.5, flexShrink: 0, whiteSpace: "nowrap" }}>
-          FORWARD TO
+        {/* ── Forward: → [target] [Forward] ── */}
+        <div className="pane-strip-sep" />
+        <span style={{ color: "var(--text-faint)", fontSize: 11, flexShrink: 0, lineHeight: 1 }}>
+          →
         </span>
 
         {linkedTarget ? (
           <span style={{
             fontSize: 10, color: "var(--text-muted)", flexShrink: 0,
             maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {linkedTarget.label}
+          }}
+            title={preferredLink?.kind === "route" ? "Preferred route" : "Observed handoff"}
+          >
+            {preferredLink?.kind === "route" ? "→ " : "↪ "}{linkedTarget.label}
           </span>
         ) : otherTerminals.length > 0 ? (
           <select
@@ -648,7 +551,7 @@ export function TerminalPane({
             `Forward to ${effectiveFwdTarget.label}`
           }
         >
-          {forwarding ? "…" : "FORWARD"}
+          {forwarding ? "…" : "Forward"}
         </StripBtn>
 
         {fwdError && (
@@ -659,74 +562,19 @@ export function TerminalPane({
 
       </div>
 
-      {/* ── Add-path row (collapsible) ── */}
-      {showAddPath && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap",
-          padding: "8px 10px",
-          background: "var(--surface-0)", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0,
-        }}>
-          <input
-            autoFocus
-            value={addInput}
-            onChange={(e) => { setAddInput(e.target.value); setAddError(""); }}
-            onKeyDown={(e) => { if (e.key === "Enter") handleAddPath(); if (e.key === "Escape") { setShowAddPath(false); setAddInput(""); setAddError(""); } }}
-            placeholder="Paste .md or .txt file path…"
-            style={{
-              flex: 1, background: "var(--surface-1)",
-              border: `1px solid ${addError ? "var(--danger)" : "var(--border-subtle)"}`,
-              color: "var(--text-main)", fontSize: 11, padding: "6px 10px",
-              borderRadius: 999, fontFamily: "monospace", outline: "none",
-              minWidth: 180,
-            }}
-          />
-          {addError && (
-            <span style={{ color: "var(--danger)", fontSize: 9, whiteSpace: "nowrap" }}>{addError}</span>
-          )}
-          <StripBtn onClick={handleAddPath} accent>ADD</StripBtn>
-          <StripBtn onClick={() => { setShowAddPath(false); setAddInput(""); setAddError(""); }}>x</StripBtn>
-        </div>
-      )}
-
-      {/* ── Preview area (collapsible) ── */}
-      {showPreviewArea && (
-        <div style={{
-          background: "var(--surface-0)", borderBottom: "1px solid var(--border-subtle)",
-          flexShrink: 0, maxHeight: 110, overflowY: "auto", position: "relative",
-        }}>
-          <button
-            onClick={() => setPreview(PREVIEW_IDLE)}
-            title="Close preview"
-            style={{
-              position: "absolute", top: 3, right: 5,
-              background: "none", border: "none", color: "var(--text-faint)",
-              fontSize: 10, cursor: "pointer", padding: 0, lineHeight: 1,
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--danger)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)"; }}
-          >x</button>
-
-          {preview.loading && (
-            <div style={{ padding: "6px 8px", color: "var(--text-muted)", fontSize: 9 }}>Loading…</div>
-          )}
-          {preview.error && (
-            <div style={{ padding: "6px 8px", color: "var(--danger)", fontSize: 9 }}>{preview.error}</div>
-          )}
-          {preview.content !== null && !preview.loading && (
-            <>
-              {preview.truncated && (
-                <div style={{ padding: "2px 8px", background: "var(--accent-soft)", color: "var(--warning)", fontSize: 8, borderBottom: "1px solid var(--border-subtle)" }}>
-                  truncated at 256 KB
-                </div>
-              )}
-              <pre style={{
-                margin: 0, padding: "5px 8px", color: "var(--text-main)",
-                fontSize: 10, fontFamily: "monospace",
-                whiteSpace: "pre-wrap", wordBreak: "break-word",
-              }}>{preview.content}</pre>
-            </>
-          )}
-        </div>
+      {/* ── Attachment panel (collapsible) ── */}
+      {showAttPanel && (
+        <AttachmentPanel
+          agent={agent}
+          allAgents={allAgents}
+          generatedOutputFiles={generatedOutputFiles}
+          isAlive={isAlive}
+          onAddAttachment={onAddAttachment}
+          onRemoveAttachment={onRemoveAttachment}
+          onSendAttachment={handleSendAttachment}
+          onRefreshGeneratedOutputs={() => onRefreshGeneratedOutputs?.()}
+          onClose={() => setShowAttPanel(false)}
+        />
       )}
 
       <div style={{
@@ -846,7 +694,19 @@ export function TerminalPane({
           initialCapture={handoffCapture}
           runningTargets={runningTargets}
           onClose={() => setHandoffCapture(null)}
-          onSent={(targetId) => onRecordWorkflowLink(agent.id, targetId, "handoff")}
+          onSent={(targetId) => {
+            onRecordWorkflowLink(agent.id, targetId, "handoff");
+            const target = allAgents.find((a) => a.id === targetId);
+            onEvent?.({
+              id: crypto.randomUUID(), ts: Date.now(), workspaceId: "",
+              agentConfigId: agent.configId, agentLabel: agent.label,
+              type: "manual_handoff",
+              payload: {
+                targetLabel: target?.label ?? targetId,
+                target: target?.configId ?? targetId,
+              },
+            });
+          }}
         />
       )}
     </div>
