@@ -1,5 +1,6 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { TerminalAgent } from "../domain/terminalAgent";
-import type { WorkflowLink }  from "../domain/workflow";
+import type { WorkflowLink, WorkflowNodePositions, WorkflowNodePosition } from "../domain/workflow";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -7,8 +8,10 @@ const NODE_W  = 158;
 const NODE_H  = 92;
 const PANEL_W = 860;
 const PANEL_H = 560;
+const HEADER_H = 45;
+const CANVAS_H = PANEL_H - HEADER_H;
 const CX      = PANEL_W / 2;
-const CY      = (PANEL_H - 40) / 2 + 20; // offset for header
+const CY      = CANVAS_H / 2;
 
 const LC_COLORS: Record<string, string> = {
   dormant:  "#737373",
@@ -31,7 +34,7 @@ function dinoIdleSprite(dinoId: string): string {
 
 interface NodePos { x: number; y: number; }
 
-function computePositions(n: number): NodePos[] {
+function computeDefaultPositions(n: number): NodePos[] {
   if (n === 0) return [];
   if (n === 1) return [{ x: CX - NODE_W / 2, y: CY - NODE_H / 2 }];
   if (n === 2) return [
@@ -46,6 +49,14 @@ function computePositions(n: number): NodePos[] {
       y: CY + r * Math.sin(angle) - NODE_H / 2,
     };
   });
+}
+
+function clampPos(x: number, y: number): NodePos {
+  const pad = 8;
+  return {
+    x: Math.max(pad, Math.min(PANEL_W - NODE_W - pad, x)),
+    y: Math.max(pad, Math.min(CANVAS_H - NODE_H - pad, y)),
+  };
 }
 
 function edgePoints(
@@ -75,25 +86,146 @@ function edgePoints(
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  agents:             TerminalAgent[];
-  workflowLinks:      WorkflowLink[];
-  lifecycleByAgentId: Record<string, string>;
-  onRemoveLink:       (id: string) => void;
-  onClose:            () => void;
+  agents:                     TerminalAgent[];
+  workflowLinks:              WorkflowLink[];
+  workflowNodePositions:      WorkflowNodePositions;
+  lifecycleByAgentId:         Record<string, string>;
+  onRemoveLink:               (id: string) => void;
+  onClose:                    () => void;
+  onUpdateNodePosition:       (configId: string, pos: WorkflowNodePosition) => void;
+  onResetLayout:              () => void;
+  onCreateRoute:              (sourceConfigId: string, targetConfigId: string) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function WorkflowPanel({
-  agents, workflowLinks, lifecycleByAgentId, onRemoveLink, onClose,
+  agents, workflowLinks, workflowNodePositions, lifecycleByAgentId,
+  onRemoveLink, onClose, onUpdateNodePosition, onResetLayout, onCreateRoute,
 }: Props) {
-  const positions  = computePositions(agents.length);
-  const posMap     = new Map(agents.map((a, i) => [a.configId, positions[i]]));
+  // Merge saved positions with computed fallbacks
+  const defaultPositions = computeDefaultPositions(agents.length);
+  const posMap = new Map<string, NodePos>(
+    agents.map((a, i) => {
+      const saved = workflowNodePositions[a.configId];
+      return [a.configId, saved ?? defaultPositions[i]];
+    })
+  );
+
+  // Local drag state (not persisted until pointerup)
+  const [dragState, setDragState] = useState<{
+    configId: string;
+    startPx: number; startPy: number;
+    startNx: number; startNy: number;
+  } | null>(null);
+  const [livePos, setLivePos] = useState<Record<string, NodePos>>({});
+
+  // Route creation mode
+  const [routeSource, setRouteSource] = useState<string | null>(null);
+
+  // Effective positions: live overrides during drag
+  function getPos(configId: string): NodePos {
+    return livePos[configId] ?? posMap.get(configId) ?? { x: 0, y: 0 };
+  }
 
   // Only draw links where both ends exist
   const drawLinks = workflowLinks.filter(
     (l) => posMap.has(l.sourceConfigId) && posMap.has(l.targetConfigId),
   );
+
+  // ── Drag handlers ──────────────────────────────────────────────────────────
+
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const handlePointerDown = useCallback((
+    e: React.PointerEvent<HTMLDivElement>,
+    configId: string,
+  ) => {
+    const target = e.target as HTMLElement;
+    // Ignore clicks on interactive children
+    if (target.closest("button, select, input, a")) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const pos = posMap.get(configId) ?? { x: 0, y: 0 };
+    setDragState({
+      configId,
+      startPx: e.clientX,
+      startPy: e.clientY,
+      startNx: pos.x,
+      startNy: pos.y,
+    });
+  }, [posMap]);
+
+  const handlePointerMove = useCallback((
+    e: React.PointerEvent,
+  ) => {
+    if (!dragState) return;
+    const dx = e.clientX - dragState.startPx;
+    const dy = e.clientY - dragState.startPy;
+    const clamped = clampPos(dragState.startNx + dx, dragState.startNy + dy);
+    setLivePos((prev) => ({ ...prev, [dragState.configId]: clamped }));
+  }, [dragState]);
+
+  const handlePointerUp = useCallback((
+    _e: React.PointerEvent<HTMLDivElement>,
+    configId: string,
+  ) => {
+    if (!dragState || dragState.configId !== configId) return;
+    const finalPos = livePos[configId];
+    if (finalPos) {
+      onUpdateNodePosition(configId, finalPos);
+      // Clear live override
+      setLivePos((prev) => {
+        const next = { ...prev };
+        delete next[configId];
+        return next;
+      });
+    }
+    setDragState(null);
+  }, [dragState, livePos, onUpdateNodePosition]);
+
+  // ── Route creation ────────────────────────────────────────────────────────
+
+  const handleRouteButtonClick = useCallback((
+    e: React.MouseEvent,
+    configId: string,
+  ) => {
+    e.stopPropagation();
+    if (routeSource === configId) {
+      setRouteSource(null);
+    } else {
+      setRouteSource(configId);
+    }
+  }, [routeSource]);
+
+  const handleNodeClick = useCallback((configId: string) => {
+    if (!routeSource) return;
+    if (routeSource === configId) {
+      setRouteSource(null);
+      return;
+    }
+    onCreateRoute(routeSource, configId);
+    setRouteSource(null);
+  }, [routeSource, onCreateRoute]);
+
+  // Cancel route mode on Escape
+  useEffect(() => {
+    if (!routeSource) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setRouteSource(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [routeSource]);
+
+  // ── Reset layout ──────────────────────────────────────────────────────────
+
+  const handleResetLayout = useCallback(() => {
+    setLivePos({});
+    onResetLayout();
+    // After reset, positions default to computed layout (empty positions object = fallback)
+  }, [onResetLayout]);
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -101,70 +233,128 @@ export function WorkflowPanel({
         position:       "fixed",
         inset:          0,
         background:     "var(--overlay-bg)",
-        backdropFilter:  "blur(8px)",
+        backdropFilter: "blur(8px)",
         display:        "flex",
         alignItems:     "center",
         justifyContent: "center",
         zIndex:         200,
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setRouteSource(null);
+          onClose();
+        }
+      }}
     >
       <div
         style={{
-          width:          PANEL_W,
-          maxWidth:       "96vw",
-          height:         PANEL_H,
-          maxHeight:      "90vh",
-          background:     "var(--surface-1)",
-          border:         "1px solid var(--border-subtle)",
-          borderRadius:   12,
-          overflow:       "hidden",
-          display:        "flex",
-          flexDirection:  "column",
-          boxShadow:      "var(--shadow-panel)",
-          position:       "relative",
+          width:         PANEL_W,
+          maxWidth:      "96vw",
+          height:        PANEL_H,
+          maxHeight:     "90vh",
+          background:    "var(--surface-1)",
+          border:        "1px solid var(--border-subtle)",
+          borderRadius:  12,
+          overflow:      "hidden",
+          display:       "flex",
+          flexDirection: "column",
+          boxShadow:     "var(--shadow-panel)",
+          position:      "relative",
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
         <div style={{
-          display:       "flex",
-          alignItems:    "center",
-          gap:           10,
-          padding:       "14px 16px",
-          borderBottom:  "1px solid var(--border-subtle)",
-          flexShrink:    0,
-          background:    "var(--surface-1)",
+          display:      "flex",
+          alignItems:   "center",
+          gap:          10,
+          padding:      "12px 16px",
+          borderBottom: "1px solid var(--border-subtle)",
+          flexShrink:   0,
+          background:   "var(--surface-1)",
+          height:       HEADER_H,
+          boxSizing:    "border-box",
         }}>
-          <span style={{ color: "var(--text-main)", fontWeight: 650, fontSize: 13, letterSpacing: 0 }}>
+          <span style={{ color: "var(--text-main)", fontWeight: 650, fontSize: 13 }}>
             Workflow
           </span>
           <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
             {agents.length} terminal{agents.length !== 1 ? "s" : ""}
-            {drawLinks.length > 0 ? ` - ${drawLinks.length} link${drawLinks.length !== 1 ? "s" : ""}` : ""}
+            {drawLinks.length > 0 ? ` · ${drawLinks.length} link${drawLinks.length !== 1 ? "s" : ""}` : ""}
           </span>
-          <button
-            onClick={onClose}
-            style={{
-              marginLeft:   "auto",
-              background:   "transparent",
-              border:       "none",
-              color:        "var(--text-muted)",
-              fontSize:     15,
-              cursor:       "pointer",
-              padding:      "4px 7px",
-              lineHeight:   1,
-              borderRadius: 999,
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--button-bg)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text-main)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)"; }}
-          >x</button>
+          {routeSource && (
+            <span style={{
+              fontSize: 10, color: "var(--accent)", flexShrink: 0,
+              background: "var(--accent-soft)", padding: "2px 8px", borderRadius: 999,
+            }}>
+              Route from {agents.find((a) => a.configId === routeSource)?.label ?? routeSource} — click target
+            </span>
+          )}
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+            <button
+              onClick={handleResetLayout}
+              disabled={agents.length === 0}
+              style={{
+                background:   "transparent",
+                border:       "1px solid var(--border-subtle)",
+                color:        agents.length === 0 ? "var(--text-faint)" : "var(--text-muted)",
+                fontSize:     11,
+                cursor:       agents.length === 0 ? "not-allowed" : "pointer",
+                padding:      "4px 10px",
+                lineHeight:   1,
+                borderRadius: 999,
+                fontFamily:   "inherit",
+              }}
+              onMouseEnter={(e) => {
+                if (agents.length === 0) return;
+                (e.currentTarget as HTMLButtonElement).style.background = "var(--button-bg)";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-main)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                (e.currentTarget as HTMLButtonElement).style.color = agents.length === 0 ? "var(--text-faint)" : "var(--text-muted)";
+              }}
+            >
+              Reset Layout
+            </button>
+            <button
+              onClick={() => { setRouteSource(null); onClose(); }}
+              style={{
+                background:   "transparent",
+                border:       "none",
+                color:        "var(--text-muted)",
+                fontSize:     15,
+                cursor:       "pointer",
+                padding:      "4px 7px",
+                lineHeight:   1,
+                borderRadius: 999,
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "var(--button-bg)";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-main)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+              }}
+            >✕</button>
+          </div>
         </div>
 
         {/* ── Canvas ── */}
-        <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "var(--surface-0)" }}>
+        <div
+          style={{
+            flex:     1,
+            position: "relative",
+            overflow: "hidden",
+            background: "var(--surface-0)",
+          }}
+          onClick={() => {
+            if (routeSource) setRouteSource(null);
+          }}
+        >
 
-          {/* Empty states */}
+          {/* Empty state */}
           {agents.length === 0 && (
             <div style={{
               position:       "absolute",
@@ -174,12 +364,11 @@ export function WorkflowPanel({
               justifyContent: "center",
               color:          "var(--text-muted)",
               fontSize:       13,
-              letterSpacing:  0,
             }}>
               No Dino terminals
             </div>
           )}
-          {agents.length > 0 && drawLinks.length === 0 && (
+          {agents.length > 0 && drawLinks.length === 0 && !routeSource && (
             <div style={{
               position:  "absolute",
               bottom:    14,
@@ -187,15 +376,16 @@ export function WorkflowPanel({
               right:     0,
               textAlign: "center",
               color:     "var(--text-faint)",
-              fontSize:  11,
-              letterSpacing: 0,
+              fontSize:  10,
+              letterSpacing: 0.2,
             }}>
-              No manual handoffs recorded yet
+              Drag to arrange · use Route on a node to wire a preferred handoff path
             </div>
           )}
 
           {/* ── SVG edges ── */}
           <svg
+            ref={svgRef}
             style={{ position: "absolute", inset: 0, overflow: "visible", pointerEvents: "none" }}
             width="100%" height="100%"
           >
@@ -209,30 +399,43 @@ export function WorkflowPanel({
               >
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--text-faint)" />
               </marker>
+              <marker
+                id="wf-arrow-route"
+                viewBox="0 0 10 10"
+                refX="9" refY="5"
+                markerWidth="5" markerHeight="5"
+                orient="auto"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)" />
+              </marker>
             </defs>
 
             {drawLinks.map((link) => {
-              const sp = posMap.get(link.sourceConfigId)!;
-              const tp = posMap.get(link.targetConfigId)!;
+              const sp = getPos(link.sourceConfigId);
+              const tp = getPos(link.targetConfigId);
               const { x1, y1, x2, y2, mx, my } = edgePoints(sp.x, sp.y, tp.x, tp.y);
-              const sw = Math.min(1 + link.count, 5);
-              const label =
-                (link.kind === "handoff" ? "handoff" : "skill send") +
-                (link.count > 1 ? ` ×${link.count}` : "");
+              const isRoute = link.kind === "route";
+              const sw    = isRoute ? 2 : Math.min(1 + link.count, 5);
+              const stroke = isRoute ? "var(--accent)" : "var(--border-strong)";
+              const marker = isRoute ? "url(#wf-arrow-route)" : "url(#wf-arrow)";
+              const label  = isRoute
+                ? "route"
+                : (link.kind === "handoff" ? "handoff" : "skill send") +
+                  (link.count > 1 ? ` ×${link.count}` : "");
 
               return (
                 <g key={link.id}>
                   <line
                     x1={x1} y1={y1} x2={x2} y2={y2}
-                    stroke="var(--border-strong)"
+                    stroke={stroke}
                     strokeWidth={sw}
-                    markerEnd="url(#wf-arrow)"
+                    strokeDasharray={isRoute ? "5 3" : undefined}
+                    markerEnd={marker}
                   />
-                  {/* Edge label + remove — uses foreignObject for HTML button */}
                   <foreignObject
-                    x={mx - 46}
+                    x={mx - 50}
                     y={my - 11}
-                    width={92}
+                    width={100}
                     height={22}
                     style={{ pointerEvents: "all" }}
                   >
@@ -243,30 +446,34 @@ export function WorkflowPanel({
                         justifyContent: "center",
                         gap:            4,
                         background:     "var(--surface-1)",
-                        border:         "1px solid var(--border-subtle)",
+                        border:         `1px solid ${isRoute ? "var(--accent)" : "var(--border-subtle)"}`,
                         borderRadius:   999,
                         padding:        "3px 7px",
                         whiteSpace:     "nowrap",
                       }}
                     >
-                      <span style={{ color: "var(--text-muted)", fontSize: 10, letterSpacing: 0 }}>
+                      <span style={{
+                        color:        isRoute ? "var(--accent)" : "var(--text-muted)",
+                        fontSize:     10,
+                        letterSpacing: 0,
+                      }}>
                         {label}
                       </span>
                       <button
-                        onClick={() => onRemoveLink(link.id)}
+                        onClick={(e) => { e.stopPropagation(); onRemoveLink(link.id); }}
                         style={{
-                          background:   "none",
-                          border:       "none",
-                          color:        "var(--text-faint)",
-                          fontSize:     10,
-                          cursor:       "pointer",
-                          padding:      0,
-                          lineHeight:   1,
-                          flexShrink:   0,
+                          background: "none",
+                          border:     "none",
+                          color:      "var(--text-faint)",
+                          fontSize:   10,
+                          cursor:     "pointer",
+                          padding:    0,
+                          lineHeight: 1,
+                          flexShrink: 0,
                         }}
                         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--danger)"; }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)"; }}
-                      >x</button>
+                      >✕</button>
                     </div>
                   </foreignObject>
                 </g>
@@ -275,90 +482,124 @@ export function WorkflowPanel({
           </svg>
 
           {/* ── Node cards ── */}
-          {agents.map((agent, i) => {
-            const pos  = positions[i];
-            const lc   = lifecycleByAgentId[agent.id] ?? "dormant";
-            const kind = agent.agentKind ?? "custom";
-            const sprite = dinoIdleSprite(agent.dinoId);
+          {agents.map((agent) => {
+            const pos     = getPos(agent.configId);
+            const lc      = lifecycleByAgentId[agent.id] ?? "dormant";
+            const kind    = agent.agentKind ?? "custom";
+            const sprite  = dinoIdleSprite(agent.dinoId);
+            const isDragging = dragState?.configId === agent.configId;
+            const isRouteTarget = routeSource !== null && routeSource !== agent.configId;
+            const isRouteSource = routeSource === agent.configId;
 
             return (
               <div
                 key={agent.id}
                 style={{
-                  position:      "absolute",
-                  left:          pos.x,
-                  top:           pos.y,
-                  width:         NODE_W,
-                  height:        NODE_H,
-                  background:    "var(--surface-1)",
-                  border:        `1px solid ${lc === "running" ? "var(--border-strong)" : "var(--border-subtle)"}`,
-                  borderRadius:  12,
-                  display:       "flex",
-                  alignItems:    "center",
-                  gap:           8,
-                  padding:       "8px 10px",
-                  boxShadow:     "none",
+                  position:  "absolute",
+                  left:      pos.x,
+                  top:       pos.y,
+                  width:     NODE_W,
+                  height:    NODE_H,
+                  background: "var(--surface-1)",
+                  border:    `1px solid ${
+                    isRouteSource ? "var(--accent)" :
+                    isRouteTarget ? "var(--border-strong)" :
+                    lc === "running" ? "var(--border-strong)" : "var(--border-subtle)"
+                  }`,
+                  borderRadius: 12,
+                  display:   "flex",
+                  alignItems: "center",
+                  gap:       8,
+                  padding:   "8px 10px",
+                  boxShadow: isDragging ? "0 4px 16px rgba(0,0,0,0.25)" : "none",
+                  cursor:    isDragging ? "grabbing" : (routeSource ? (isRouteTarget ? "pointer" : "default") : "grab"),
+                  userSelect: "none",
+                  zIndex:    isDragging ? 10 : 1,
+                  transition: isDragging ? "none" : "box-shadow 0.15s, border-color 0.15s",
+                  outline:   isRouteTarget ? "2px dashed var(--border-strong)" : undefined,
+                }}
+                onPointerDown={(e) => handlePointerDown(e, agent.configId)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={(e) => handlePointerUp(e, agent.configId)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNodeClick(agent.configId);
                 }}
               >
                 {/* Dino avatar */}
                 {sprite && (
                   <div
                     style={{
-                      width:               44,
-                      height:              44,
-                      backgroundImage:     `url("${sprite}")`,
-                      backgroundSize:      "132px 44px",
-                      backgroundPosition:  "0 0",
-                      backgroundRepeat:    "no-repeat",
-                      imageRendering:      "pixelated",
-                      flexShrink:          0,
-                      opacity:             lc === "dormant" || lc === "killed" || lc === "exited" ? 0.35 : 0.85,
+                      width:              44,
+                      height:             44,
+                      backgroundImage:    `url("${sprite}")`,
+                      backgroundSize:     "132px 44px",
+                      backgroundPosition: "0 0",
+                      backgroundRepeat:   "no-repeat",
+                      imageRendering:     "pixelated",
+                      flexShrink:         0,
+                      opacity:            lc === "dormant" || lc === "killed" || lc === "exited" ? 0.35 : 0.85,
                     }}
                   />
                 )}
 
                 {/* Text info */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, flex: 1 }}>
                   <span style={{
-                    color:         "var(--text-main)",
-                    fontSize:      11,
-                    fontWeight:    650,
-                    letterSpacing: 0,
-                    overflow:      "hidden",
-                    textOverflow:  "ellipsis",
-                    whiteSpace:    "nowrap",
+                    color:        "var(--text-main)",
+                    fontSize:     11,
+                    fontWeight:   650,
+                    overflow:     "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace:   "nowrap",
                   }}>
                     {agent.label}
                   </span>
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                     <span style={{
-                      color:         "var(--text-muted)",
-                      fontSize:      9,
-                      letterSpacing: 0,
-                      background:    "var(--button-bg)",
-                      padding:       "2px 6px",
-                      borderRadius:  999,
+                      color:        "var(--text-muted)",
+                      fontSize:     9,
+                      background:   "var(--button-bg)",
+                      padding:      "2px 6px",
+                      borderRadius: 999,
                     }}>
                       {kind}
                     </span>
-                    <span style={{
-                      color:         lcColor(lc),
-                      fontSize:      9,
-                      letterSpacing: 0,
-                      fontWeight:    600,
-                    }}>
-                      {lc.toUpperCase()}
+                    <span style={{ color: lcColor(lc), fontSize: 9, fontWeight: 600 }}>
+                      {lc}
                     </span>
                   </div>
-                  <span style={{
-                    color:         "var(--text-faint)",
-                    fontSize:      9,
-                    overflow:      "hidden",
-                    textOverflow:  "ellipsis",
-                    whiteSpace:    "nowrap",
-                  }}>
-                    {agent.dinoId}
-                  </span>
+                  {/* ROUTE button */}
+                  <button
+                    onClick={(e) => handleRouteButtonClick(e, agent.configId)}
+                    style={{
+                      alignSelf:    "flex-start",
+                      background:   isRouteSource ? "var(--accent)" : "transparent",
+                      border:       `1px solid ${isRouteSource ? "var(--accent)" : "var(--border-subtle)"}`,
+                      color:        isRouteSource ? "var(--app-bg)" : "var(--text-faint)",
+                      fontSize:     8,
+                      padding:      "2px 6px",
+                      borderRadius: 999,
+                      cursor:       "pointer",
+                      fontFamily:   "inherit",
+                      fontWeight:   600,
+                      letterSpacing: 0.5,
+                      lineHeight:   1.4,
+                      flexShrink:   0,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (isRouteSource) return;
+                      (e.currentTarget as HTMLButtonElement).style.background = "var(--button-bg)";
+                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-main)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (isRouteSource) return;
+                      (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)";
+                    }}
+                  >
+                    {isRouteSource ? "Cancel" : "Route"}
+                  </button>
                 </div>
               </div>
             );

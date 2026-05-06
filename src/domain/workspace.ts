@@ -1,7 +1,7 @@
 import type { AgentKind } from "./agentKind";
 import { inferAgentKind } from "./agentKind";
-import type { WorkflowLink } from "./workflow";
-import { sanitizeWorkflowLinks } from "./workflow";
+import type { WorkflowLink, WorkflowNodePositions } from "./workflow";
+import { sanitizeWorkflowLinks, sanitizeWorkflowNodePositions } from "./workflow";
 
 export const WORKSPACE_SCHEMA_VERSION = 3 as const;
 
@@ -23,10 +23,11 @@ export interface PersistedTerminalConfig {
 }
 
 export interface CmdinoWorkspaceFile {
-  schemaVersion: 3;
-  workspaceName: string;
-  terminals:     PersistedTerminalConfig[];
-  workflowLinks: WorkflowLink[];
+  schemaVersion:          3;
+  workspaceName:          string;
+  terminals:              PersistedTerminalConfig[];
+  workflowLinks:          WorkflowLink[];
+  workflowNodePositions?: WorkflowNodePositions;
 }
 
 const VALID_KINDS    = new Set<string>(["claude", "codex", "gemini", "ollama", "custom"]);
@@ -142,5 +143,10 @@ export function validateWorkspaceFile(data: unknown): CmdinoWorkspaceFile {
   const rawLinks = Array.isArray(obj.workflowLinks) ? obj.workflowLinks : [];
   const workflowLinks: WorkflowLink[] = sanitizeWorkflowLinks(rawLinks, validConfigIds);
 
-  return { schemaVersion: 3, workspaceName, terminals, workflowLinks };
+  const workflowNodePositions = sanitizeWorkflowNodePositions(
+    obj.workflowNodePositions,
+    validConfigIds,
+  );
+
+  return { schemaVersion: 3, workspaceName, terminals, workflowLinks, workflowNodePositions };
 }
