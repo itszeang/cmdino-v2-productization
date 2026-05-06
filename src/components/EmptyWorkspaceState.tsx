@@ -1,10 +1,11 @@
 interface Props {
-  maxTerminals: number;
-  onDeployAgent: () => void;
-  onLoadDemo:    () => void;
+  maxTerminals:   number;
+  onDeployAgent:  () => void;
+  onLoadDemo:     () => void;
+  onLoadTemplate: () => void;
 }
 
-export function EmptyWorkspaceState({ onDeployAgent, onLoadDemo }: Props) {
+export function EmptyWorkspaceState({ onDeployAgent, onLoadDemo, onLoadTemplate }: Props) {
   return (
     <div className="empty-ws">
       <div className="empty-ws-inner">
@@ -25,6 +26,10 @@ export function EmptyWorkspaceState({ onDeployAgent, onLoadDemo }: Props) {
         <div className="empty-ws-actions">
           <button className="empty-ws-primary" onClick={onDeployAgent}>
             Deploy First Agent
+          </button>
+
+          <button className="empty-ws-secondary" onClick={onLoadTemplate}>
+            Load Template
           </button>
 
           <div className="empty-ws-demo-wrap">

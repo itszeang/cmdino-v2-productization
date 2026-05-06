@@ -19,12 +19,13 @@ const STEPS = [
 ];
 
 interface Props {
-  onDismiss:     (dontShowAgain: boolean) => void;
-  onLoadDemo:    () => void;
-  onDeployAgent: () => void;
+  onDismiss:       (dontShowAgain: boolean) => void;
+  onLoadDemo:      () => void;
+  onDeployAgent:   () => void;
+  onLoadTemplate:  () => void;
 }
 
-export function WelcomeModal({ onDismiss, onLoadDemo, onDeployAgent }: Props) {
+export function WelcomeModal({ onDismiss, onLoadDemo, onDeployAgent, onLoadTemplate }: Props) {
   const [dontShow, setDontShow] = useState(true);
 
   return (
@@ -160,6 +161,28 @@ export function WelcomeModal({ onDismiss, onLoadDemo, onDeployAgent }: Props) {
               }}
             >
               Start Empty
+            </button>
+
+            {/* Secondary: templates */}
+            <button
+              onClick={onLoadTemplate}
+              style={{
+                background: "none", border: "1px solid transparent",
+                color: "var(--text-muted)", fontSize: 12, padding: "8px 14px",
+                borderRadius: 999, fontFamily: "inherit", fontWeight: 600, cursor: "pointer",
+              }}
+              onMouseEnter={(e) => {
+                const b = e.currentTarget as HTMLButtonElement;
+                b.style.color = "var(--text-main)";
+                b.style.background = "var(--button-bg)";
+              }}
+              onMouseLeave={(e) => {
+                const b = e.currentTarget as HTMLButtonElement;
+                b.style.color = "var(--text-muted)";
+                b.style.background = "none";
+              }}
+            >
+              Templates
             </button>
 
             {/* Secondary: demo */}

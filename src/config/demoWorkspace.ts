@@ -84,4 +84,9 @@ export const DEMO_WORKSPACE: CmdinoWorkspaceFile = {
       updatedAt:      0,
     },
   ],
+  workflowNodePositions: {
+    [CLAUDE_ID]: { x: 120, y: 120 },
+    [CODEX_ID]:  { x: 350, y: 250 },
+    [GEMINI_ID]: { x: 590, y: 120 },
+  },
 };
