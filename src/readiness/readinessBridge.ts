@@ -16,10 +16,10 @@ const PRESET_CLI: Partial<Record<AgentKind, string>> = {
 };
 
 const CLI_ERROR: Record<string, string> = {
-  claude: "Claude CLI not found. Install Claude Code or update this agent command.",
-  codex:  "Codex CLI not found. Install Codex CLI or update this agent command.",
-  gemini: "Gemini CLI not found. Install Gemini CLI or update this agent command.",
-  ollama: "Ollama CLI not found. Install Ollama or update this agent command.",
+  claude: "Claude CLI not found. Install and authenticate Claude Code, or update this agent command.",
+  codex:  "Codex CLI not found. Install and authenticate Codex CLI, or update this agent command.",
+  gemini: "Gemini CLI not found. Install and authenticate Gemini CLI, or update this agent command.",
+  ollama: "Ollama CLI not found. Install Ollama and pull a model, or update this agent command.",
 };
 
 // Shell builtins and package managers that must NOT be PATH-validated.

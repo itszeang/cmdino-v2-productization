@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { TerminalGrid }           from "./components/TerminalGrid";
 import { AgentCreationModal }     from "./components/AgentCreationModal";
 import { AgentEditModal }         from "./components/AgentEditModal";
@@ -9,19 +9,27 @@ import { WorkflowPanel }       from "./components/WorkflowPanel";
 import { SettingsPanel }       from "./components/SettingsPanel";
 import { WelcomeModal }        from "./components/WelcomeModal";
 import { HistoryDrawer }       from "./components/HistoryDrawer";
+import { TemplatePickerModal } from "./components/TemplatePickerModal";
 import { useTerminalAgents, MAX_TERMINALS } from "./state/useTerminalAgents";
 import { useAppSettings }      from "./state/useAppSettings";
 import { useSessionLog }       from "./state/useSessionLog";
+import { useAttachmentDrop }   from "./hooks/useAttachmentDrop";
 import { workspaceBridge }     from "./workspace/workspaceBridge";
 import { validateWorkspaceFile, sanitizeWorkspaceFilename } from "./domain/workspace";
+import type { CmdinoWorkspaceFile } from "./domain/workspace";
 import type { TerminalViewMode } from "./domain/viewMode";
 import type { AgentKind }      from "./domain/agentKind";
 import type { TerminalAttachment } from "./domain/orchestration";
+import type { GeneratedOutputFile } from "./domain/attachments";
 import type { WorkflowLinkKind } from "./domain/workflow";
 import type { TerminalLifecycleState } from "./terminal/useTerminalProcess";
 import { DEMO_WORKSPACE }      from "./config/demoWorkspace";
 import type { ReadinessFailure } from "./domain/readiness";
 import { validateAgentReadiness } from "./readiness/readinessBridge";
+import { buildMemoryBriefs } from "./domain/memoryBrief";
+import { buildTranscriptFiles } from "./domain/transcriptExport";
+import { writeMemoryBriefs, writeOutputFiles, listOutputFiles } from "./memory/memoryBriefBridge";
+import { buildPublicExportKit } from "./domain/buildPublicExport";
 
 const isTauri = Boolean(
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
@@ -34,6 +42,7 @@ export default function App() {
     setWorkspaceName,
     runningAgentIds,
     workflowLinks,
+    workflowNodePositions,
     addAgent,
     updateAgent,
     removeAgent,
@@ -41,6 +50,9 @@ export default function App() {
     removeAttachment,
     recordWorkflowLink,
     removeWorkflowLink,
+    updateWorkflowNodePosition,
+    resetWorkflowLayout,
+    createWorkflowRoute,
     startAgent,
     resetWorkspace,
     loadWorkspaceConfig,
@@ -60,10 +72,38 @@ export default function App() {
   const [lifecycleByAgentId,  setLifecycleByAgentId]  = useState<Record<string, string>>({});
   const [editingAgentId,      setEditingAgentId]      = useState<string | null>(null);
   const [readinessErrors,     setReadinessErrors]     = useState<Record<string, ReadinessFailure | null>>({});
+  const [exportNotice,        setExportNotice]        = useState<string | null>(null);
+  const [outputFiles,         setOutputFiles]         = useState<GeneratedOutputFile[]>([]);
+  const [showTemplatePicker,  setShowTemplatePicker]  = useState(false);
+
+  const transcriptGettersRef = useRef<Map<string, () => string>>(new Map());
+  const paneRefsMap          = useRef<Map<string, HTMLElement>>(new Map());
+
+  const handleRegisterPaneRef = useCallback((agentId: string, el: HTMLElement | null) => {
+    if (el) paneRefsMap.current.set(agentId, el);
+    else    paneRefsMap.current.delete(agentId);
+  }, []);
+
+  const handleRegisterTranscriptGetter = useCallback((agentId: string, getter: (() => string) | null) => {
+    if (getter) {
+      transcriptGettersRef.current.set(agentId, getter);
+    } else {
+      transcriptGettersRef.current.delete(agentId);
+    }
+  }, []);
 
   // ── View mode (UI-only, never persisted) ───────────────────────────────────
   const [viewMode,         setViewMode]         = useState<TerminalViewMode>("focus");
   const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
+
+  // Wire drag-drop onto pane elements
+  useAttachmentDrop({
+    paneRefs:      paneRefsMap,
+    activeAgentId: activeTerminalId,
+    onDrop: (agentId, paths) => {
+      for (const path of paths) addAttachment(agentId, path, "user");
+    },
+  });
 
   // Active terminal safety: keep activeTerminalId valid as agents change
   useEffect(() => {
@@ -152,7 +192,18 @@ export default function App() {
     } catch { /* silently ignore */ }
   }
 
-  useEffect(() => { void refreshList(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    void refreshList();
+    void refreshOutputFiles();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function refreshOutputFiles() {
+    if (!isTauri) return;
+    try {
+      const files = await listOutputFiles();
+      setOutputFiles(files);
+    } catch { /* silently ignore */ }
+  }
 
   // ── Workspace operations ───────────────────────────────────────────────────
 
@@ -196,6 +247,94 @@ export default function App() {
       alert(`Load failed: ${err instanceof Error ? err.message : String(err)}`);
       await refreshList();
     }
+  }
+
+  // ── Memory briefs ─────────────────────────────────────────────────────────
+
+  async function handleGenerateMemoryBriefs() {
+    if (!isTauri) {
+      alert("Memory brief export requires the desktop app.");
+      return;
+    }
+    if (agents.length === 0) {
+      alert("No agents to generate briefs for.");
+      return;
+    }
+    try {
+      const briefs = buildMemoryBriefs({
+        workspaceName,
+        agents,
+        workflowLinks,
+        sessionEntries,
+        generatedAt: Date.now(),
+      });
+      const result = await writeMemoryBriefs(briefs);
+      setExportNotice(`Generated ${result.count} memory brief${result.count === 1 ? "" : "s"} in outputs`);
+      setTimeout(() => setExportNotice(null), 4000);
+      void refreshOutputFiles();
+    } catch (err) {
+      alert(`Memory brief generation failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // ── Transcript export ─────────────────────────────────────────────────────
+
+  async function handleExportTranscripts() {
+    if (!isTauri) {
+      alert("Transcript export requires the desktop app.");
+      return;
+    }
+    if (agents.length === 0) {
+      alert("No agents to export transcripts for.");
+      return;
+    }
+    try {
+      const files = buildTranscriptFiles({
+        workspaceName,
+        agents,
+        generatedAt: Date.now(),
+        getTranscriptForAgent: (agentId) => transcriptGettersRef.current.get(agentId)?.() ?? "",
+      });
+      const result = await writeMemoryBriefs(files);
+      setExportNotice(`Exported ${result.count} transcript${result.count === 1 ? "" : "s"} in outputs`);
+      setTimeout(() => setExportNotice(null), 4000);
+      void refreshOutputFiles();
+    } catch (err) {
+      alert(`Transcript export failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // ── Build-in-Public Export Kit ────────────────────────────────────────────
+
+  async function handleGenerateBuildUpdateKit() {
+    if (!isTauri) {
+      alert("Build Update Kit export requires the desktop app.");
+      return;
+    }
+    try {
+      const files = buildPublicExportKit({
+        workspaceName,
+        agents,
+        workflowLinks,
+        sessionEntries,
+        outputFiles,
+        generatedAt: Date.now(),
+      });
+      await writeOutputFiles(files);
+      setExportNotice("Generated Build-in-Public kit in outputs");
+      setTimeout(() => setExportNotice(null), 4000);
+      void refreshOutputFiles();
+    } catch (err) {
+      alert(`Build Update Kit failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // ── Workspace templates ───────────────────────────────────────────────────
+
+  function handleLoadTemplate(workspace: CmdinoWorkspaceFile) {
+    loadWorkspaceConfig(workspace);
+    updateSettings({ onboardingDismissed: true });
+    setShowTemplatePicker(false);
   }
 
   // ── Demo workspace ────────────────────────────────────────────────────────
@@ -264,10 +403,18 @@ export default function App() {
         onOpenSettings={() => setShowSettings(true)}
         onOpenHistory={() => setShowHistory(true)}
         onStartAll={() => { void handleStartAll(); }}
+        onGenerateMemoryBriefs={() => { void handleGenerateMemoryBriefs(); }}
+        onExportTranscripts={() => { void handleExportTranscripts(); }}
+        onGenerateBuildUpdateKit={() => { void handleGenerateBuildUpdateKit(); }}
+        canGenerateBuildKit={agents.length > 0 || sessionEntries.length > 0}
         terminalCount={count}
         maxTerminals={MAX_TERMINALS}
         maxReached={maxReached}
       />
+
+      {exportNotice && (
+        <div className="toast">{exportNotice}</div>
+      )}
 
       {/* Main workspace column */}
       <main className="workspace-shell">
@@ -286,6 +433,7 @@ export default function App() {
               maxTerminals={MAX_TERMINALS}
               onDeployAgent={() => setShowModal(true)}
               onLoadDemo={loadDemoWorkspace}
+              onLoadTemplate={() => setShowTemplatePicker(true)}
             />
           ) : (
             <TerminalGrid
@@ -310,6 +458,10 @@ export default function App() {
               readinessErrors={readinessErrors}
               onReadinessError={handleReadinessError}
               onEvent={appendEvent}
+              onRegisterTranscriptGetter={handleRegisterTranscriptGetter}
+              generatedOutputFiles={outputFiles}
+              onRefreshGeneratedOutputs={() => { void refreshOutputFiles(); }}
+              onRegisterPaneRef={handleRegisterPaneRef}
             />
           )}
         </section>
@@ -346,6 +498,7 @@ export default function App() {
             updateSettings({ onboardingDismissed: true });
           }}
           onDeployAgent={() => setShowModal(true)}
+          onLoadTemplate={() => setShowTemplatePicker(true)}
         />
       )}
 
@@ -368,9 +521,13 @@ export default function App() {
         <WorkflowPanel
           agents={agents}
           workflowLinks={workflowLinks}
+          workflowNodePositions={workflowNodePositions}
           lifecycleByAgentId={lifecycleByAgentId}
           onRemoveLink={removeWorkflowLink}
           onClose={() => setShowWorkflow(false)}
+          onUpdateNodePosition={updateWorkflowNodePosition}
+          onResetLayout={resetWorkflowLayout}
+          onCreateRoute={createWorkflowRoute}
         />
       )}
 
@@ -380,6 +537,14 @@ export default function App() {
           entries={sessionEntries}
           onClear={clearLog}
           onClose={() => setShowHistory(false)}
+        />
+      )}
+
+      {/* Template picker overlay */}
+      {showTemplatePicker && (
+        <TemplatePickerModal
+          onSelect={handleLoadTemplate}
+          onClose={() => setShowTemplatePicker(false)}
         />
       )}
     </div>

@@ -758,7 +758,7 @@ input[type="range"]::-webkit-slider-track {
   padding: 4px 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 20px;
   scrollbar-width: none;
 }
 .sidebar-sections::-webkit-scrollbar { display: none; }
@@ -1230,4 +1230,58 @@ input[type="range"]::-webkit-slider-track {
 .terminal-grid[data-view="grid"] .terminal-slot {
   min-width: 0;
   min-height: 0;
+}
+
+/* ── Toast notification ──────────────────────────────────────────────────── */
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text-main);
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 9999;
+  box-shadow: var(--shadow-panel);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ── Lifecycle state pill ────────────────────────────────────────────────── */
+
+.lc-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  opacity: 0.72;
+  flex-shrink: 0;
+  transition: color 0.25s, border-color 0.25s;
+}
+
+/* ── Pane strip separator (replaces pipe glyphs) ─────────────────────────── */
+
+.pane-strip-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+  margin: 0 3px;
+}
+
+/* ── Sidebar section divider (before Share) ──────────────────────────────── */
+
+.sidebar-section--divider {
+  padding-top: 6px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 2px;
 }

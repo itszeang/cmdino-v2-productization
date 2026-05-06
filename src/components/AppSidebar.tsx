@@ -1,20 +1,24 @@
 import type { ButtonHTMLAttributes } from "react";
 
 interface AppSidebarProps {
-  onAddTerminal:   () => void;
-  onLoadDemo:      () => void;
-  onOpenWorkflow:  () => void;
-  onNew:           () => void;
-  onSave:          () => void;
-  onLoad:          (name: string) => void;
-  onRefreshList:   () => void;
-  savedWorkspaces: string[];
-  onOpenSettings:  () => void;
-  onOpenHistory:   () => void;
-  onStartAll:      () => void;
-  terminalCount:   number;
-  maxTerminals:    number;
-  maxReached:      boolean;
+  onAddTerminal:             () => void;
+  onLoadDemo:                () => void;
+  onOpenWorkflow:            () => void;
+  onNew:                     () => void;
+  onSave:                    () => void;
+  onLoad:                    (name: string) => void;
+  onRefreshList:             () => void;
+  savedWorkspaces:           string[];
+  onOpenSettings:            () => void;
+  onOpenHistory:             () => void;
+  onStartAll:                () => void;
+  onGenerateMemoryBriefs:    () => void;
+  onExportTranscripts:       () => void;
+  onGenerateBuildUpdateKit:  () => void;
+  canGenerateBuildKit:       boolean;
+  terminalCount:             number;
+  maxTerminals:              number;
+  maxReached:                boolean;
 }
 
 type SidebarIconName =
@@ -25,7 +29,10 @@ type SidebarIconName =
   | "save"
   | "load"
   | "settings"
-  | "history";
+  | "history"
+  | "memory"
+  | "transcript"
+  | "share";
 
 function SidebarIcon({ name }: { name: SidebarIconName }) {
   const common = {
@@ -96,6 +103,32 @@ function SidebarIcon({ name }: { name: SidebarIconName }) {
           <path d="M12 7v5l3 3" {...common} />
         </>
       )}
+      {name === "memory" && (
+        <>
+          <path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9l-6-6z" {...common} />
+          <path d="M9 3v6h6" {...common} />
+          <path d="M8 13h8" {...common} />
+          <path d="M8 17h5" {...common} />
+        </>
+      )}
+      {name === "transcript" && (
+        <>
+          <rect x="4" y="2" width="16" height="20" rx="2" {...common} />
+          <path d="M8 7h8" {...common} />
+          <path d="M8 11h8" {...common} />
+          <path d="M8 15h5" {...common} />
+          <circle cx="19" cy="19" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M19 18v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="19" cy="21" r="0.5" fill="currentColor" />
+        </>
+      )}
+      {name === "share" && (
+        <>
+          <path d="M4.93 19.07a9 9 0 1 1 14.14 0" {...common} />
+          <path d="M8.46 15.54a5 5 0 1 1 7.07 0" {...common} />
+          <circle cx="12" cy="13" r="1.5" fill="currentColor" stroke="none" />
+        </>
+      )}
     </svg>
   );
 }
@@ -127,6 +160,10 @@ export function AppSidebar({
   onOpenSettings,
   onOpenHistory,
   onStartAll,
+  onGenerateMemoryBriefs,
+  onExportTranscripts,
+  onGenerateBuildUpdateKit,
+  canGenerateBuildKit,
   terminalCount,
   maxTerminals,
   maxReached,
@@ -182,22 +219,49 @@ export function AppSidebar({
               onChange={(e) => { if (e.target.value) onLoad(e.target.value); }}
               onFocus={onRefreshList}
             >
-              <option value="" disabled></option>
-              {savedWorkspaces.length === 0 ? (
-                <option value="" disabled>No saved workspaces</option>
-              ) : (
-                savedWorkspaces.map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))
-              )}
+              <option value="" disabled>
+                {savedWorkspaces.length === 0 ? "No saved workspaces yet." : "Select workspace…"}
+              </option>
+              {savedWorkspaces.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
             </select>
           </div>
+
         </div>
 
         <div className="sidebar-section">
           <div className="sidebar-label">Session</div>
           <SidebarRow icon="history" onClick={onOpenHistory} title="View session event history">
             History
+          </SidebarRow>
+          <SidebarRow
+            icon="memory"
+            onClick={onGenerateMemoryBriefs}
+            disabled={terminalCount === 0}
+            title={terminalCount === 0 ? "No agents to generate briefs for" : "Generate markdown continuity files for current agents"}
+          >
+            Memory Briefs
+          </SidebarRow>
+          <SidebarRow
+            icon="transcript"
+            onClick={onExportTranscripts}
+            disabled={terminalCount === 0}
+            title={terminalCount === 0 ? "No agents to export transcripts for" : "Export buffered terminal output to markdown files"}
+          >
+            Transcripts
+          </SidebarRow>
+        </div>
+
+        <div className="sidebar-section sidebar-section--divider">
+          <div className="sidebar-label">Share</div>
+          <SidebarRow
+            icon="share"
+            onClick={onGenerateBuildUpdateKit}
+            disabled={!canGenerateBuildKit}
+            title={canGenerateBuildKit ? "Generate build-in-public markdown kit in outputs folder" : "Deploy an agent or run a session first"}
+          >
+            Build Kit
           </SidebarRow>
         </div>
       </div>

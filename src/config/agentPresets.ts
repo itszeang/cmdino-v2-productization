@@ -16,6 +16,7 @@ export interface AgentPreset {
   defaultCommand:   string;
   defaultDinoId?:   string;
   roleDescription:  string;
+  cliRequirement:   string;
   defaultBrainIds?: PresetBrainId[];
   accentColor:      string;
 }
@@ -29,6 +30,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     defaultCommand:  "claude",
     defaultDinoId:   "female-cole",
     roleDescription: "Breaks requests into implementation plans.",
+    cliRequirement:  "Requires: claude CLI",
     defaultBrainIds: ["claude-planner-brain"],
     accentColor:     "#e5e5e5",
   },
@@ -40,6 +42,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     defaultCommand:  "codex",
     defaultDinoId:   "male-kira",
     roleDescription: "Implements scoped patches.",
+    cliRequirement:  "Requires: codex CLI",
     defaultBrainIds: ["codex-builder-brain"],
     accentColor:     "#d4d4d4",
   },
@@ -51,6 +54,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     defaultCommand:  "gemini",
     defaultDinoId:   "female-kira",
     roleDescription: "Reviews architecture, risks, UX, and tests.",
+    cliRequirement:  "Requires: gemini CLI",
     defaultBrainIds: ["gemini-reviewer-brain"],
     accentColor:     "#a3a3a3",
   },
@@ -62,6 +66,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     defaultCommand:  "ollama run llama3",
     defaultDinoId:   "female-loki",
     roleDescription: "Local/offline assistant worker.",
+    cliRequirement:  "Requires: ollama CLI",
     defaultBrainIds: ["ollama-worker-brain"],
     accentColor:     "#737373",
   },
@@ -73,6 +78,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     defaultCommand:  "",
     defaultDinoId:   undefined,
     roleDescription: "User-defined terminal agent.",
+    cliRequirement:  "Any local shell command",
     accentColor:     "#525252",
   },
 ];

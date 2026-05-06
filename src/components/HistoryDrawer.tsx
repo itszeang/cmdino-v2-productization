@@ -56,8 +56,15 @@ function eventMessage(ev: SessionLogEvent): string {
     case "terminal_error":   return "Process error";
     case "terminal_removed": return "Terminal removed";
     case "manual_handoff":
-      return ev.payload.target ? `Forwarded → ${String(ev.payload.target)}` : "Output forwarded";
-    case "auto_forward":     return "Auto-forwarded to next agent";
+      return ev.payload.targetLabel
+        ? `Forwarded → ${String(ev.payload.targetLabel)}`
+        : ev.payload.target
+        ? `Forwarded → ${String(ev.payload.target)}`
+        : "Output forwarded";
+    case "auto_forward":
+      return ev.payload.targetLabel
+        ? `Auto-forwarded → ${String(ev.payload.targetLabel)}`
+        : "Auto-forwarded to next agent";
     case "manual_send":      return "File content sent to terminal";
     case "preset_brain_send":return "Attachment sent to terminal";
     case "workspace_saved":
