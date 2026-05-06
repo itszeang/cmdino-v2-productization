@@ -57,6 +57,8 @@ CMDino is a local desktop command center for AI-assisted development. Each agent
 
 It keeps your preferred tools in place. A preset can launch `claude`, `codex`, `gemini`, `ollama`, or a custom shell command, provided the tool is installed and authenticated on the machine.
 
+CMDino does not ship Claude, Codex, Gemini, or Ollama. It orchestrates CLI tools you install and authenticate locally. Any CLI-based model or agent tool can be used through Custom Agent.
+
 CMDino currently provides:
 
 - A Tauri desktop app with a real Rust PTY backend.
@@ -84,7 +86,7 @@ The product promise is intentionally narrow: orchestrate real local tools withou
 | Custom attachments | `.md` and `.txt` attach, preview, remove, and send |
 | Handoff | Capture selected or recent output, edit it, send it to another running agent, and record a link |
 | Auto Forward Lite | Forward cleaned recent output to a selected or linked target |
-| Workflow graph | Visualizes directional handoff/forward links and supports link removal |
+| Workflow Builder Lite | Draggable agent nodes with position persistence; user-authored preferred route edges; existing handoff/forward link visualization; Reset Layout; no autonomous execution |
 | Workspace files | Save/load local `.cmdino.json` workspace configs with schema validation |
 | Agent management | Edit label, command, cwd, kind, dino, and attachments after deploy |
 | Readiness checks | Validate cwd and executable availability before start/restart/start all |
