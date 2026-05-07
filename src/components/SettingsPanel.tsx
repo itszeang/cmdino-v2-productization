@@ -1,5 +1,22 @@
 import type { AppSettings } from "../domain/appSettings";
 import { DEFAULT_SETTINGS } from "../domain/appSettings";
+import type { HealthSnapshot, HealthStatus } from "../domain/health";
+
+const HEALTH_STATUS_LABEL: Record<HealthStatus, string> = {
+  ready: "Ready", missing: "Missing", auth_required: "Auth needed",
+  offline: "Offline", error: "Error", unknown: "Not verified", installed: "Installed",
+};
+
+function settingsHealthSummary(snapshot: HealthSnapshot): { label: string; color: string } {
+  if (snapshot.status === "idle")     return { label: "Not scanned",  color: "var(--text-faint)" };
+  if (snapshot.status === "scanning") return { label: "Scanning…",    color: "var(--text-faint)" };
+  if (snapshot.status === "error")    return { label: "Scan error",   color: "var(--danger)" };
+  const ps = Object.values(snapshot.providers);
+  const issues = ps.filter((p) => p.status === "missing" || p.status === "auth_required" || p.status === "offline" || p.status === "error");
+  if (issues.length === 0) return { label: "All clear",    color: "var(--success)" };
+  const labels = issues.map((p) => HEALTH_STATUS_LABEL[p.status]);
+  return { label: `${issues.length} issue${issues.length > 1 ? "s" : ""} — ${[...new Set(labels)].join(", ")}`, color: "var(--warning)" };
+}
 
 interface SliderRowProps {
   label:    string;
@@ -92,56 +109,40 @@ interface Props {
   onReset:           () => void;
   onClose:           () => void;
   onShowOnboarding:  () => void;
+  healthSnapshot:    HealthSnapshot;
+  onOpenHealth:      () => void;
 }
 
-export function SettingsPanel({ settings, onUpdate, onReset, onClose, onShowOnboarding }: Props) {
+export function SettingsPanel({ settings, onUpdate, onReset, onClose, onShowOnboarding, healthSnapshot, onOpenHealth }: Props) {
+  const { label: healthLabel, color: healthColor } = settingsHealthSummary(healthSnapshot);
   return (
     <div
-      style={{
-        position:       "fixed",
-        inset:          0,
-        background:     "var(--overlay-bg)",
-        display:        "flex",
-        alignItems:     "center",
-        justifyContent: "center",
-        zIndex:         300,
-      }}
+      className="cmd-modal-overlay"
+      style={{ zIndex: 300 }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        style={{
-          width:         360,
-          maxWidth:      "94vw",
-          background:    "var(--surface-1)",
-          border:        "1px solid var(--border-subtle)",
-          borderRadius:  12,
-          display:       "flex",
-          flexDirection: "column",
-          overflow:      "hidden",
-          boxShadow:     "var(--shadow-panel)",
-        }}
+        className="cmd-modal-panel cmd-modal-panel--compact soft-enter"
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{
-          display:      "flex",
-          alignItems:   "center",
-          gap:          8,
-          padding:      "10px 16px",
-          borderBottom: "1px solid var(--border-subtle)",
-          background:   "var(--surface-1)",
-        }}>
-          <span style={{ color: "var(--text-main)", fontWeight: 650, fontSize: 13, letterSpacing: 0, flex: 1 }}>
+        <div className="cmd-modal-header">
+          <span style={{ color: "var(--text-main)", fontWeight: 650, fontSize: 13, flex: 1 }}>
             Settings
           </span>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none", border: "none", color: "var(--text-muted)",
-              fontSize: 14, cursor: "pointer", padding: "3px 6px", lineHeight: 1, borderRadius: 999,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--danger)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-faint)"; }}
-          >x</button>
+          <button className="cmd-icon-btn" onClick={onClose}>✕</button>
+        </div>
+
+        {/* System Health */}
+        <div style={{ borderBottom: "1px solid var(--border-subtle)", padding: "10px 16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 650 }}>System Health</span>
+              <span style={{ color: healthColor, fontSize: 10, marginLeft: 8 }}>{healthLabel}</span>
+            </div>
+            <button className="cmd-pill-btn" style={{ fontSize: 10 }} onClick={onOpenHealth}>
+              Open
+            </button>
+          </div>
         </div>
 
         <div style={{ borderBottom: "1px solid var(--border-subtle)" }}>
@@ -175,50 +176,22 @@ export function SettingsPanel({ settings, onUpdate, onReset, onClose, onShowOnbo
           />
         </div>
 
-        <div style={{
-          display:        "flex",
-          justifyContent: "space-between",
-          alignItems:     "center",
-          padding:        "10px 16px",
-        }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px" }}>
           <span style={{ color: "var(--text-faint)", fontSize: 9 }}>
             Saved to localStorage automatically
           </span>
           <button
+            className="cmd-pill-btn cmd-pill-btn--danger"
+            style={{ borderColor: "transparent" }}
             onClick={() => {
               if (window.confirm("Reset all visual settings to defaults?")) onReset();
-            }}
-            style={{
-              background:   "none",
-              border:       "1px solid transparent",
-              color:        "var(--text-muted)",
-              fontSize:     11,
-              padding:      "6px 10px",
-              borderRadius: 999,
-              fontFamily:   "inherit",
-              fontWeight:   600,
-              letterSpacing: 0,
-              cursor:       "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "var(--danger)";
-              e.currentTarget.style.background = "var(--button-bg)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "var(--text-muted)";
-              e.currentTarget.style.background = "none";
             }}
           >
             RESET DEFAULTS
           </button>
         </div>
 
-        <div style={{
-          display:        "flex",
-          justifyContent: "space-between",
-          alignItems:     "center",
-          padding:        "6px 16px 10px",
-        }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 16px 10px" }}>
           <span style={{ color: "var(--text-faint)", fontSize: 8, letterSpacing: 0.5 }}>
             CMDino V1 Alpha
             {settings.animationSpeed === DEFAULT_SETTINGS.animationSpeed
@@ -228,28 +201,10 @@ export function SettingsPanel({ settings, onUpdate, onReset, onClose, onShowOnbo
               ? "" : " - Modified"}
           </span>
           <button
+            className="cmd-pill-btn"
+            style={{ borderColor: "transparent" }}
             onClick={onShowOnboarding}
             title="Show mission briefing on next launch"
-            style={{
-              background:   "none",
-              border:       "1px solid transparent",
-              color:        "var(--text-muted)",
-              fontSize:     11,
-              padding:      "6px 10px",
-              borderRadius: 999,
-              fontFamily:   "inherit",
-              fontWeight:   600,
-              letterSpacing: 0,
-              cursor:       "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "var(--text-main)";
-              e.currentTarget.style.background = "var(--button-bg)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "var(--text-muted)";
-              e.currentTarget.style.background = "none";
-            }}
           >
             SHOW BRIEFING
           </button>

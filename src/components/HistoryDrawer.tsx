@@ -188,40 +188,19 @@ export function HistoryDrawer({ entries, onClear, onClose }: Props) {
           </span>
           {entries.length > 0 && (
             <button
+              className="cmd-pill-btn cmd-pill-btn--danger"
+              style={{ fontSize: 11, padding: "3px 9px" }}
               onClick={handleClear}
               title="Clear history"
-              style={{
-                background: "transparent", border: "1px solid var(--border-subtle)",
-                color: "var(--text-faint)", fontSize: 11, fontWeight: 600,
-                padding: "3px 9px", borderRadius: 999, cursor: "pointer",
-                fontFamily: "inherit", transition: "color 0.12s, border-color 0.12s",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--danger)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--danger)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-subtle)";
-              }}
             >
               Clear
             </button>
           )}
           <button
+            className="cmd-icon-btn"
             onClick={onClose}
             title="Close"
-            style={{
-              background: "transparent", border: "none",
-              color: "var(--text-faint)", fontSize: 16, lineHeight: 1,
-              cursor: "pointer", padding: "2px 6px", borderRadius: 6,
-              fontFamily: "inherit",
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-main)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)"; }}
-          >
-            ×
-          </button>
+          >×</button>
         </div>
 
         {/* Filter tabs */}

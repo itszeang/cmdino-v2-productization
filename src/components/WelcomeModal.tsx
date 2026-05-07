@@ -29,51 +29,19 @@ export function WelcomeModal({ onDismiss, onLoadDemo, onDeployAgent, onLoadTempl
   const [dontShow, setDontShow] = useState(true);
 
   return (
-    <div
-      style={{
-        position:       "fixed",
-        inset:          0,
-        background:     "var(--overlay-bg)",
-        backdropFilter: "blur(8px)",
-        display:        "flex",
-        alignItems:     "center",
-        justifyContent: "center",
-        zIndex:         400,
-      }}
-    >
-      <div
-        style={{
-          width:         560,
-          maxWidth:      "96vw",
-          maxHeight:     "90vh",
-          background:    "var(--surface-1)",
-          border:        "1px solid var(--border-subtle)",
-          borderRadius:  12,
-          display:       "flex",
-          flexDirection: "column",
-          overflow:      "hidden",
-          boxShadow:     "var(--shadow-panel)",
-        }}
-      >
+    <div className="cmd-modal-overlay" style={{ zIndex: 400 }}>
+      <div className="cmd-modal-panel cmd-modal-panel--welcome soft-enter">
         {/* Header */}
-        <div style={{
-          padding:      "14px 18px 12px",
-          borderBottom: "1px solid var(--border-subtle)",
-          flexShrink:   0,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img
-              src="/app-icon.png"
-              alt=""
-              aria-hidden="true"
-              style={{ width: 28, height: 28, borderRadius: 8, display: "block" }}
-            />
-            <span style={{ color: "var(--text-main)", fontWeight: 700, fontSize: 15 }}>
-              Welcome to CMDino
-            </span>
-          </div>
-          <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 5 }}>
-            Visual command center for multi-agent AI CLI workflows.
+        <div className="cmd-modal-header">
+          <img
+            src="/app-icon.png"
+            alt=""
+            aria-hidden="true"
+            style={{ width: 28, height: 28, borderRadius: 8, display: "block", flexShrink: 0 }}
+          />
+          <div className="cmd-modal-title-group">
+            <span className="cmd-modal-title">Welcome to CMDino</span>
+            <span className="cmd-modal-subtitle">Visual command center for multi-agent AI CLI workflows.</span>
           </div>
         </div>
 
@@ -120,16 +88,7 @@ export function WelcomeModal({ onDismiss, onLoadDemo, onDeployAgent, onLoadTempl
         </div>
 
         {/* Footer */}
-        <div style={{
-          display:        "flex",
-          alignItems:     "center",
-          justifyContent: "space-between",
-          padding:        "12px 18px",
-          gap:            12,
-          flexShrink:     0,
-          flexWrap:       "wrap",
-          rowGap:         10,
-        }}>
+        <div className="cmd-modal-footer" style={{ justifyContent: "space-between" }}>
           <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
             <input
               type="checkbox"
@@ -141,84 +100,20 @@ export function WelcomeModal({ onDismiss, onLoadDemo, onDeployAgent, onLoadTempl
           </label>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {/* Tertiary: start empty */}
-            <button
-              onClick={() => onDismiss(dontShow)}
-              style={{
-                background: "none", border: "1px solid transparent",
-                color: "var(--text-faint)", fontSize: 12, padding: "8px 12px",
-                borderRadius: 999, fontFamily: "inherit", fontWeight: 600, cursor: "pointer",
-              }}
-              onMouseEnter={(e) => {
-                const b = e.currentTarget as HTMLButtonElement;
-                b.style.color = "var(--text-muted)";
-                b.style.background = "var(--button-bg)";
-              }}
-              onMouseLeave={(e) => {
-                const b = e.currentTarget as HTMLButtonElement;
-                b.style.color = "var(--text-faint)";
-                b.style.background = "none";
-              }}
-            >
+            <button className="cmd-pill-btn cmd-pill-btn--ghost" style={{ fontSize: 12, padding: "8px 12px" }}
+              onClick={() => onDismiss(dontShow)}>
               Start Empty
             </button>
-
-            {/* Secondary: templates */}
-            <button
-              onClick={onLoadTemplate}
-              style={{
-                background: "none", border: "1px solid transparent",
-                color: "var(--text-muted)", fontSize: 12, padding: "8px 14px",
-                borderRadius: 999, fontFamily: "inherit", fontWeight: 600, cursor: "pointer",
-              }}
-              onMouseEnter={(e) => {
-                const b = e.currentTarget as HTMLButtonElement;
-                b.style.color = "var(--text-main)";
-                b.style.background = "var(--button-bg)";
-              }}
-              onMouseLeave={(e) => {
-                const b = e.currentTarget as HTMLButtonElement;
-                b.style.color = "var(--text-muted)";
-                b.style.background = "none";
-              }}
-            >
+            <button className="cmd-pill-btn" style={{ fontSize: 12, padding: "8px 14px", borderColor: "transparent" }}
+              onClick={onLoadTemplate}>
               Templates
             </button>
-
-            {/* Secondary: demo */}
-            <button
-              onClick={() => { onLoadDemo(); onDismiss(dontShow); }}
-              style={{
-                background: "none", border: "1px solid transparent",
-                color: "var(--text-muted)", fontSize: 12, padding: "8px 14px",
-                borderRadius: 999, fontFamily: "inherit", fontWeight: 600, cursor: "pointer",
-              }}
-              onMouseEnter={(e) => {
-                const b = e.currentTarget as HTMLButtonElement;
-                b.style.color = "var(--text-main)";
-                b.style.background = "var(--button-bg)";
-              }}
-              onMouseLeave={(e) => {
-                const b = e.currentTarget as HTMLButtonElement;
-                b.style.color = "var(--text-muted)";
-                b.style.background = "none";
-              }}
-            >
+            <button className="cmd-pill-btn" style={{ fontSize: 12, padding: "8px 14px", borderColor: "transparent" }}
+              onClick={() => { onLoadDemo(); onDismiss(dontShow); }}>
               Load Demo Workflow
             </button>
-
-            {/* Primary: deploy */}
-            <button
-              onClick={() => { onDeployAgent(); onDismiss(dontShow); }}
-              style={{
-                background: "var(--accent)", border: "1px solid transparent",
-                color: "var(--app-bg)", fontSize: 12, padding: "8px 16px",
-                borderRadius: 999, fontFamily: "inherit", fontWeight: 650, cursor: "pointer",
-                transition: "opacity 0.12s",
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.88"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
-            >
+            <button className="cmd-pill-btn cmd-pill-btn--primary"
+              onClick={() => { onDeployAgent(); onDismiss(dontShow); }}>
               Deploy First Agent
             </button>
           </div>

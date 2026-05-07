@@ -123,8 +123,8 @@ function OwnerBadge({ owners }: { owners: string[] }) {
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      fontSize: 8, fontWeight: 700, letterSpacing: 0.9,
-      color: "var(--text-faint)", padding: "7px 10px 3px",
+      fontSize: 9, fontWeight: 700, letterSpacing: 0.9,
+      color: "var(--text-faint)", padding: "7px 12px 3px",
       textTransform: "uppercase" as const,
     }}>
       {children}
@@ -146,7 +146,7 @@ function FileRow({
       onClick={onClick}
       style={{
         display: "flex", alignItems: "center", gap: 6,
-        padding: "5px 10px",
+        padding: "6px 12px",
         background: isSelected ? "var(--button-bg)" : "transparent",
         cursor: "pointer",
         borderLeft: isSelected
@@ -291,37 +291,24 @@ export function AttachmentPanel({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{
-      background: "var(--surface-0)", borderBottom: "1px solid var(--border-subtle)",
-      flexShrink: 0, maxHeight: 360, overflowY: "auto",
-    }}>
+    <div className="att-panel">
 
       {/* ── Title row ── */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "7px 12px 6px",
-        borderBottom: "1px solid var(--border-subtle)",
-        background: "var(--surface-1)",
-      }}>
-        <span style={{ fontSize: 11, fontWeight: 650, color: "var(--text-main)", letterSpacing: 0 }}>
-          Context
+      <div className="att-header">
+        <div className="att-header-title">
+          <span className="att-header-name">Context</span>
+          <span className="att-header-sub">working memory</span>
           {atts.length > 0 && (
-            <span style={{ color: "var(--text-faint)", fontWeight: 400, marginLeft: 6, fontSize: 10 }}>
+            <span style={{ color: "var(--text-faint)", fontWeight: 400, fontSize: 10 }}>
               {atts.length} file{atts.length !== 1 ? "s" : ""}
             </span>
           )}
-        </span>
-        <span style={{ fontSize: 10, color: "var(--text-faint)", letterSpacing: 0 }}>
-          {agent.label}
-        </span>
+        </div>
+        <span className="att-header-agent">{agent.label}</span>
       </div>
 
       {/* ── Paste-path input row ── */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 5, padding: "7px 10px",
-        borderBottom: "1px solid var(--border-subtle)",
-        background: "var(--surface-1)",
-      }}>
+      <div className="att-input-row">
         <input
           autoFocus
           value={addInput}
@@ -330,7 +317,7 @@ export function AttachmentPanel({
             if (e.key === "Enter")  handleAddPath();
             if (e.key === "Escape") onClose();
           }}
-          placeholder="Paste .md or .txt path, or drag & drop…"
+          placeholder="Paste .md / .txt path…"
           style={{
             flex: 1, background: "var(--surface-0)",
             border: `1px solid ${addError ? "var(--danger)" : "var(--border-subtle)"}`,
@@ -341,7 +328,7 @@ export function AttachmentPanel({
         {addError && (
           <span style={{ color: "var(--danger)", fontSize: 9, flexShrink: 0 }}>{addError}</span>
         )}
-        <ActionBtn onClick={handleAddPath} accent>ADD</ActionBtn>
+        <ActionBtn onClick={handleAddPath} accent>Add</ActionBtn>
         <button
           onClick={onRefreshGeneratedOutputs}
           title="Refresh generated outputs"
@@ -365,11 +352,7 @@ export function AttachmentPanel({
       </div>
 
       {/* ── Action bar ── */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap",
-        padding: "5px 10px", borderBottom: "1px solid var(--border-subtle)",
-        background: "var(--surface-1)",
-      }}>
+      <div className="att-actions">
         <ActionBtn onClick={() => { void handlePreview(); }} disabled={!selected}>Preview</ActionBtn>
         <ActionBtn onClick={() => { void handleSend(); }} disabled={!canSend} accent>
           {sending ? "…" : "Send"}
@@ -381,53 +364,40 @@ export function AttachmentPanel({
           <ActionBtn onClick={handleRemove} danger>Remove</ActionBtn>
         )}
         <ActionBtn onClick={handleCopyPath} disabled={!selected}>Copy Path</ActionBtn>
-        {selected && (
-          <span style={{
-            fontSize: 9, color: "var(--text-faint)", flex: 1, minWidth: 0,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            marginLeft: 4, fontFamily: "monospace",
-          }}>
-            {selected.fileName}
-          </span>
-        )}
-        {!isAlive && selected && (
-          <span style={{ fontSize: 9, color: "var(--danger)", flexShrink: 0 }}>start first</span>
-        )}
       </div>
+
+      {/* ── Selected path display ── */}
+      {selected && (
+        <div className="att-selected-path">
+          <span className="att-selected-path-text">{selected.path}</span>
+          {!isAlive && <span className="att-warn">start terminal first</span>}
+        </div>
+      )}
 
       {/* ── Preview area ── */}
       {(preview.loading || preview.content !== null || preview.error !== null) && (
-        <div style={{
-          borderBottom: "1px solid var(--border-subtle)",
-          maxHeight: 160, overflowY: "auto", position: "relative",
-        }}>
+        <div className="att-preview">
           <button
             onClick={() => setPreview(PREVIEW_IDLE)}
             title="Close preview"
-            style={{
-              position: "absolute", top: 3, right: 5,
-              background: "none", border: "none", color: "var(--text-faint)",
-              fontSize: 10, cursor: "pointer", padding: 0, lineHeight: 1,
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--danger)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)"; }}
-          >x</button>
+            className="att-preview-close"
+          >✕</button>
           {preview.loading && (
-            <div style={{ padding: "5px 10px", color: "var(--text-muted)", fontSize: 9 }}>Loading…</div>
+            <div style={{ padding: "8px 12px", color: "var(--text-muted)", fontSize: 10 }}>Loading…</div>
           )}
           {preview.error && (
-            <div style={{ padding: "5px 10px", color: "var(--danger)", fontSize: 9 }}>{preview.error}</div>
+            <div style={{ padding: "8px 12px", color: "var(--danger)", fontSize: 10 }}>{preview.error}</div>
           )}
           {preview.content !== null && !preview.loading && (
             <>
               {preview.truncated && (
-                <div style={{ padding: "2px 10px", background: "var(--accent-soft)", color: "var(--warning)", fontSize: 8 }}>
+                <div style={{ padding: "3px 12px", background: "var(--accent-soft)", color: "var(--warning)", fontSize: 9 }}>
                   truncated at 256 KB
                 </div>
               )}
               <pre style={{
-                margin: 0, padding: "5px 10px", color: "var(--text-main)",
-                fontSize: 9, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word",
+                margin: 0, padding: "8px 12px", color: "var(--text-main)",
+                fontSize: 11, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word",
               }}>{preview.content}</pre>
             </>
           )}
@@ -437,7 +407,7 @@ export function AttachmentPanel({
       {/* ── Generated section ── */}
       {generatedOutputFiles.length > 0 && (
         <>
-          <SectionLabel>Generated</SectionLabel>
+          <SectionLabel>Generated outputs</SectionLabel>
           {generatedOutputFiles.map((f) => {
             const isAttachedHere = attachedGenPathSet.has(f.path);
             const attId = groups.generated.find((a) => a.path === f.path)?.id ?? null;
@@ -470,7 +440,7 @@ export function AttachmentPanel({
       {/* ── Uploaded section ── */}
       {groups.uploaded.length > 0 && (
         <>
-          <SectionLabel>Uploaded</SectionLabel>
+          <SectionLabel>Attached files</SectionLabel>
           {groups.uploaded.map((att) => {
             const isSelected = selected?.path === att.path;
             return (
@@ -494,7 +464,7 @@ export function AttachmentPanel({
       {/* ── Preset Brains section ── */}
       {groups.preset.length > 0 && (
         <>
-          <SectionLabel>Preset Brains</SectionLabel>
+          <SectionLabel>Preset brains</SectionLabel>
           {groups.preset.map((att) => {
             const isSelected = selected?.path === att.path;
             return (
@@ -528,12 +498,14 @@ export function AttachmentPanel({
         groups.uploaded.length === 0 &&
         groups.preset.length === 0 && (
         <div style={{
-          padding: "14px 10px", color: "var(--text-faint)",
-          fontSize: 9, textAlign: "center", lineHeight: 1.6,
+          padding: "18px 14px", color: "var(--text-faint)",
+          fontSize: 11, textAlign: "center", lineHeight: 1.7,
         }}>
-          No attachments or generated outputs yet.
+          No context attached yet.
           <br />
-          Paste a path above, drop a .md/.txt file here, or generate Memory Briefs.
+          <span style={{ fontSize: 10, opacity: 0.7 }}>
+            Paste a .md or .txt path above, or generate a Memory Brief.
+          </span>
         </div>
       )}
     </div>

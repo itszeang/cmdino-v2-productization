@@ -120,61 +120,21 @@ export function TemplatePickerModal({ onSelect, onClose }: Props) {
 
   return (
     <div
-      style={{
-        position:       "fixed",
-        inset:          0,
-        background:     "var(--overlay-bg)",
-        backdropFilter: "blur(8px)",
-        display:        "flex",
-        alignItems:     "center",
-        justifyContent: "center",
-        zIndex:         500,
-      }}
+      className="cmd-modal-overlay"
+      style={{ zIndex: 500 }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{
-        width:         600,
-        maxWidth:      "94vw",
-        maxHeight:     "88vh",
-        background:    "var(--surface-1)",
-        border:        "1px solid var(--border-subtle)",
-        borderRadius:  12,
-        display:       "flex",
-        flexDirection: "column",
-        overflow:      "hidden",
-        boxShadow:     "var(--shadow-panel)",
-      }}>
+      <div className="cmd-modal-panel cmd-modal-panel--wide soft-enter">
 
         {/* Header */}
-        <div style={{
-          display:      "flex",
-          alignItems:   "center",
-          justifyContent: "space-between",
-          padding:      "14px 20px 12px",
-          borderBottom: "1px solid var(--border-subtle)",
-          flexShrink:   0,
-        }}>
-          <div>
-            <div style={{ color: "var(--text-main)", fontWeight: 700, fontSize: 14 }}>
-              Workspace Templates
-            </div>
-            <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3 }}>
+        <div className="cmd-modal-header">
+          <div className="cmd-modal-title-group">
+            <span className="cmd-modal-title">Workspace Templates</span>
+            <span className="cmd-modal-subtitle">
               Load a pre-built multi-agent workflow. Set working directories after loading.
-            </div>
+            </span>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "transparent", border: "none",
-              color: "var(--text-faint)", fontSize: 16,
-              cursor: "pointer", padding: "4px 6px", borderRadius: 999,
-              lineHeight: 1, flexShrink: 0,
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--danger)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)"; }}
-          >
-            ✕
-          </button>
+          <button className="cmd-icon-btn" onClick={onClose}>✕</button>
         </div>
 
         {/* Template list */}
@@ -189,32 +149,9 @@ export function TemplatePickerModal({ onSelect, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding:        "10px 20px",
-          borderTop:      "1px solid var(--border-subtle)",
-          display:        "flex",
-          justifyContent: "center",
-          flexShrink:     0,
-        }}>
-          <button
-            onClick={onClose}
-            style={{
-              background: "transparent", border: "1px solid transparent",
-              color: "var(--text-faint)", fontSize: 12,
-              padding: "7px 14px", borderRadius: 999,
-              fontFamily: "inherit", fontWeight: 600, cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              const b = e.currentTarget as HTMLButtonElement;
-              b.style.color = "var(--text-muted)";
-              b.style.background = "var(--button-bg)";
-            }}
-            onMouseLeave={(e) => {
-              const b = e.currentTarget as HTMLButtonElement;
-              b.style.color = "var(--text-faint)";
-              b.style.background = "transparent";
-            }}
-          >
+        <div className="cmd-modal-footer" style={{ justifyContent: "center" }}>
+          <button className="cmd-pill-btn cmd-pill-btn--ghost" style={{ fontSize: 12, padding: "7px 14px" }}
+            onClick={onClose}>
             Cancel
           </button>
         </div>

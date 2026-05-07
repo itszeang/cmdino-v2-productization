@@ -13,6 +13,8 @@ import { TemplatePickerModal } from "./components/TemplatePickerModal";
 import { useTerminalAgents, MAX_TERMINALS } from "./state/useTerminalAgents";
 import { useAppSettings }      from "./state/useAppSettings";
 import { useSessionLog }       from "./state/useSessionLog";
+import { useProviderHealth }   from "./state/useProviderHealth";
+import { HealthPanel }         from "./components/HealthPanel";
 import { useAttachmentDrop }   from "./hooks/useAttachmentDrop";
 import { workspaceBridge }     from "./workspace/workspaceBridge";
 import { validateWorkspaceFile, sanitizeWorkspaceFilename } from "./domain/workspace";
@@ -63,6 +65,7 @@ export default function App() {
 
   const { settings, updateSettings, resetSettings } = useAppSettings();
   const { entries: sessionEntries, appendEvent, clearLog } = useSessionLog();
+  const { snapshot: healthSnapshot, refresh: refreshHealth } = useProviderHealth();
 
   const [showModal,           setShowModal]           = useState(false);
   const [showWorkflow,        setShowWorkflow]        = useState(false);
@@ -75,6 +78,7 @@ export default function App() {
   const [exportNotice,        setExportNotice]        = useState<string | null>(null);
   const [outputFiles,         setOutputFiles]         = useState<GeneratedOutputFile[]>([]);
   const [showTemplatePicker,  setShowTemplatePicker]  = useState(false);
+  const [showHealth,          setShowHealth]          = useState(false);
 
   const transcriptGettersRef = useRef<Map<string, () => string>>(new Map());
   const paneRefsMap          = useRef<Map<string, HTMLElement>>(new Map());
@@ -163,9 +167,6 @@ export default function App() {
     setReadinessErrors((prev) => ({ ...prev, ...newErrors }));
   }, [agents, runningAgentIds, startAgent]);
 
-  // Derived active label for header
-  const activeTerminalLabel = agents.find((a) => a.id === activeTerminalId)?.label;
-
   // ── Lifecycle tracking ─────────────────────────────────────────────────────
 
   const handleLifecycleChange = useCallback((agentId: string, lifecycle: TerminalLifecycleState) => {
@@ -195,6 +196,7 @@ export default function App() {
   useEffect(() => {
     void refreshList();
     void refreshOutputFiles();
+    void refreshHealth();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refreshOutputFiles() {
@@ -395,6 +397,7 @@ export default function App() {
         onAddTerminal={() => setShowModal(true)}
         onLoadDemo={loadDemoWorkspace}
         onOpenWorkflow={() => setShowWorkflow(true)}
+        onOpenHealth={() => setShowHealth(true)}
         onNew={handleNew}
         onSave={() => { void handleSave(); }}
         onLoad={(name) => { void handleLoad(name); }}
@@ -410,6 +413,7 @@ export default function App() {
         terminalCount={count}
         maxTerminals={MAX_TERMINALS}
         maxReached={maxReached}
+        healthSnapshot={healthSnapshot}
       />
 
       {exportNotice && (
@@ -424,7 +428,6 @@ export default function App() {
           onNameChange={setWorkspaceName}
           viewMode={viewMode}
           onToggleViewMode={() => setViewMode((m) => m === "focus" ? "grid" : "focus")}
-          activeTerminalLabel={activeTerminalLabel}
         />
 
         <section className="workspace-body">
@@ -472,6 +475,7 @@ export default function App() {
         <AgentCreationModal
           onConfirm={handleCreate}
           onCancel={() => setShowModal(false)}
+          providerHealth={healthSnapshot}
         />
       )}
 
@@ -513,6 +517,8 @@ export default function App() {
             updateSettings({ onboardingDismissed: false });
             setShowSettings(false);
           }}
+          healthSnapshot={healthSnapshot}
+          onOpenHealth={() => { setShowSettings(false); setShowHealth(true); }}
         />
       )}
 
@@ -545,6 +551,15 @@ export default function App() {
         <TemplatePickerModal
           onSelect={handleLoadTemplate}
           onClose={() => setShowTemplatePicker(false)}
+        />
+      )}
+
+      {/* Health panel overlay */}
+      {showHealth && (
+        <HealthPanel
+          snapshot={healthSnapshot}
+          onRefresh={() => { void refreshHealth(); }}
+          onClose={() => setShowHealth(false)}
         />
       )}
     </div>

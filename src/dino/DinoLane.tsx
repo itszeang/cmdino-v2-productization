@@ -261,20 +261,12 @@ export function DinoLane({
   return (
     <div
       ref={laneRef}
+      className="dino-lane"
+      data-phase={visualPhase}
+      data-state={state}
       style={{
-        position:        "relative",
-        width:           "100%",
-        height:          laneHeight,
-        marginTop:        0,
-        paddingTop:       Math.round(10 * dinoScale),
-        background:      [
-          "linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.008) 48%, var(--terminal-floor) 100%)",
-          "radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.026), transparent 66%)",
-        ].join(", "),
-        borderTop:       "none",
-        boxShadow:       "none",
-        overflow:        "visible",
-        flexShrink: 0,
+        height:    laneHeight,
+        paddingTop: Math.round(10 * dinoScale),
       }}
     >
       <div

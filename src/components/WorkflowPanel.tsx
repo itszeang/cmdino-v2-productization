@@ -142,8 +142,7 @@ export function WorkflowPanel({
     configId: string,
   ) => {
     // In route creation mode skip drag entirely so the click event fires
-    // reliably for target selection. setPointerCapture + any micro-movement
-    // causes the browser to classify the gesture as a drag and suppress click.
+    // reliably for target selection.
     if (routeSource) return;
 
     const target = e.target as HTMLElement;
@@ -160,9 +159,7 @@ export function WorkflowPanel({
     });
   }, [posMap, routeSource]);
 
-  const handlePointerMove = useCallback((
-    e: React.PointerEvent,
-  ) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragState) return;
     const dx = e.clientX - dragState.startPx;
     const dy = e.clientY - dragState.startPy;
@@ -178,7 +175,6 @@ export function WorkflowPanel({
     const finalPos = livePos[configId];
     if (finalPos) {
       onUpdateNodePosition(configId, finalPos);
-      // Clear live override
       setLivePos((prev) => {
         const next = { ...prev };
         delete next[configId];
@@ -227,23 +223,13 @@ export function WorkflowPanel({
   const handleResetLayout = useCallback(() => {
     setLivePos({});
     onResetLayout();
-    // After reset, positions default to computed layout (empty positions object = fallback)
   }, [onResetLayout]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div
-      style={{
-        position:       "fixed",
-        inset:          0,
-        background:     "var(--overlay-bg)",
-        backdropFilter: "blur(8px)",
-        display:        "flex",
-        alignItems:     "center",
-        justifyContent: "center",
-        zIndex:         200,
-      }}
+      className="workflow-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           setRouteSource(null);
@@ -252,46 +238,19 @@ export function WorkflowPanel({
       }}
     >
       <div
-        style={{
-          width:         PANEL_W,
-          maxWidth:      "96vw",
-          height:        PANEL_H,
-          maxHeight:     "90vh",
-          background:    "var(--surface-1)",
-          border:        "1px solid var(--border-subtle)",
-          borderRadius:  12,
-          overflow:      "hidden",
-          display:       "flex",
-          flexDirection: "column",
-          boxShadow:     "var(--shadow-panel)",
-          position:      "relative",
-        }}
+        className="workflow-panel"
+        style={{ width: PANEL_W, height: PANEL_H }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div style={{
-          display:      "flex",
-          alignItems:   "center",
-          gap:          10,
-          padding:      "12px 16px",
-          borderBottom: "1px solid var(--border-subtle)",
-          flexShrink:   0,
-          background:   "var(--surface-1)",
-          height:       HEADER_H,
-          boxSizing:    "border-box",
-        }}>
-          <span style={{ color: "var(--text-main)", fontWeight: 650, fontSize: 13 }}>
-            Workflow
-          </span>
-          <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
+        <div className="workflow-header" style={{ height: HEADER_H }}>
+          <span className="workflow-kicker">Workflow</span>
+          <span className="workflow-meta">
             {agents.length} terminal{agents.length !== 1 ? "s" : ""}
             {drawLinks.length > 0 ? ` · ${drawLinks.length} link${drawLinks.length !== 1 ? "s" : ""}` : ""}
           </span>
           {routeSource && (
-            <span style={{
-              fontSize: 10, color: "var(--accent)", flexShrink: 0,
-              background: "var(--accent-soft)", padding: "2px 8px", borderRadius: 999,
-            }}>
+            <span className="workflow-route-banner">
               Route from {agents.find((a) => a.configId === routeSource)?.label ?? routeSource} — click target
             </span>
           )}
@@ -299,91 +258,27 @@ export function WorkflowPanel({
             <button
               onClick={handleResetLayout}
               disabled={agents.length === 0}
-              style={{
-                background:   "transparent",
-                border:       "1px solid var(--border-subtle)",
-                color:        agents.length === 0 ? "var(--text-faint)" : "var(--text-muted)",
-                fontSize:     11,
-                cursor:       agents.length === 0 ? "not-allowed" : "pointer",
-                padding:      "4px 10px",
-                lineHeight:   1,
-                borderRadius: 999,
-                fontFamily:   "inherit",
-              }}
-              onMouseEnter={(e) => {
-                if (agents.length === 0) return;
-                (e.currentTarget as HTMLButtonElement).style.background = "var(--button-bg)";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-main)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                (e.currentTarget as HTMLButtonElement).style.color = agents.length === 0 ? "var(--text-faint)" : "var(--text-muted)";
-              }}
+              className="cmd-pill-btn"
             >
               Reset Layout
             </button>
             <button
               onClick={() => { setRouteSource(null); onClose(); }}
-              style={{
-                background:   "transparent",
-                border:       "none",
-                color:        "var(--text-muted)",
-                fontSize:     15,
-                cursor:       "pointer",
-                padding:      "4px 7px",
-                lineHeight:   1,
-                borderRadius: 999,
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "var(--button-bg)";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-main)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-              }}
+              className="cmd-icon-btn"
             >✕</button>
           </div>
         </div>
 
         {/* ── Canvas ── */}
         <div
-          style={{
-            flex:     1,
-            position: "relative",
-            overflow: "hidden",
-            background: "var(--surface-0)",
-          }}
-          onClick={() => {
-            if (routeSource) setRouteSource(null);
-          }}
+          className="workflow-canvas"
+          onClick={() => { if (routeSource) setRouteSource(null); }}
         >
-
-          {/* Empty state */}
           {agents.length === 0 && (
-            <div style={{
-              position:       "absolute",
-              inset:          0,
-              display:        "flex",
-              alignItems:     "center",
-              justifyContent: "center",
-              color:          "var(--text-muted)",
-              fontSize:       13,
-            }}>
-              No Dino terminals
-            </div>
+            <div className="workflow-empty">No Dino terminals</div>
           )}
           {agents.length > 0 && drawLinks.length === 0 && !routeSource && (
-            <div style={{
-              position:  "absolute",
-              bottom:    14,
-              left:      0,
-              right:     0,
-              textAlign: "center",
-              color:     "var(--text-faint)",
-              fontSize:  10,
-              letterSpacing: 0.2,
-            }}>
+            <div className="workflow-hint">
               Drag to arrange · use Route on a node to wire a preferred handoff path
             </div>
           )}
@@ -420,8 +315,7 @@ export function WorkflowPanel({
               const tp = getPos(link.targetConfigId);
               const { x1, y1, x2, y2, mx, my } = edgePoints(sp.x, sp.y, tp.x, tp.y);
               const isRoute = link.kind === "route";
-              const sw    = isRoute ? 2 : Math.min(1 + link.count, 5);
-              const stroke = isRoute ? "var(--accent)" : "var(--border-strong)";
+              const sw = isRoute ? 2 : Math.min(1 + link.count, 5);
               const marker = isRoute ? "url(#wf-arrow-route)" : "url(#wf-arrow)";
               const label  = isRoute
                 ? "route"
@@ -430,11 +324,16 @@ export function WorkflowPanel({
 
               return (
                 <g key={link.id}>
+                  {/* halo behind main edge */}
                   <line
                     x1={x1} y1={y1} x2={x2} y2={y2}
-                    stroke={stroke}
+                    className="workflow-edge-halo"
+                    strokeWidth={sw + 5}
+                  />
+                  <line
+                    x1={x1} y1={y1} x2={x2} y2={y2}
+                    className={`workflow-edge${isRoute ? " workflow-edge--route" : ""}`}
                     strokeWidth={sw}
-                    strokeDasharray={isRoute ? "5 3" : undefined}
                     markerEnd={marker}
                   />
                   <foreignObject
@@ -444,40 +343,13 @@ export function WorkflowPanel({
                     height={22}
                     style={{ pointerEvents: "all" }}
                   >
-                    <div
-                      style={{
-                        display:        "flex",
-                        alignItems:     "center",
-                        justifyContent: "center",
-                        gap:            4,
-                        background:     "var(--surface-1)",
-                        border:         `1px solid ${isRoute ? "var(--accent)" : "var(--border-subtle)"}`,
-                        borderRadius:   999,
-                        padding:        "3px 7px",
-                        whiteSpace:     "nowrap",
-                      }}
-                    >
-                      <span style={{
-                        color:        isRoute ? "var(--accent)" : "var(--text-muted)",
-                        fontSize:     10,
-                        letterSpacing: 0,
-                      }}>
+                    <div className={`workflow-edge-label-wrap${isRoute ? " workflow-edge-label-wrap--route" : ""}`}>
+                      <span className={`workflow-edge-label${isRoute ? " workflow-edge-label--route" : ""}`}>
                         {label}
                       </span>
                       <button
+                        className="workflow-edge-remove"
                         onClick={(e) => { e.stopPropagation(); onRemoveLink(link.id); }}
-                        style={{
-                          background: "none",
-                          border:     "none",
-                          color:      "var(--text-faint)",
-                          fontSize:   10,
-                          cursor:     "pointer",
-                          padding:    0,
-                          lineHeight: 1,
-                          flexShrink: 0,
-                        }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--danger)"; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)"; }}
                       >✕</button>
                     </div>
                   </foreignObject>
@@ -488,120 +360,53 @@ export function WorkflowPanel({
 
           {/* ── Node cards ── */}
           {agents.map((agent) => {
-            const pos     = getPos(agent.configId);
-            const lc      = lifecycleByAgentId[agent.id] ?? "dormant";
-            const kind    = agent.agentKind ?? "custom";
-            const sprite  = dinoIdleSprite(agent.dinoId);
-            const isDragging = dragState?.configId === agent.configId;
+            const pos        = getPos(agent.configId);
+            const lc         = lifecycleByAgentId[agent.id] ?? "dormant";
+            const kind       = agent.agentKind ?? "custom";
+            const sprite     = dinoIdleSprite(agent.dinoId);
+            const isDragging    = dragState?.configId === agent.configId;
             const isRouteTarget = routeSource !== null && routeSource !== agent.configId;
             const isRouteSource = routeSource === agent.configId;
 
             return (
               <div
                 key={agent.id}
-                style={{
-                  position:  "absolute",
-                  left:      pos.x,
-                  top:       pos.y,
-                  width:     NODE_W,
-                  height:    NODE_H,
-                  background: "var(--surface-1)",
-                  border:    `1px solid ${
-                    isRouteSource ? "var(--accent)" :
-                    isRouteTarget ? "var(--border-strong)" :
-                    lc === "running" ? "var(--border-strong)" : "var(--border-subtle)"
-                  }`,
-                  borderRadius: 12,
-                  display:   "flex",
-                  alignItems: "center",
-                  gap:       8,
-                  padding:   "8px 10px",
-                  boxShadow: isDragging ? "0 4px 16px rgba(0,0,0,0.25)" : "none",
-                  cursor:    isDragging ? "grabbing" : (routeSource ? (isRouteTarget ? "pointer" : "default") : "grab"),
-                  userSelect: "none",
-                  zIndex:    isDragging ? 10 : 1,
-                  transition: isDragging ? "none" : "box-shadow 0.15s, border-color 0.15s",
-                  outline:   isRouteTarget ? "2px dashed var(--border-strong)" : undefined,
-                }}
+                className="workflow-node"
+                data-lifecycle={lc}
+                data-route-source={String(isRouteSource)}
+                data-route-target={String(isRouteTarget)}
+                data-dragging={String(isDragging)}
+                style={{ left: pos.x, top: pos.y, width: NODE_W, height: NODE_H }}
                 onPointerDown={(e) => handlePointerDown(e, agent.configId)}
                 onPointerMove={handlePointerMove}
                 onPointerUp={(e) => handlePointerUp(e, agent.configId)}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleNodeClick(agent.configId);
-                }}
+                onClick={(e) => { e.stopPropagation(); handleNodeClick(agent.configId); }}
               >
                 {/* Dino avatar */}
                 {sprite && (
                   <div
+                    className="workflow-node-avatar"
                     style={{
-                      width:              44,
-                      height:             44,
                       backgroundImage:    `url("${sprite}")`,
                       backgroundSize:     "132px 44px",
                       backgroundPosition: "0 0",
                       backgroundRepeat:   "no-repeat",
                       imageRendering:     "pixelated",
-                      flexShrink:         0,
-                      opacity:            lc === "dormant" || lc === "killed" || lc === "exited" ? 0.35 : 0.85,
                     }}
                   />
                 )}
 
                 {/* Text info */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, flex: 1 }}>
-                  <span style={{
-                    color:        "var(--text-main)",
-                    fontSize:     11,
-                    fontWeight:   650,
-                    overflow:     "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace:   "nowrap",
-                  }}>
-                    {agent.label}
-                  </span>
-                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    <span style={{
-                      color:        "var(--text-muted)",
-                      fontSize:     9,
-                      background:   "var(--button-bg)",
-                      padding:      "2px 6px",
-                      borderRadius: 999,
-                    }}>
-                      {kind}
-                    </span>
-                    <span style={{ color: lcColor(lc), fontSize: 9, fontWeight: 600 }}>
-                      {lc}
-                    </span>
+                <div className="workflow-node-body">
+                  <span className="workflow-node-title">{agent.label}</span>
+                  <div className="workflow-node-meta">
+                    <span className="workflow-kind-pill">{kind}</span>
+                    <span className="workflow-lifecycle" style={{ color: lcColor(lc) }}>{lc}</span>
                   </div>
-                  {/* ROUTE button */}
                   <button
+                    className="workflow-route-btn"
+                    data-active={String(isRouteSource)}
                     onClick={(e) => handleRouteButtonClick(e, agent.configId)}
-                    style={{
-                      alignSelf:    "flex-start",
-                      background:   isRouteSource ? "var(--accent)" : "transparent",
-                      border:       `1px solid ${isRouteSource ? "var(--accent)" : "var(--border-subtle)"}`,
-                      color:        isRouteSource ? "var(--app-bg)" : "var(--text-faint)",
-                      fontSize:     8,
-                      padding:      "2px 6px",
-                      borderRadius: 999,
-                      cursor:       "pointer",
-                      fontFamily:   "inherit",
-                      fontWeight:   600,
-                      letterSpacing: 0.5,
-                      lineHeight:   1.4,
-                      flexShrink:   0,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (isRouteSource) return;
-                      (e.currentTarget as HTMLButtonElement).style.background = "var(--button-bg)";
-                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-main)";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (isRouteSource) return;
-                      (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)";
-                    }}
                   >
                     {isRouteSource ? "Cancel" : "Route"}
                   </button>

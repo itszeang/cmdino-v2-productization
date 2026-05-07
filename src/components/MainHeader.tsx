@@ -2,11 +2,10 @@ import { useState } from "react";
 import type { TerminalViewMode } from "../domain/viewMode";
 
 interface MainHeaderProps {
-  workspaceName:        string;
-  onNameChange:         (name: string) => void;
-  viewMode:             TerminalViewMode;
-  onToggleViewMode:     () => void;
-  activeTerminalLabel?: string;
+  workspaceName:    string;
+  onNameChange:     (name: string) => void;
+  viewMode:         TerminalViewMode;
+  onToggleViewMode: () => void;
 }
 
 export function MainHeader({
@@ -14,7 +13,6 @@ export function MainHeader({
   onNameChange,
   viewMode,
   onToggleViewMode,
-  activeTerminalLabel,
 }: MainHeaderProps) {
   const [editing,   setEditing]   = useState(false);
   const [nameInput, setNameInput] = useState(workspaceName);
@@ -42,19 +40,13 @@ export function MainHeader({
               onBlur={commitName}
               onKeyDown={(e) => {
                 if (e.key === "Enter") commitName();
-                if (e.key === "Escape") {
-                  setEditing(false);
-                  setNameInput(workspaceName);
-                }
+                if (e.key === "Escape") { setEditing(false); setNameInput(workspaceName); }
               }}
             />
           ) : (
             <span
               className="header-name-display"
-              onClick={() => {
-                setNameInput(workspaceName);
-                setEditing(true);
-              }}
+              onClick={() => { setNameInput(workspaceName); setEditing(true); }}
               title="Click to rename workspace"
             >
               {workspaceName}
@@ -62,14 +54,7 @@ export function MainHeader({
           )}
         </div>
 
-        {/* Middle: active terminal context — focus mode only */}
-        {activeTerminalLabel && viewMode === "focus" && (
-          <div className="header-active-terminal">
-            <span className="header-active-label">{activeTerminalLabel}</span>
-          </div>
-        )}
-
-        {/* Right: view mode toggle — always pushed to the end */}
+        {/* Right: view mode toggle */}
         <div className="header-view-toggle">
           <button
             className="header-view-btn"

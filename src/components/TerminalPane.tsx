@@ -31,14 +31,6 @@ const STATE_COLORS: Record<string, string> = {
   idle_center:      "#737373",
 };
 
-const LIFECYCLE_COLORS: Record<TerminalLifecycleState, string> = {
-  dormant:  "#737373",
-  spawning: "#fbbf24",
-  running:  "#e5e5e5",
-  exited:   "#6b7280",
-  killed:   "#6b7280",
-  error:    "#fca5a5",
-};
 
 const VIEW_MODE_DINO_SCALE: Record<TerminalViewMode, number> = {
   focus: 1.25,
@@ -281,11 +273,9 @@ export function TerminalPane({
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
-  const color         = dotColor(dinoState);
-  const lcColor       = LIFECYCLE_COLORS[lifecycle];
-  const pulse         = dinoState === "patrol_running" || dinoState === "heavy_processing";
-  const showLifecycle = lifecycle !== "running";
-  const dinoScale     = (settings?.dinoScale ?? 1) * VIEW_MODE_DINO_SCALE[viewMode];
+  const color     = dotColor(dinoState);
+  const pulse     = dinoState === "patrol_running" || dinoState === "heavy_processing";
+  const dinoScale = (settings?.dinoScale ?? 1) * VIEW_MODE_DINO_SCALE[viewMode];
   const isAlive        = lifecycle === "running" || lifecycle === "spawning";
   const runningTargets = allAgents.filter((a) => a.id !== agent.id && runningAgentIds.has(a.id));
 
@@ -420,145 +410,116 @@ export function TerminalPane({
       position: "relative",
     }}>
 
-      {/* ── Header — lifecycle only ── */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", rowGap: 6,
-        padding: "10px 12px",
-        background: "var(--surface-1)", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0,
-      }}>
-        <div
-          className={pulse ? "status-dot-pulse" : undefined}
-          style={{
-            width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0,
-            boxShadow: dinoState !== "terminal_dead" && dinoState !== "idle_center"
-              ? `0 0 0 2px ${color}1f` : "none",
-            transition: "background 0.25s, box-shadow 0.25s",
-          }}
-        />
-        <span style={{
-          color: "var(--text-main)", fontWeight: 600, fontSize: 12, letterSpacing: 0,
-          flex: "1 1 150px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        }}>
-          {agent.label}
-        </span>
-        {showLifecycle && (
-          <span className="lc-pill" style={{ color: lcColor }}>
-            {lifecycle}
-          </span>
-        )}
-        <HdrBtn title="Copy visible output" onClick={() => { void copyVisible(); }}>⎘</HdrBtn>
-        <HdrBtn title="View session logs" onClick={() => setShowLogs(true)}
-          onMouseDown={(e) => e.preventDefault()}>≡</HdrBtn>
-        <HdrBtn title={readinessChecking ? "Checking…" : "Restart terminal"} onClick={() => { if (!readinessChecking) void handleRestart(); }}>↺</HdrBtn>
-        {onFocus && (
-          <HdrBtn
-            title={viewMode === "focus" && isActive ? "Restore grid" : "Focus this terminal"}
-            onClick={onFocus}
+      {/* ── Single chrome row: orchestration + pane controls ── */}
+      <div className="pane-orch">
+
+        {/* Left: context + handoff */}
+        <div className="pane-orch-group">
+          <StripBtn
+            onClick={() => { showAttPanel ? setShowAttPanel(false) : openAttPanel(); }}
+            accent={showAttPanel}
+            title={showAttPanel ? "Close context panel" : "Manage context attachments"}
           >
-            {viewMode === "focus" && isActive ? (
-              /* restore-to-grid: 2×2 squares */
-              <svg viewBox="0 0 10 10" width="10" height="10" fill="currentColor" style={{ display: "block" }}>
-                <rect x="1"   y="1"   width="3.5" height="3.5" rx="0.5" />
-                <rect x="5.5" y="1"   width="3.5" height="3.5" rx="0.5" />
-                <rect x="1"   y="5.5" width="3.5" height="3.5" rx="0.5" />
-                <rect x="5.5" y="5.5" width="3.5" height="3.5" rx="0.5" />
-              </svg>
-            ) : (
-              /* expand/focus: diagonal arrow with corner brackets */
-              <svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
-                <path d="M5.5 1H9v3.5M4.5 9H1V5.5M9 1L1 9"/>
-              </svg>
-            )}
-          </HdrBtn>
-        )}
-        <HdrBtn title="Agent Settings" onClick={() => onEditAgent(agent.id)}>
-          <svg viewBox="0 0 10 10" width="10" height="10" fill="currentColor" style={{ display: "block" }}>
-            <path d="M5 3.2a1.8 1.8 0 1 0 0 3.6A1.8 1.8 0 0 0 5 3.2zm3.7-.5-.5-.87-.87.5A3.2 3.2 0 0 0 6 2.02V1h-2v1.02a3.2 3.2 0 0 0-1.33.31l-.87-.5-.5.87.87.5A3.2 3.2 0 0 0 1.83 5H.8v1h1.03a3.2 3.2 0 0 0 .31 1.33l-.87.5.5.87.87-.5A3.2 3.2 0 0 0 4 9.17V10h2V9.17a3.2 3.2 0 0 0 1.33-.3l.87.5.5-.87-.87-.5A3.2 3.2 0 0 0 8.17 7H9.2V6H8.17A3.2 3.2 0 0 0 7.87 4.7l.83-.5z"/>
-          </svg>
-        </HdrBtn>
-        <HdrBtn title="Close terminal" onClick={() => { void handleRemove(); }} danger>✕</HdrBtn>
-      </div>
+            {atts.length > 0 ? `Context (${atts.length})` : "Context"}
+          </StripBtn>
+          <div className="pane-strip-sep" />
+          <StripBtn
+            onClick={handleOpenHandoff}
+            disabled={!isAlive}
+            title={isAlive ? "Handoff output to another terminal" : "Start terminal first"}
+          >Handoff</StripBtn>
+        </div>
 
-      {/* ── Orchestration strip ── */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", rowGap: 6,
-        padding: "9px 12px",
-        background: "var(--surface-0)", borderBottom: "1px solid var(--border-subtle)",
-        flexShrink: 0, minHeight: 40,
-      }}>
-        {/* Context / Attach toggle — accent when panel is open */}
-        <StripBtn
-          onClick={() => { showAttPanel ? setShowAttPanel(false) : openAttPanel(); }}
-          accent={showAttPanel}
-          title={showAttPanel ? "Close context panel" : "Manage context attachments"}
-        >
-          {atts.length > 0 ? `Context (${atts.length})` : "Attach"}
-        </StripBtn>
-
-        <div className="pane-strip-sep" />
-
-        {/* Handoff */}
-        <StripBtn
-          onClick={handleOpenHandoff}
-          disabled={!isAlive}
-          accent
-          title={isAlive ? "Handoff output to another terminal" : "Start terminal first"}
-        >Handoff</StripBtn>
-
-        {/* ── Forward: → [target] [Forward] ── */}
-        <div className="pane-strip-sep" />
-        <span style={{ color: "var(--text-faint)", fontSize: 11, flexShrink: 0, lineHeight: 1 }}>
-          →
-        </span>
-
-        {linkedTarget ? (
-          <span style={{
-            fontSize: 10, color: "var(--text-muted)", flexShrink: 0,
-            maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}
-            title={preferredLink?.kind === "route" ? "Preferred route" : "Observed handoff"}
-          >
-            {preferredLink?.kind === "route" ? "→ " : "↪ "}{linkedTarget.label}
-          </span>
-        ) : otherTerminals.length > 0 ? (
-          <select
-            value={effectiveFwdTarget?.id ?? ""}
-            onChange={(e) => { setSelectedForwardTargetId(e.target.value); setFwdError(""); }}
-            style={{
-              background: "transparent",
-              border: "1px solid var(--border-subtle)",
-              color: "var(--text-muted)",
-              fontSize: 9, padding: "3px 6px",
-              borderRadius: 999, fontFamily: "inherit",
-              maxWidth: 90, flexShrink: 1, minWidth: 0,
+        {/* Middle/right: forward flow */}
+        <div className="pane-orch-group pane-orch-group--end">
+          <span style={{ color: "var(--text-faint)", fontSize: 10, flexShrink: 0, lineHeight: 1 }}>→</span>
+          {linkedTarget ? (
+            <span style={{
+              fontSize: 10, color: "var(--text-muted)", flexShrink: 0,
+              maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}
+              title={preferredLink?.kind === "route" ? "Preferred route" : "Observed handoff"}
+            >
+              {preferredLink?.kind === "route" ? "→ " : "↪ "}{linkedTarget.label}
+            </span>
+          ) : otherTerminals.length > 0 ? (
+            <select
+              value={effectiveFwdTarget?.id ?? ""}
+              onChange={(e) => { setSelectedForwardTargetId(e.target.value); setFwdError(""); }}
+              style={{
+                background: "transparent", border: "1px solid var(--border-subtle)",
+                color: "var(--text-muted)", fontSize: 9, padding: "3px 6px",
+                borderRadius: 999, fontFamily: "inherit", maxWidth: 90, flexShrink: 1, minWidth: 0,
+              }}
+            >
+              {otherTerminals.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+            </select>
+          ) : (
+            <span style={{ fontSize: 9, color: "var(--text-faint)", flexShrink: 0 }}>—</span>
+          )}
+          <StripBtn
+            onClick={() => { void handleForwardToNext(); }}
+            disabled={!isAlive || !effectiveFwdTarget || !targetIsRunning || forwarding || otherTerminals.length === 0}
+            title={
+              !isAlive                                            ? "Start this terminal first" :
+              otherTerminals.length === 0 || !effectiveFwdTarget  ? "No targets"               :
+              !targetIsRunning                                    ? "Start target first"        :
+              forwarding                                          ? "Forwarding…"              :
+              `Forward to ${effectiveFwdTarget.label}`
+            }
           >
-            {otherTerminals.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
-          </select>
-        ) : (
-          <span style={{ fontSize: 9, color: "var(--text-faint)", flexShrink: 0 }}>—</span>
-        )}
+            {forwarding ? "…" : "Forward"}
+          </StripBtn>
+          {fwdError && (
+            <span style={{ color: "var(--danger)", fontSize: 9, whiteSpace: "nowrap", flexShrink: 0 }}>
+              {fwdError}
+            </span>
+          )}
+        </div>
 
-        <StripBtn
-          onClick={() => { void handleForwardToNext(); }}
-          disabled={!isAlive || !effectiveFwdTarget || !targetIsRunning || forwarding || otherTerminals.length === 0}
-          accent={isAlive && !!effectiveFwdTarget && targetIsRunning && !forwarding}
-          title={
-            !isAlive                                           ? "Start this terminal first" :
-            otherTerminals.length === 0 || !effectiveFwdTarget ? "No targets"               :
-            !targetIsRunning                                   ? "Start target first"        :
-            forwarding                                         ? "Forwarding…"              :
-            `Forward to ${effectiveFwdTarget.label}`
-          }
-        >
-          {forwarding ? "…" : "Forward"}
-        </StripBtn>
-
-        {fwdError && (
-          <span style={{ color: "var(--danger)", fontSize: 9, whiteSpace: "nowrap", flexShrink: 0 }}>
-            {fwdError}
-          </span>
-        )}
+        {/* Far right: status dot + pane controls */}
+        <div className="pane-orch-group" style={{ paddingLeft: 6, borderLeft: "1px solid var(--border-subtle)", gap: 1, flexShrink: 0 }}>
+          <div
+            className={pulse ? "status-dot-pulse" : undefined}
+            style={{
+              width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0, marginRight: 2,
+              boxShadow: dinoState !== "terminal_dead" && dinoState !== "idle_center"
+                ? `0 0 0 2px ${color}1f` : "none",
+              transition: "background 0.25s, box-shadow 0.25s",
+            }}
+          />
+          <HdrBtn title="Copy visible output" onClick={() => { void copyVisible(); }}>⎘</HdrBtn>
+          <HdrBtn title="View session logs" onClick={() => setShowLogs(true)}
+            onMouseDown={(e) => e.preventDefault()}>≡</HdrBtn>
+          <HdrBtn title={readinessChecking ? "Checking…" : "Restart terminal"}
+            onClick={() => { if (!readinessChecking) void handleRestart(); }}>↺</HdrBtn>
+          <span className="pane-strip-sep" />
+          {onFocus && (
+            <HdrBtn
+              title={viewMode === "focus" && isActive ? "Restore grid" : "Focus this terminal"}
+              onClick={onFocus}
+            >
+              {viewMode === "focus" && isActive ? (
+                <svg viewBox="0 0 10 10" width="10" height="10" fill="currentColor" style={{ display: "block" }}>
+                  <rect x="1"   y="1"   width="3.5" height="3.5" rx="0.5" />
+                  <rect x="5.5" y="1"   width="3.5" height="3.5" rx="0.5" />
+                  <rect x="1"   y="5.5" width="3.5" height="3.5" rx="0.5" />
+                  <rect x="5.5" y="5.5" width="3.5" height="3.5" rx="0.5" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+                  <path d="M5.5 1H9v3.5M4.5 9H1V5.5M9 1L1 9"/>
+                </svg>
+              )}
+            </HdrBtn>
+          )}
+          <HdrBtn title="Agent Settings" onClick={() => onEditAgent(agent.id)}>
+            <svg viewBox="0 0 10 10" width="10" height="10" fill="currentColor" style={{ display: "block" }}>
+              <path d="M5 3.2a1.8 1.8 0 1 0 0 3.6A1.8 1.8 0 0 0 5 3.2zm3.7-.5-.5-.87-.87.5A3.2 3.2 0 0 0 6 2.02V1h-2v1.02a3.2 3.2 0 0 0-1.33.31l-.87-.5-.5.87.87.5A3.2 3.2 0 0 0 1.83 5H.8v1h1.03a3.2 3.2 0 0 0 .31 1.33l-.87.5.5.87.87-.5A3.2 3.2 0 0 0 4 9.17V10h2V9.17a3.2 3.2 0 0 0 1.33-.3l.87.5.5-.87-.87-.5A3.2 3.2 0 0 0 8.17 7H9.2V6H8.17A3.2 3.2 0 0 0 7.87 4.7l.83-.5z"/>
+            </svg>
+          </HdrBtn>
+          <HdrBtn title="Close terminal" onClick={() => { void handleRemove(); }} danger>✕</HdrBtn>
+        </div>
 
       </div>
 
@@ -639,18 +600,20 @@ export function TerminalPane({
           <div style={{
             flex: 1, display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center",
-            gap: 8, minHeight: 0,
+            gap: 6, minHeight: 0,
           }}>
-            <span style={{ color: "var(--text-faint)", fontSize: 12, letterSpacing: 0 }}>Dormant</span>
-            <span style={{ color: "var(--text-faint)", fontSize: 10, letterSpacing: 0, opacity: 0.7 }}>
+            <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 650, letterSpacing: 0 }}>
+              {agent.label}
+            </span>
+            <span style={{ color: "var(--text-faint)", fontSize: 11, letterSpacing: 0 }}>Dormant</span>
+            <span style={{ color: "var(--text-faint)", fontSize: 10, letterSpacing: 0, opacity: 0.6, marginBottom: 4 }}>
               Start when ready
             </span>
             <button
               onClick={() => { void handleStart(); }}
               disabled={readinessChecking}
               style={{
-                marginTop: 4,
-                padding: "7px 18px",
+                padding: "9px 24px",
                 background: readinessChecking ? "var(--button-bg)" : "var(--accent)",
                 border: "1px solid transparent", borderRadius: 999,
                 color: readinessChecking ? "var(--text-muted)" : "var(--app-bg)",

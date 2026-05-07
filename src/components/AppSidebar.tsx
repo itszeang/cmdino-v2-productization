@@ -1,9 +1,40 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { HealthSnapshot, HealthStatus } from "../domain/health";
+
+const HEALTH_DOT_COLOR: Record<string, string> = {
+  ready:   "var(--success)",
+  warning: "var(--warning)",
+  error:   "var(--danger)",
+  idle:    "var(--text-faint)",
+};
+
+function healthAggregateDot(snapshot: HealthSnapshot): ReactNode {
+  if (snapshot.status === "idle")     return null;
+  if (snapshot.status === "scanning") {
+    return <span className="sidebar-health-dot" style={{ background: "var(--text-faint)", opacity: 0.5 }} />;
+  }
+  const ps = Object.values(snapshot.providers);
+  const hasIssue = ps.some((p): boolean => {
+    const s: HealthStatus = p.status;
+    return s === "missing" || s === "auth_required" || s === "offline";
+  });
+  const hasError = ps.some((p) => p.status === "error");
+  const allReady = ps.every((p) => p.status === "ready");
+  const color = hasError
+    ? HEALTH_DOT_COLOR.error
+    : hasIssue
+    ? HEALTH_DOT_COLOR.warning
+    : allReady
+    ? HEALTH_DOT_COLOR.ready
+    : HEALTH_DOT_COLOR.idle;
+  return <span className="sidebar-health-dot" style={{ background: color }} />;
+}
 
 interface AppSidebarProps {
   onAddTerminal:             () => void;
   onLoadDemo:                () => void;
   onOpenWorkflow:            () => void;
+  onOpenHealth:              () => void;
   onNew:                     () => void;
   onSave:                    () => void;
   onLoad:                    (name: string) => void;
@@ -19,11 +50,13 @@ interface AppSidebarProps {
   terminalCount:             number;
   maxTerminals:              number;
   maxReached:                boolean;
+  healthSnapshot:            HealthSnapshot;
 }
 
 type SidebarIconName =
   | "demo"
   | "workflow"
+  | "health"
   | "start"
   | "new"
   | "save"
@@ -129,21 +162,24 @@ function SidebarIcon({ name }: { name: SidebarIconName }) {
           <circle cx="12" cy="13" r="1.5" fill="currentColor" stroke="none" />
         </>
       )}
+      {name === "health" && (
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" {...common} />
+      )}
     </svg>
   );
 }
 
 function SidebarRow({
-  icon,
-  children,
-  ...buttonProps
+  icon, children, trailing, ...buttonProps
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  icon: SidebarIconName;
+  icon:      SidebarIconName;
+  trailing?: React.ReactNode;
 }) {
   return (
     <button className="sidebar-row" {...buttonProps}>
       <SidebarIcon name={icon} />
       <span className="sidebar-row-text">{children}</span>
+      {trailing}
     </button>
   );
 }
@@ -152,6 +188,7 @@ export function AppSidebar({
   onAddTerminal,
   onLoadDemo,
   onOpenWorkflow,
+  onOpenHealth,
   onNew,
   onSave,
   onLoad,
@@ -167,6 +204,7 @@ export function AppSidebar({
   terminalCount,
   maxTerminals,
   maxReached,
+  healthSnapshot,
 }: AppSidebarProps) {
   return (
     <aside className="app-sidebar">
@@ -196,6 +234,14 @@ export function AppSidebar({
           </SidebarRow>
           <SidebarRow icon="workflow" onClick={onOpenWorkflow} title="Open workflow canvas">
             Workflow
+          </SidebarRow>
+          <SidebarRow
+            icon="health"
+            onClick={onOpenHealth}
+            title="View provider health and CLI status"
+            trailing={healthAggregateDot(healthSnapshot)}
+          >
+            Health
           </SidebarRow>
           <SidebarRow
             icon="start"

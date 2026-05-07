@@ -1472,3 +1472,796 @@ input[type="range"]::-webkit-slider-track {
   border-top: 1px solid var(--border-subtle);
   margin-top: 2px;
 }
+
+/* ── Pane chrome ──────────────────────────────────────────────────────────── */
+
+.pane-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  padding: 10px 12px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.pane-orch {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.pane-orch-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.pane-orch-group--end {
+  margin-left: auto;
+}
+
+/* ── Attachment panel ─────────────────────────────────────────────────────── */
+
+.att-panel {
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.att-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 12px 7px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.att-header-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.att-header-name {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--text-main);
+}
+
+.att-header-sub {
+  font-size: 9px;
+  color: var(--text-faint);
+  letter-spacing: 0.3px;
+}
+
+.att-header-agent {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.att-input-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.att-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.att-selected-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 5px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.att-selected-path-text {
+  font-size: 9px;
+  color: var(--text-faint);
+  font-family: "Cascadia Code", "Consolas", monospace;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.att-warn {
+  font-size: 9px;
+  color: var(--danger);
+  flex-shrink: 0;
+}
+
+.att-preview {
+  border-bottom: 1px solid var(--border-subtle);
+  max-height: 160px;
+  overflow-y: auto;
+  position: relative;
+  background: var(--terminal-bg);
+}
+
+.att-preview-close {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.att-preview-close:hover {
+  color: var(--danger);
+  background: var(--button-bg);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Block C – Premium UI polish
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Shared button primitives ────────────────────────────────────────────── */
+
+.cmd-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px 7px;
+  line-height: 1;
+  border-radius: 999px;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s;
+}
+.cmd-icon-btn:hover {
+  background: var(--button-bg);
+  color: var(--text-main);
+}
+
+.cmd-pill-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 10px;
+  line-height: 1;
+  border-radius: 999px;
+  font-family: inherit;
+  font-weight: 600;
+  transition: background 0.12s, color 0.12s, border-color 0.12s, opacity 0.12s;
+}
+.cmd-pill-btn:hover:not(:disabled) {
+  background: var(--button-bg);
+  color: var(--text-main);
+  border-color: var(--border-strong);
+}
+.cmd-pill-btn:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+.cmd-pill-btn--ghost {
+  border-color: transparent;
+  color: var(--text-faint);
+}
+.cmd-pill-btn--ghost:hover:not(:disabled) {
+  color: var(--text-muted);
+  background: var(--button-bg);
+  border-color: transparent;
+}
+.cmd-pill-btn--primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--app-bg);
+  font-weight: 650;
+  font-size: 12px;
+  padding: 8px 16px;
+}
+.cmd-pill-btn--primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--app-bg);
+  opacity: 0.88;
+}
+.cmd-pill-btn--danger:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: transparent;
+}
+
+.cmd-card-hover {
+  transition: background 0.1s, border-left-color 0.1s;
+}
+.cmd-card-hover:hover {
+  background: var(--surface-2);
+}
+
+/* ── Shared modal shell ──────────────────────────────────────────────────── */
+
+.cmd-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-bg);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cmd-modal-panel {
+  width: 480px;
+  max-width: 96vw;
+  max-height: 90vh;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-panel);
+}
+.cmd-modal-panel--wide    { width: 600px; }
+.cmd-modal-panel--compact { width: 360px; }
+.cmd-modal-panel--welcome { width: 560px; }
+
+.cmd-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 18px 11px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  background: var(--surface-1);
+}
+
+.cmd-modal-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cmd-modal-title {
+  color: var(--text-main);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.cmd-modal-subtitle {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.cmd-modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ── Workflow overlay + panel ─────────────────────────────────────────────── */
+
+.workflow-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-bg);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.workflow-panel {
+  max-width: 96vw;
+  max-height: 90vh;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-panel);
+  position: relative;
+}
+.workflow-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+  z-index: 0;
+}
+
+.workflow-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  background: var(--surface-1);
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+}
+
+.workflow-kicker {
+  color: var(--text-main);
+  font-weight: 650;
+  font-size: 13px;
+}
+
+.workflow-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.workflow-route-banner {
+  font-size: 10px;
+  color: var(--accent);
+  flex-shrink: 0;
+  background: var(--accent-soft);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+}
+
+/* ── Workflow canvas ──────────────────────────────────────────────────────── */
+
+.workflow-canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--surface-0);
+  background-image:
+    radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.018) 0%, transparent 68%),
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px;
+  background-position: 0 0, -0.5px -0.5px, -0.5px -0.5px;
+}
+
+[data-theme="light"] .workflow-canvas {
+  background-image:
+    radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.015) 0%, transparent 68%),
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+}
+
+.workflow-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.workflow-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 10px;
+  letter-spacing: 0.2px;
+  pointer-events: none;
+}
+
+/* ── Workflow edges ───────────────────────────────────────────────────────── */
+
+.workflow-edge-halo {
+  stroke: var(--surface-1);
+  stroke-opacity: 0.4;
+  fill: none;
+}
+
+.workflow-edge {
+  stroke: var(--border-strong);
+  fill: none;
+}
+
+.workflow-edge--route {
+  stroke: var(--accent);
+  stroke-dasharray: 5 3;
+  animation: wf-route-dash 3s linear infinite;
+}
+
+@keyframes wf-route-dash {
+  to { stroke-dashoffset: -16; }
+}
+
+.workflow-edge-label-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+.workflow-edge-label-wrap--route {
+  border-color: var(--accent);
+}
+
+.workflow-edge-label {
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+.workflow-edge-label--route {
+  color: var(--accent);
+}
+
+.workflow-edge-remove {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.12s;
+  font-family: inherit;
+}
+.workflow-edge-remove:hover {
+  color: var(--danger);
+}
+
+/* ── Workflow nodes ───────────────────────────────────────────────────────── */
+
+.workflow-node {
+  position: absolute;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: grab;
+  user-select: none;
+  z-index: 1;
+  box-sizing: border-box;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.workflow-node:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.workflow-node[data-dragging="true"] {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.28);
+  cursor: grabbing;
+  z-index: 10;
+  transition: none;
+}
+
+.workflow-node[data-lifecycle="running"] {
+  border-color: var(--border-strong);
+}
+.workflow-node[data-lifecycle="spawning"] {
+  border-color: var(--warning);
+}
+.workflow-node[data-lifecycle="error"] {
+  border-color: var(--danger);
+}
+.workflow-node[data-route-source="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+  cursor: default;
+}
+.workflow-node[data-route-target="true"] {
+  cursor: pointer;
+  outline: 2px dashed var(--border-strong);
+  outline-offset: 2px;
+}
+.workflow-node[data-route-target="true"]:hover {
+  border-color: var(--accent);
+  outline-color: var(--accent);
+}
+
+.workflow-node[data-lifecycle="running"]::after,
+.workflow-node[data-lifecycle="spawning"]::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 16px;
+  border: 1px solid;
+  opacity: 0;
+  animation: wf-node-ring 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+.workflow-node[data-lifecycle="running"]::after  { border-color: var(--border-strong); }
+.workflow-node[data-lifecycle="spawning"]::after { border-color: var(--warning); }
+
+@keyframes wf-node-ring {
+  0%   { opacity: 0.5; transform: scale(1); }
+  70%  { opacity: 0;   transform: scale(1.1); }
+  100% { opacity: 0;   transform: scale(1.1); }
+}
+
+.workflow-node-avatar {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.workflow-node[data-lifecycle="dormant"] .workflow-node-avatar,
+.workflow-node[data-lifecycle="killed"]  .workflow-node-avatar,
+.workflow-node[data-lifecycle="exited"]  .workflow-node-avatar {
+  opacity: 0.32;
+}
+
+.workflow-node-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.workflow-node-title {
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-node-meta {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.workflow-kind-pill {
+  color: var(--text-muted);
+  font-size: 9px;
+  background: var(--button-bg);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.workflow-lifecycle {
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.workflow-route-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-faint);
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.workflow-route-btn:hover {
+  background: var(--button-bg);
+  color: var(--text-main);
+  border-color: var(--border-strong);
+}
+.workflow-route-btn[data-active="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--app-bg);
+}
+.workflow-route-btn[data-active="true"]:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--app-bg);
+  opacity: 0.88;
+}
+
+/* ── DinoLane ─────────────────────────────────────────────────────────────── */
+
+.dino-lane {
+  position: relative;
+  width: 100%;
+  margin-top: 0;
+  overflow: visible;
+  flex-shrink: 0;
+  background:
+    linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.008) 48%, var(--terminal-floor) 100%),
+    radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.026), transparent 66%);
+}
+.dino-lane[data-phase="egg_hatching"] {
+  background:
+    linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.014) 48%, var(--terminal-floor) 100%),
+    radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.044), transparent 66%);
+}
+
+/* ── Status dot polish ────────────────────────────────────────────────────── */
+
+.status-dot-pulse {
+  animation: pulse-glow 1.4s ease-in-out infinite;
+}
+
+/* ── Lifecycle pill ──────────────────────────────────────────────────────── */
+
+.lc-pill {
+  transition: color 0.3s, border-color 0.3s;
+}
+
+/* ── Status ring (standalone) ─────────────────────────────────────────────── */
+
+.status-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 1px solid currentColor;
+  opacity: 0;
+  animation: status-ring-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes status-ring-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%       { opacity: 0;   transform: scale(1.3); }
+}
+
+/* ── Soft entrance ────────────────────────────────────────────────────────── */
+
+@keyframes soft-enter-anim {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.soft-enter {
+  animation: soft-enter-anim 0.18s ease-out both;
+}
+
+/* ── Focus rings ─────────────────────────────────────────────────────────── */
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Prefers-reduced-motion guard ────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ── Health panel ─────────────────────────────────────────────────────────── */
+
+.health-card {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.1s;
+}
+.health-card:last-child { border-bottom: none; }
+.health-card:hover { background: var(--surface-2, rgba(255,255,255,0.02)); }
+
+.health-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+
+.health-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.health-card-name {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-main);
+}
+
+.health-card-command {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-family: "Cascadia Code", "Consolas", monospace;
+  background: var(--button-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.health-card-version {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-family: "Cascadia Code", "Consolas", monospace;
+}
+
+.health-status-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.health-card-explanation {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.health-card-hint {
+  font-size: 10px;
+  color: var(--text-faint);
+  line-height: 1.5;
+  margin: 3px 0 0;
+  font-style: italic;
+}
+
+.health-card-meta {
+  font-size: 9px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+
+/* Sidebar health dot */
+.sidebar-health-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: auto;
+}
