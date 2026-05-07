@@ -2,10 +2,10 @@ import { useState } from "react";
 import type { TerminalViewMode } from "../domain/viewMode";
 
 interface MainHeaderProps {
-  workspaceName:       string;
-  onNameChange:        (name: string) => void;
-  viewMode:            TerminalViewMode;
-  onToggleViewMode:    () => void;
+  workspaceName:        string;
+  onNameChange:         (name: string) => void;
+  viewMode:             TerminalViewMode;
+  onToggleViewMode:     () => void;
   activeTerminalLabel?: string;
 }
 
@@ -28,35 +28,48 @@ export function MainHeader({
 
   return (
     <header className="workspace-header">
-      <div className="header-context">
-        {editing ? (
-          <input
-            className="header-name-input"
-            autoFocus
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            onBlur={commitName}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commitName();
-              if (e.key === "Escape") {
-                setEditing(false);
+      <div className="header-shell">
+
+        {/* Left: workspace identity */}
+        <div className="header-identity">
+          <span className="header-kicker">workspace</span>
+          {editing ? (
+            <input
+              className="header-name-input"
+              autoFocus
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitName();
+                if (e.key === "Escape") {
+                  setEditing(false);
+                  setNameInput(workspaceName);
+                }
+              }}
+            />
+          ) : (
+            <span
+              className="header-name-display"
+              onClick={() => {
                 setNameInput(workspaceName);
-              }
-            }}
-          />
-        ) : (
-          <span
-            className="header-name-display"
-            onClick={() => {
-              setNameInput(workspaceName);
-              setEditing(true);
-            }}
-            title="Click to rename workspace"
-          >
-            {workspaceName}
-          </span>
+                setEditing(true);
+              }}
+              title="Click to rename workspace"
+            >
+              {workspaceName}
+            </span>
+          )}
+        </div>
+
+        {/* Middle: active terminal context — focus mode only */}
+        {activeTerminalLabel && viewMode === "focus" && (
+          <div className="header-active-terminal">
+            <span className="header-active-label">{activeTerminalLabel}</span>
+          </div>
         )}
 
+        {/* Right: view mode toggle — always pushed to the end */}
         <div className="header-view-toggle">
           <button
             className="header-view-btn"
@@ -74,11 +87,6 @@ export function MainHeader({
           </button>
         </div>
 
-        {activeTerminalLabel && viewMode === "focus" && (
-          <span className="header-active-label">
-            {activeTerminalLabel}
-          </span>
-        )}
       </div>
     </header>
   );

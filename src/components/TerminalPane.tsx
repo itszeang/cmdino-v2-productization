@@ -423,7 +423,7 @@ export function TerminalPane({
       {/* ── Header — lifecycle only ── */}
       <div style={{
         display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", rowGap: 6,
-        padding: "8px 10px",
+        padding: "10px 12px",
         background: "var(--surface-1)", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0,
       }}>
         <div
@@ -482,9 +482,9 @@ export function TerminalPane({
       {/* ── Orchestration strip ── */}
       <div style={{
         display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", rowGap: 6,
-        padding: "7px 10px",
+        padding: "9px 12px",
         background: "var(--surface-0)", borderBottom: "1px solid var(--border-subtle)",
-        flexShrink: 0, minHeight: 36,
+        flexShrink: 0, minHeight: 40,
       }}>
         {/* Context / Attach toggle — accent when panel is open */}
         <StripBtn

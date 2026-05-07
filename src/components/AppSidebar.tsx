@@ -170,6 +170,13 @@ export function AppSidebar({
 }: AppSidebarProps) {
   return (
     <aside className="app-sidebar">
+      {/* Brand mark — subtle product identity, not a splash banner */}
+      <div className="sidebar-brand">
+        <span className="sidebar-brand-mark">&gt;_</span>
+        <span className="sidebar-brand-title">CMDino</span>
+        <span className="sidebar-brand-subtitle">alpha</span>
+      </div>
+
       <div className="sidebar-top">
         <button
           className="sidebar-cta"
@@ -230,7 +237,7 @@ export function AppSidebar({
 
         </div>
 
-        <div className="sidebar-section">
+        <div className="sidebar-section sidebar-section--secondary">
           <div className="sidebar-label">Session</div>
           <SidebarRow icon="history" onClick={onOpenHistory} title="View session event history">
             History
@@ -253,7 +260,7 @@ export function AppSidebar({
           </SidebarRow>
         </div>
 
-        <div className="sidebar-section sidebar-section--divider">
+        <div className="sidebar-section sidebar-section--secondary sidebar-section--divider">
           <div className="sidebar-label">Share</div>
           <SidebarRow
             icon="share"
