@@ -6,6 +6,7 @@ export type SessionLogEventType =
   | "terminal_kill"
   | "terminal_exited"
   | "terminal_error"
+  | "runtime_error"
   | "terminal_output"
   | "terminal_removed"
   | "manual_send"

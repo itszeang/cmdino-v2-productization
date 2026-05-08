@@ -465,6 +465,7 @@ export default function App() {
               generatedOutputFiles={outputFiles}
               onRefreshGeneratedOutputs={() => { void refreshOutputFiles(); }}
               onRegisterPaneRef={handleRegisterPaneRef}
+              onOpenHealth={() => setShowHealth(true)}
             />
           )}
         </section>
@@ -493,7 +494,7 @@ export default function App() {
         );
       })()}
 
-      {/* First-launch mission briefing — only when no agents are loaded */}
+      {/* First-launch setup screen — only when no agents are loaded */}
       {!settings.onboardingDismissed && count === 0 && (
         <WelcomeModal
           onDismiss={(dontShow) => updateSettings({ onboardingDismissed: dontShow })}
@@ -503,6 +504,8 @@ export default function App() {
           }}
           onDeployAgent={() => setShowModal(true)}
           onLoadTemplate={() => setShowTemplatePicker(true)}
+          providerHealth={healthSnapshot}
+          onOpenHealth={() => setShowHealth(true)}
         />
       )}
 

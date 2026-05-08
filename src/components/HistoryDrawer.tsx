@@ -9,14 +9,14 @@ const FILTER_TYPES: Record<FilterTab, SessionLogEventType[]> = {
   all:      [],
   commands: ["terminal_start", "terminal_restart", "terminal_kill", "terminal_exited", "terminal_error", "terminal_removed"],
   handoffs: ["manual_handoff", "auto_forward", "manual_send", "preset_brain_send"],
-  errors:   ["terminal_error"],
+  errors:   ["terminal_error", "runtime_error"],
   workspace: ["workspace_saved", "workspace_loaded", "agent_created"],
 };
 
 // ── Event display helpers ─────────────────────────────────────────────────────
 
 function badgeColor(type: SessionLogEventType): string {
-  if (type === "terminal_error") return "#f87171";
+  if (type === "terminal_error" || type === "runtime_error") return "#f87171";
   if (["terminal_start","terminal_restart","terminal_kill","terminal_exited","terminal_removed"].includes(type))
     return "#60a5fa";
   if (["manual_handoff","auto_forward","manual_send","preset_brain_send"].includes(type))
@@ -35,6 +35,7 @@ function badgeLabel(type: SessionLogEventType): string {
     terminal_kill:    "KILLED",
     terminal_exited:  "EXITED",
     terminal_error:   "ERROR",
+    runtime_error:    "RUNTIME",
     terminal_removed: "REMOVED",
     manual_send:      "SEND",
     preset_brain_send:"BRAIN",
@@ -54,6 +55,12 @@ function eventMessage(ev: SessionLogEvent): string {
     case "terminal_kill":    return "Killed by user";
     case "terminal_exited":  return "Process exited";
     case "terminal_error":   return "Process error";
+    case "runtime_error":
+      return ev.payload.title
+        ? String(ev.payload.title)
+        : ev.payload.kind
+        ? `Runtime error: ${String(ev.payload.kind).replace(/_/g, " ")}`
+        : "Runtime error";
     case "terminal_removed": return "Terminal removed";
     case "manual_handoff":
       return ev.payload.targetLabel

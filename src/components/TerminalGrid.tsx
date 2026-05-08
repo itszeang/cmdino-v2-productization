@@ -39,6 +39,7 @@ interface Props {
   generatedOutputFiles?:        GeneratedOutputFile[];
   onRefreshGeneratedOutputs?:   () => void;
   onRegisterPaneRef?:           (agentId: string, el: HTMLElement | null) => void;
+  onOpenHealth?:                () => void;
 }
 
 export function TerminalGrid({
@@ -53,6 +54,7 @@ export function TerminalGrid({
   generatedOutputFiles = [],
   onRefreshGeneratedOutputs,
   onRegisterPaneRef,
+  onOpenHealth,
 }: Props) {
   // Grid mode needs dynamic column/row counts — set as inline style only in grid mode.
   // Focus mode: no inline style on layout div (CSS class handles everything).
@@ -125,6 +127,7 @@ export function TerminalGrid({
                   generatedOutputFiles={generatedOutputFiles}
                   onRefreshGeneratedOutputs={onRefreshGeneratedOutputs}
                   onRegisterPaneRef={onRegisterPaneRef}
+                  onOpenHealth={onOpenHealth}
                 />
               </div>
             );

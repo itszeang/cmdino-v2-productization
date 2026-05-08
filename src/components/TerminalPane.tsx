@@ -4,6 +4,7 @@ import { DinoLane, type DinoVisualPhase } from "../dino/DinoLane";
 import { LogsPanel }       from "./LogsPanel";
 import { HandoffModal }    from "./HandoffModal";
 import { AttachmentPanel } from "./AttachmentPanel";
+import { RuntimeErrorCard } from "./RuntimeErrorCard";
 import type { TerminalAgent }   from "../domain/terminalAgent";
 import { fileBridge }      from "../orchestration/fileBridge";
 import type { WorkflowLink, WorkflowLinkKind } from "../domain/workflow";
@@ -132,6 +133,7 @@ interface Props {
   generatedOutputFiles?:          GeneratedOutputFile[];
   onRefreshGeneratedOutputs?:     () => void;
   onRegisterPaneRef?:             (agentId: string, el: HTMLElement | null) => void;
+  onOpenHealth?:                  () => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -149,6 +151,7 @@ export function TerminalPane({
   generatedOutputFiles = [],
   onRefreshGeneratedOutputs,
   onRegisterPaneRef,
+  onOpenHealth,
 }: Props) {
   const containerRef      = useRef<HTMLDivElement>(null);
   const paneRootRef       = useRef<HTMLDivElement>(null);
@@ -157,6 +160,7 @@ export function TerminalPane({
 
   const {
     dinoState, lifecycle,
+    lastRuntimeError, dismissRuntimeError,
     copyVisible, restart, kill,
     getSessionLogs, focusTerminal,
     sendInput, captureSelectedOrLastLines, captureLastOutputBlock,
@@ -203,6 +207,35 @@ export function TerminalPane({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent.id, agent.configId, agent.label, lifecycle, onLifecycleChange, onEvent]);
+
+  // Emit session log when a runtime error surfaces (dedup by occurredAt)
+  const lastEmittedErrorAtRef = useRef<number>(0);
+  useEffect(() => {
+    if (!lastRuntimeError) return;
+    if (lastRuntimeError.occurredAt === lastEmittedErrorAtRef.current) return;
+    // Only log high/medium confidence errors
+    if (lastRuntimeError.confidence === "low") return;
+    lastEmittedErrorAtRef.current = lastRuntimeError.occurredAt;
+    onEvent?.({
+      id: crypto.randomUUID(),
+      ts: lastRuntimeError.occurredAt,
+      workspaceId: "",
+      agentConfigId: agent.configId,
+      agentLabel: agent.label,
+      type: "runtime_error",
+      payload: {
+        kind:       lastRuntimeError.kind,
+        title:      lastRuntimeError.title,
+        message:    lastRuntimeError.message,
+        nextAction: lastRuntimeError.nextAction,
+        confidence: lastRuntimeError.confidence,
+        source:     lastRuntimeError.source,
+        rawSummary: lastRuntimeError.rawSummary,
+        exitCode:   lastRuntimeError.exitCode,
+      },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastRuntimeError, agent.configId, agent.label, onEvent]);
 
   // Register transcript getter so App-level export can read this pane's buffer
   useEffect(() => {
@@ -264,6 +297,7 @@ export function TerminalPane({
   const [showLogs,          setShowLogs]          = useState(false);
   const [handoffCapture,    setHandoffCapture]    = useState<string | null>(null);
   const [readinessChecking, setReadinessChecking] = useState(false);
+  const [restarting,        setRestarting]        = useState(false);
   const [showAttPanel,      setShowAttPanel]      = useState(false);
 
   // Forward state
@@ -386,16 +420,23 @@ export function TerminalPane({
   }
 
   async function handleRestart() {
+    // Guard against double-click and re-entry during restart / readiness check
+    if (restarting || readinessChecking) return;
     if (isAlive && !window.confirm(`Restart "${agent.label}"?`)) return;
     isRestartingRef.current = true;
-    // Validate before killing the current session.
-    const ok = await runReadinessAndStart();
-    if (ok) {
-      await restart();
-    } else {
-      isRestartingRef.current = false;
+    setRestarting(true);
+    try {
+      // Validate before killing the current session.
+      const ok = await runReadinessAndStart();
+      if (ok) {
+        await restart();
+      } else {
+        isRestartingRef.current = false;
+      }
+      // If !ok: error is shown; current running PTY stays alive.
+    } finally {
+      setRestarting(false);
     }
-    // If !ok: error is shown; current running PTY stays alive.
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -491,8 +532,10 @@ export function TerminalPane({
           <HdrBtn title="Copy visible output" onClick={() => { void copyVisible(); }}>⎘</HdrBtn>
           <HdrBtn title="View session logs" onClick={() => setShowLogs(true)}
             onMouseDown={(e) => e.preventDefault()}>≡</HdrBtn>
-          <HdrBtn title={readinessChecking ? "Checking…" : "Restart terminal"}
-            onClick={() => { if (!readinessChecking) void handleRestart(); }}>↺</HdrBtn>
+          <HdrBtn
+            title={readinessChecking ? "Checking…" : restarting ? "Starting…" : "Restart terminal"}
+            onClick={() => { if (!readinessChecking && !restarting) void handleRestart(); }}
+          >↺</HdrBtn>
           <span className="pane-strip-sep" />
           {onFocus && (
             <HdrBtn
@@ -570,6 +613,18 @@ export function TerminalPane({
           </div>
         )}
 
+        {/* Runtime error — compact strip above xterm when process is running */}
+        {lastRuntimeError && isRunning && lastRuntimeError.confidence !== "low" && (
+          <RuntimeErrorCard
+            error={lastRuntimeError}
+            variant="strip"
+            onRetry={() => { void handleRestart(); }}
+            onSettings={() => onEditAgent(agent.id)}
+            onOpenHealth={onOpenHealth}
+            onDismiss={dismissRuntimeError}
+          />
+        )}
+
         {isRunning ? (
           <div ref={containerRef} style={{ flex: 1, overflow: "hidden", minHeight: 0 }} />
         ) : readinessError ? (
@@ -595,6 +650,22 @@ export function TerminalPane({
                 </button>
               </div>
             </div>
+          </div>
+        ) : lastRuntimeError && lastRuntimeError.confidence !== "low" ? (
+          /* Non-running pane with runtime error: centered panel */
+          <div style={{
+            flex: 1, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            gap: 0, minHeight: 0, padding: "0 16px",
+          }}>
+            <RuntimeErrorCard
+              error={lastRuntimeError}
+              variant="panel"
+              onRetry={() => { void handleStart(); }}
+              onSettings={() => onEditAgent(agent.id)}
+              onOpenHealth={onOpenHealth}
+              onDismiss={dismissRuntimeError}
+            />
           </div>
         ) : (
           <div style={{

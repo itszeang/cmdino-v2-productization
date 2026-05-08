@@ -1729,7 +1729,7 @@ input[type="range"]::-webkit-slider-track {
 }
 .cmd-modal-panel--wide    { width: 600px; }
 .cmd-modal-panel--compact { width: 360px; }
-.cmd-modal-panel--welcome { width: 560px; }
+.cmd-modal-panel--welcome { width: 620px; }
 
 .cmd-modal-header {
   display: flex;

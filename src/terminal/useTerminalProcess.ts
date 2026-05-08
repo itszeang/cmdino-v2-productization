@@ -19,6 +19,13 @@ import { inferAgentKind } from "../domain/agentKind";
 import type { ThemeMode } from "../domain/appSettings";
 import { getXtermTheme } from "../config/themeTokens";
 import type { DinoState } from "./dinoStateMachine";
+import type { RuntimeErrorInfo } from "../domain/runtimeError";
+import {
+  classifySpawnError,
+  classifyOutputWhileRunning,
+  classifyOutputAfterExit,
+  classifyExitEvent,
+} from "./runtimeErrorClassifier";
 
 export type TerminalLifecycleState =
   | "dormant"
@@ -64,6 +71,8 @@ export interface TerminalProcessHandle {
   lifecycle: TerminalLifecycleState;
   /** Derived: lifecycle === "running" */
   ready: boolean;
+  lastRuntimeError: RuntimeErrorInfo | null;
+  dismissRuntimeError: () => void;
   copyVisible: () => Promise<void>;
   restart: () => Promise<void>;
   kill: () => Promise<void>;
@@ -88,20 +97,28 @@ export function useTerminalProcess({
   enabled = true,
   fontScale = 1,
 }: Options): TerminalProcessHandle {
-  const [dinoState, setDinoState] = useState<DinoState>("idle_center");
-  const [lifecycle, setLifecycle] = useState<TerminalLifecycleState>("spawning");
+  const [dinoState, setDinoState]               = useState<DinoState>("idle_center");
+  const [lifecycle, setLifecycle]               = useState<TerminalLifecycleState>("spawning");
+  const [lastRuntimeError, setLastRuntimeError] = useState<RuntimeErrorInfo | null>(null);
 
-  const dinoStateRef         = useRef<DinoState>("idle_center");
-  const termRef              = useRef<Terminal | null>(null);
-  const fitAddonRef          = useRef<FitAddon | null>(null);
-  const logsRef              = useRef<string>("");
-  const recentOutputRef      = useRef<string>("");
-  const lastOutputBlockRef   = useRef<string>("");   // stripped output since last user input
-  const resetOnNextChunkRef  = useRef<boolean>(false); // true after user sends input
-  const restartInProgressRef = useRef(false);
-  const idleTimerRef         = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const burstRef             = useRef<BurstTracker>(createBurstTracker());
-  const processAliveRef      = useRef(false);
+  const dinoStateRef              = useRef<DinoState>("idle_center");
+  const termRef                   = useRef<Terminal | null>(null);
+  const fitAddonRef               = useRef<FitAddon | null>(null);
+  const logsRef                   = useRef<string>("");
+  const recentOutputRef           = useRef<string>("");
+  const lastOutputBlockRef        = useRef<string>("");   // stripped output since last user input
+  const resetOnNextChunkRef       = useRef<boolean>(false); // true after user sends input
+  const restartInProgressRef      = useRef(false);
+  const idleTimerRef              = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const burstRef                  = useRef<BurstTracker>(createBurstTracker());
+  const processAliveRef           = useRef(false);
+  const lastRuntimeErrorRef       = useRef<RuntimeErrorInfo | null>(null);
+  const outputErrorKindRef        = useRef<string | null>(null);
+
+  const setError = useCallback((err: RuntimeErrorInfo | null) => {
+    lastRuntimeErrorRef.current = err;
+    setLastRuntimeError(err);
+  }, []);
 
   // ── Intelligence helpers ──────────────────────────────────────────────────
 
@@ -132,6 +149,7 @@ export function useTerminalProcess({
     lastOutputBlockRef.current   = "";
     resetOnNextChunkRef.current  = false;
     processAliveRef.current      = false;
+    outputErrorKindRef.current   = null;
   }, [clearIdleTimer]);
 
   const classifyWithFallback = useCallback((
@@ -267,6 +285,12 @@ export function useTerminalProcess({
     }
   }, []);
 
+  const dismissRuntimeError = useCallback(() => {
+    // Reset outputErrorKindRef so the same error kind can re-fire after dismiss
+    outputErrorKindRef.current = null;
+    setError(null);
+  }, [setError]);
+
   const kill = useCallback(async () => {
     clearIdleTimer();
     processAliveRef.current = false;
@@ -281,10 +305,18 @@ export function useTerminalProcess({
     restartInProgressRef.current = true;
 
     const t = termRef.current;
+    let spawnSucceeded = false;
     try {
       resetIntelligence();
+      setError(null);
       _spawnedAgentIds.delete(agentId);
       await terminalBridge.kill(agentId).catch(() => {});
+
+      // Brief pause after kill — gives Windows PTY resources time to release
+      // before the new spawn. Without this, spawn can return "already_running"
+      // or race with a delayed terminal:exit from the old session.
+      await new Promise<void>((resolve) => setTimeout(resolve, 180));
+
       logsRef.current = "";
       t?.clear();
       t?.focus();
@@ -299,6 +331,7 @@ export function useTerminalProcess({
 
       _spawnedAgentIds.add(agentId);
       processAliveRef.current = true;
+      spawnSucceeded = true;
       setLifecycle("running");
       t.focus();
 
@@ -309,15 +342,25 @@ export function useTerminalProcess({
           terminalBridge.write(agentId, launchCommand.trim() + "\r").catch(() => {});
         }, 300);
       }
+
+      // Grace period: keep restartInProgressRef true so that any delayed
+      // terminal:exit from the old session (arriving after spawn completes)
+      // is ignored by the onExit handler. Without this, Gemini and other
+      // slow-exiting processes can corrupt lifecycle back to "exited".
+      setTimeout(() => { restartInProgressRef.current = false; }, 600);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       t?.write(`\r\n\x1b[31m[CMDino restart failed: ${msg}]\x1b[0m\r\n`);
+      setError(classifySpawnError(msg));
       setLifecycle("error");
       setDino("terminal_error");
     } finally {
-      restartInProgressRef.current = false;
+      // Only reset immediately on failure; success path uses the 600ms grace timer above.
+      if (!spawnSucceeded) {
+        restartInProgressRef.current = false;
+      }
     }
-  }, [agentId, cwd, launchCommand, resetIntelligence, setDino]);
+  }, [agentId, cwd, launchCommand, resetIntelligence, setDino, setError]);
 
   // ── Terminal lifecycle effect ─────────────────────────────────────────────
 
@@ -461,6 +504,14 @@ export function useTerminalProcess({
         } else {
           scheduleIdle();
         }
+
+        // High-confidence output classification (running process only)
+        const recentSlice = normalizedRecentOutput.slice(-2000);
+        const outputErr = classifyOutputWhileRunning(recentSlice);
+        if (outputErr !== null && outputErr.kind !== outputErrorKindRef.current) {
+          outputErrorKindRef.current = outputErr.kind;
+          setError(outputErr);
+        }
       })
       .then((fn) => { if (!active) fn(); else unlistens.data = fn; })
       .catch(() => {
@@ -487,6 +538,17 @@ export function useTerminalProcess({
           term.write(`\r\n\x1b[2m[process ${label}]\x1b[0m\r\n`);
         } catch {
           // Terminal may already be disposed during a webview remount.
+        }
+
+        // Classify exit — don't override an existing high-confidence output error
+        if (ev.reason !== "killed") {
+          const existing = lastRuntimeErrorRef.current;
+          if (!existing || existing.confidence !== "high") {
+            const recentSlice = stripAnsi(recentOutputRef.current).slice(-2000);
+            const outputErr   = classifyOutputAfterExit(recentSlice);
+            const chosenErr   = outputErr ?? classifyExitEvent(ev.reason, ev.code ?? null);
+            if (chosenErr) setError(chosenErr);
+          }
         }
       })
       .then((fn) => { if (!active) fn(); else unlistens.exit = fn; })
@@ -521,6 +583,7 @@ export function useTerminalProcess({
           if (!active) return;
           _spawnedAgentIds.add(agentId);
           processAliveRef.current = true;
+          setError(null);
           setLifecycle("running");
           // Only send launchCommand on a genuinely new PTY.
           // "already_running" means a live session is being reattached —
@@ -540,6 +603,7 @@ export function useTerminalProcess({
           } catch {
             // Terminal may already be disposed during teardown.
           }
+          setError(classifySpawnError(msg));
           setLifecycle("error");
           setDino("terminal_error");
         });
@@ -568,6 +632,8 @@ export function useTerminalProcess({
     dinoState,
     lifecycle,
     ready: lifecycle === "running",
+    lastRuntimeError,
+    dismissRuntimeError,
     copyVisible,
     restart,
     kill,
