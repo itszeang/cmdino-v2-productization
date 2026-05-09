@@ -1,14 +1,43 @@
+import { useState } from "react";
+import { ContinuationPanel } from "./ContinuationPanel";
+import type { LastSessionRecord } from "../domain/lastSession";
+import type { GeneratedOutputFile } from "../domain/attachments";
+
 interface Props {
-  maxTerminals:   number;
-  onDeployAgent:  () => void;
-  onLoadDemo:     () => void;
-  onLoadTemplate: () => void;
+  maxTerminals:         number;
+  onDeployAgent:        () => void;
+  onLoadDemo:           () => void;
+  onLoadTemplate:       () => void;
+  lastSession?:         LastSessionRecord | null;
+  outputFiles?:         GeneratedOutputFile[];
+  onViewOutputs?:       () => void;
+  onLoadLastWorkspace?: () => Promise<void>;
 }
 
-export function EmptyWorkspaceState({ onDeployAgent, onLoadDemo, onLoadTemplate }: Props) {
+export function EmptyWorkspaceState({
+  onDeployAgent, onLoadDemo, onLoadTemplate,
+  lastSession, outputFiles = [], onViewOutputs, onLoadLastWorkspace,
+}: Props) {
+  const [continuationDismissed, setContinuationDismissed] = useState(false);
+
+  const showContinuation = !!lastSession && !continuationDismissed && !!onLoadLastWorkspace;
+
   return (
     <div className="empty-ws">
       <div className="empty-ws-inner">
+
+        {/* Continuation panel — shown above existing actions for returning users */}
+        {showContinuation && (
+          <div style={{ marginBottom: 20, width: "100%", display: "flex", justifyContent: "center" }}>
+            <ContinuationPanel
+              session={lastSession!}
+              outputFiles={outputFiles}
+              onViewOutputs={onViewOutputs}
+              onLoad={onLoadLastWorkspace!}
+              onDismiss={() => setContinuationDismissed(true)}
+            />
+          </div>
+        )}
 
         <img
           src="/app-icon.png"

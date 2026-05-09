@@ -9,6 +9,8 @@ import { WorkflowPanel }       from "./components/WorkflowPanel";
 import { SettingsPanel }       from "./components/SettingsPanel";
 import { WelcomeModal }        from "./components/WelcomeModal";
 import { HistoryDrawer }       from "./components/HistoryDrawer";
+import { OutputLibraryDrawer } from "./components/OutputLibraryDrawer";
+import { ConfirmDialog }       from "./components/ConfirmDialog";
 import { TemplatePickerModal } from "./components/TemplatePickerModal";
 import { useTerminalAgents, MAX_TERMINALS } from "./state/useTerminalAgents";
 import { useAppSettings }      from "./state/useAppSettings";
@@ -32,6 +34,8 @@ import { buildMemoryBriefs } from "./domain/memoryBrief";
 import { buildTranscriptFiles } from "./domain/transcriptExport";
 import { writeMemoryBriefs, writeOutputFiles, listOutputFiles } from "./memory/memoryBriefBridge";
 import { buildPublicExportKit } from "./domain/buildPublicExport";
+import { saveLastSession, loadLastSession, clearLastSession } from "./domain/lastSession";
+import type { LastSessionRecord } from "./domain/lastSession";
 
 const isTauri = Boolean(
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
@@ -79,6 +83,11 @@ export default function App() {
   const [outputFiles,         setOutputFiles]         = useState<GeneratedOutputFile[]>([]);
   const [showTemplatePicker,  setShowTemplatePicker]  = useState(false);
   const [showHealth,          setShowHealth]          = useState(false);
+  const [showOutputLibrary,   setShowOutputLibrary]   = useState(false);
+  const [lastSession,         setLastSession]         = useState<LastSessionRecord | null>(() => loadLastSession());
+  const [confirmDialog,       setConfirmDialog]       = useState<{
+    title: string; body: string; confirmLabel: string; destructive: boolean; onConfirm: () => void;
+  } | null>(null);
 
   const transcriptGettersRef = useRef<Map<string, () => string>>(new Map());
   const paneRefsMap          = useRef<Map<string, HTMLElement>>(new Map());
@@ -226,6 +235,20 @@ export default function App() {
       await refreshList();
       appendEvent({ id: crypto.randomUUID(), ts: Date.now(), workspaceId: workspaceName,
         agentConfigId: "", agentLabel: "", type: "workspace_saved", payload: { name: workspaceName } });
+      const lastEv = sessionEntries[sessionEntries.length - 1];
+      const record: LastSessionRecord = {
+        workspaceName,
+        workspaceSlug:   fileName,
+        savedAt:         Date.now(),
+        agentCount:      agents.length,
+        agentLabels:     agents.slice(0, 5).map((a) => a.label),
+        outputCount:     outputFiles.length,
+        lastEventType:   lastEv?.type,
+        lastEventLabel:  lastEv?.agentLabel,
+        lastEventAt:     lastEv?.ts,
+      };
+      saveLastSession(record);
+      setLastSession(record);
     } catch (err) {
       alert(`Save failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -245,10 +268,50 @@ export default function App() {
       loadWorkspaceConfig(validated);
       appendEvent({ id: crypto.randomUUID(), ts: Date.now(), workspaceId: name,
         agentConfigId: "", agentLabel: "", type: "workspace_loaded", payload: { name } });
+      const lastEv = sessionEntries[sessionEntries.length - 1];
+      const record: LastSessionRecord = {
+        workspaceName:   validated.workspaceName,
+        workspaceSlug:   name,
+        savedAt:         Date.now(),
+        agentCount:      validated.terminals.length,
+        agentLabels:     validated.terminals.slice(0, 5).map((t) => t.label),
+        outputCount:     outputFiles.length,
+        lastEventType:   lastEv?.type,
+        lastEventLabel:  lastEv?.agentLabel,
+        lastEventAt:     lastEv?.ts,
+      };
+      saveLastSession(record);
+      setLastSession(record);
     } catch (err) {
       alert(`Load failed: ${err instanceof Error ? err.message : String(err)}`);
       await refreshList();
     }
+  }
+
+  function handleDeleteWorkspace(name: string) {
+    if (!isTauri) { alert("Workspace management requires the desktop app."); return; }
+    setConfirmDialog({
+      title:        "Delete workspace?",
+      body:         `This removes "${name}" from saved local workspaces. Running or loaded agents in the current window are not deleted.`,
+      confirmLabel: "Delete",
+      destructive:  true,
+      onConfirm: () => {
+        setConfirmDialog(null);
+        workspaceBridge.delete(name)
+          .then(() => refreshList())
+          .then(() => {
+            if (lastSession?.workspaceSlug === name) {
+              clearLastSession();
+              setLastSession(null);
+            }
+            setExportNotice(`Workspace "${name}" deleted`);
+            setTimeout(() => setExportNotice(null), 4000);
+          })
+          .catch((err: unknown) => {
+            alert(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+          });
+      },
+    });
   }
 
   // ── Memory briefs ─────────────────────────────────────────────────────────
@@ -410,6 +473,9 @@ export default function App() {
         onExportTranscripts={() => { void handleExportTranscripts(); }}
         onGenerateBuildUpdateKit={() => { void handleGenerateBuildUpdateKit(); }}
         canGenerateBuildKit={agents.length > 0 || sessionEntries.length > 0}
+        onOpenOutputLibrary={() => setShowOutputLibrary(true)}
+        outputFileCount={outputFiles.length}
+        onDeleteWorkspace={handleDeleteWorkspace}
         terminalCount={count}
         maxTerminals={MAX_TERMINALS}
         maxReached={maxReached}
@@ -437,6 +503,14 @@ export default function App() {
               onDeployAgent={() => setShowModal(true)}
               onLoadDemo={loadDemoWorkspace}
               onLoadTemplate={() => setShowTemplatePicker(true)}
+              lastSession={lastSession}
+              outputFiles={outputFiles}
+              onViewOutputs={outputFiles.length > 0 ? () => setShowOutputLibrary(true) : undefined}
+              onLoadLastWorkspace={
+                lastSession
+                  ? async () => { await handleLoad(lastSession.workspaceSlug); }
+                  : undefined
+              }
             />
           ) : (
             <TerminalGrid
@@ -554,6 +628,30 @@ export default function App() {
         <TemplatePickerModal
           onSelect={handleLoadTemplate}
           onClose={() => setShowTemplatePicker(false)}
+        />
+      )}
+
+      {/* Output Library drawer */}
+      {showOutputLibrary && (
+        <OutputLibraryDrawer
+          outputFiles={outputFiles}
+          agents={agents}
+          activeTerminalId={activeTerminalId}
+          onAttach={addAttachment}
+          onRefresh={() => { void refreshOutputFiles(); }}
+          onClose={() => setShowOutputLibrary(false)}
+        />
+      )}
+
+      {/* Confirmation dialog */}
+      {confirmDialog && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          body={confirmDialog.body}
+          confirmLabel={confirmDialog.confirmLabel}
+          destructive={confirmDialog.destructive}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
         />
       )}
 

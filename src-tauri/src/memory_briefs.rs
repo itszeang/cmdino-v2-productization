@@ -138,3 +138,30 @@ pub fn write_memory_briefs(
         count: written.len(),
     })
 }
+
+#[tauri::command]
+pub fn delete_output_file(
+    app: tauri::AppHandle,
+    file_name: String,
+) -> Result<bool, String> {
+    let safe_name = sanitize_file_name(&file_name);
+    if !safe_name.ends_with(".md") && !safe_name.ends_with(".txt") {
+        return Err(format!("Only .md and .txt files may be deleted: {safe_name}"));
+    }
+    let dir  = outputs_dir(&app)?;
+    let path = dir.join(&safe_name);
+    if !path.exists() {
+        return Ok(false);
+    }
+    if path.is_dir() {
+        return Err(format!("Expected a file, found directory: {}", path.display()));
+    }
+    // Canonical parent check — reject any path that escapes the outputs dir.
+    if let (Ok(cp), Ok(cd)) = (path.canonicalize(), dir.canonicalize()) {
+        if cp.parent() != Some(cd.as_path()) {
+            return Err("Path escapes outputs directory".to_string());
+        }
+    }
+    fs::remove_file(&path).map_err(|e| format!("delete output: {e}"))?;
+    Ok(true)
+}

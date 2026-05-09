@@ -15,4 +15,9 @@ export const workspaceBridge = {
   list(): Promise<string[]> {
     return invoke<string[]>("list_workspace_files");
   },
+
+  /** Delete a saved workspace by name slug. Returns true if deleted, false if not found. */
+  delete(fileName: string): Promise<boolean> {
+    return invoke<boolean>("delete_workspace_file", { fileName });
+  },
 };

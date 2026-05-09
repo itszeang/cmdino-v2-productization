@@ -28,3 +28,8 @@ export function writeOutputFiles(files: OutputFileInput[]): Promise<MemoryBriefW
 export function listOutputFiles(): Promise<GeneratedOutputFile[]> {
   return invoke<GeneratedOutputFile[]>("list_output_files");
 }
+
+/** Delete a generated output file by fileName. Returns true if deleted, false if not found. */
+export function deleteOutputFile(fileName: string): Promise<boolean> {
+  return invoke<boolean>("delete_output_file", { fileName });
+}

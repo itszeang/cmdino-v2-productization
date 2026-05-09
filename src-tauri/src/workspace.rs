@@ -65,3 +65,20 @@ pub fn list_workspace_files(app: tauri::AppHandle) -> Result<Vec<String>, String
     names.sort();
     Ok(names)
 }
+
+#[tauri::command]
+pub fn delete_workspace_file(
+    app: tauri::AppHandle,
+    file_name: String,
+) -> Result<bool, String> {
+    let dir  = workspaces_dir(&app)?;
+    let path = dir.join(to_file_name(&file_name));
+    if !path.exists() {
+        return Ok(false);
+    }
+    if path.is_dir() {
+        return Err(format!("Expected a file, found directory: {}", path.display()));
+    }
+    fs::remove_file(&path).map_err(|e| format!("delete workspace: {e}"))?;
+    Ok(true)
+}

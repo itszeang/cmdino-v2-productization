@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { HealthSnapshot, HealthStatus } from "../domain/health";
 
@@ -47,6 +48,9 @@ interface AppSidebarProps {
   onExportTranscripts:       () => void;
   onGenerateBuildUpdateKit:  () => void;
   canGenerateBuildKit:       boolean;
+  onOpenOutputLibrary:       () => void;
+  outputFileCount:           number;
+  onDeleteWorkspace:         (name: string) => void;
   terminalCount:             number;
   maxTerminals:              number;
   maxReached:                boolean;
@@ -65,7 +69,8 @@ type SidebarIconName =
   | "history"
   | "memory"
   | "transcript"
-  | "share";
+  | "share"
+  | "library";
 
 function SidebarIcon({ name }: { name: SidebarIconName }) {
   const common = {
@@ -165,6 +170,15 @@ function SidebarIcon({ name }: { name: SidebarIconName }) {
       {name === "health" && (
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" {...common} />
       )}
+      {name === "library" && (
+        <>
+          <rect x="3" y="3" width="7" height="7" rx="1" {...common} />
+          <rect x="14" y="3" width="7" height="7" rx="1" {...common} />
+          <rect x="3" y="14" width="7" height="7" rx="1" {...common} />
+          <path d="M14 17.5h7" {...common} />
+          <path d="M17.5 14v7" {...common} />
+        </>
+      )}
     </svg>
   );
 }
@@ -201,11 +215,16 @@ export function AppSidebar({
   onExportTranscripts,
   onGenerateBuildUpdateKit,
   canGenerateBuildKit,
+  onOpenOutputLibrary,
+  outputFileCount,
+  onDeleteWorkspace,
   terminalCount,
   maxTerminals,
   maxReached,
   healthSnapshot,
 }: AppSidebarProps) {
+  const [selectedWorkspace, setSelectedWorkspace] = useState("");
+
   return (
     <aside className="app-sidebar">
       {/* Brand mark — subtle product identity, not a splash banner */}
@@ -262,14 +281,34 @@ export function AppSidebar({
             Save
           </SidebarRow>
 
+          <SidebarRow
+            icon="library"
+            onClick={onOpenOutputLibrary}
+            title={outputFileCount > 0 ? `Browse ${outputFileCount} generated file${outputFileCount !== 1 ? "s" : ""}` : "Browse generated output files"}
+          >
+            Output Library
+            {outputFileCount > 0 && (
+              <span style={{
+                marginLeft: "auto",
+                fontSize: 9, fontWeight: 700,
+                color: "var(--text-faint)",
+                background: "var(--surface-2, rgba(255,255,255,0.06))",
+                border: "1px solid var(--border-subtle)",
+                borderRadius: 999, padding: "1px 5px",
+              }}>
+                {outputFileCount}
+              </span>
+            )}
+          </SidebarRow>
+
           <div className="sidebar-select-wrapper" title="Load a saved workspace">
             <SidebarIcon name="load" />
             <span className="sidebar-select-label">Load Workspace</span>
             <span className="sidebar-select-arrow">v</span>
             <select
               className="sidebar-select-native"
-              value=""
-              onChange={(e) => { if (e.target.value) onLoad(e.target.value); }}
+              value={selectedWorkspace}
+              onChange={(e) => setSelectedWorkspace(e.target.value)}
               onFocus={onRefreshList}
             >
               <option value="" disabled>
@@ -279,6 +318,26 @@ export function AppSidebar({
                 <option key={name} value={name}>{name}</option>
               ))}
             </select>
+          </div>
+          <div style={{ display: "flex", gap: 4, padding: "2px 8px 4px" }}>
+            <button
+              className="cmd-pill-btn"
+              style={{ flex: 1, fontSize: 10, padding: "4px 6px" }}
+              disabled={!selectedWorkspace}
+              title={selectedWorkspace ? `Load "${selectedWorkspace}"` : "Select a workspace first"}
+              onClick={() => { if (selectedWorkspace) onLoad(selectedWorkspace); }}
+            >
+              Load
+            </button>
+            <button
+              className="cmd-pill-btn cmd-pill-btn--danger"
+              style={{ fontSize: 10, padding: "4px 8px" }}
+              disabled={!selectedWorkspace}
+              title={selectedWorkspace ? `Delete "${selectedWorkspace}"` : "Select a workspace first"}
+              onClick={() => { if (selectedWorkspace) { onDeleteWorkspace(selectedWorkspace); setSelectedWorkspace(""); } }}
+            >
+              Delete
+            </button>
           </div>
 
         </div>

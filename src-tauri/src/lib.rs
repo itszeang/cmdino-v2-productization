@@ -7,10 +7,10 @@ mod memory_briefs;
 use terminal::{
     kill_terminal, resize_terminal, spawn_terminal, write_terminal, TerminalState,
 };
-use workspace::{list_workspace_files, load_workspace_file, save_workspace_file};
+use workspace::{list_workspace_files, load_workspace_file, save_workspace_file, delete_workspace_file};
 use files::{read_file_preview, read_preset_brain};
 use readiness::{check_command_available, check_directory_exists, run_health_scan};
-use memory_briefs::{write_memory_briefs, list_output_files};
+use memory_briefs::{write_memory_briefs, list_output_files, delete_output_file};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,6 +30,8 @@ pub fn run() {
             check_directory_exists,
             write_memory_briefs,
             list_output_files,
+            delete_output_file,
+            delete_workspace_file,
             run_health_scan,
         ])
         .run(tauri::generate_context!())
