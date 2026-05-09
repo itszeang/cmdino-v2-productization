@@ -42,6 +42,15 @@ CMDino does not ship Claude, Codex, Gemini, or Ollama. It orchestrates CLI tools
 
 ## Features
 
+### Product Trust Systems
+
+- **Health checks** - CMDino scans local CLI availability and surfaces provider status before deploy.
+- **Runtime error cards** - Common auth, missing command, service, and runtime failures are shown as readable in-pane actions.
+- **First-run setup** - Onboarding guides users toward Health, Templates, Demo, or first agent deployment based on local readiness.
+- **Session continuity** - The app remembers the last saved workspace and generated output count for return visits.
+- **Output Library** - Generated markdown outputs can be browsed, previewed, copied, attached, refreshed, and deleted in-app.
+- **Safe local deletion** - Saved workspaces and selected generated outputs can be deleted one at a time with confirmation; no cloud, bulk delete, or recursive delete is used.
+
 ### Terminal Workspace
 
 - **Focus / Grid view modes** — Switch between single focused pane and tiled grid. Tab bar shows all agents with status dots.

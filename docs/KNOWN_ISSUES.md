@@ -1,17 +1,18 @@
-# CMDino Alpha Known Issues
+# CMDino Known Issues
 
-Date: 2026-05-01
-Status: Known issues for V1 Alpha release prep
+Date: 2026-05-09
+Status: Phase 1 Product Trust known issues
 
-| Issue | Severity | User impact | Workaround | Status / Recommendation |
-| --- | --- | --- | --- | --- |
-| Session History logs events, not full terminal transcript or output scrollback. | Low | Users can audit actions like deploy, handoff, save/load, and errors, but cannot replay or search full terminal output from history. | Use terminal copy/log controls during the session when full output is needed. | Keep for alpha. Full scrollback persistence should be a later scoped feature. |
-| Auto Forward Lite is best with selected text; raw terminal TUI output may be noisy depending on CLI. | Medium | Forwarded context may include prompts, control text, spinners, or unrelated recent output. | Select the exact terminal text before forwarding, or use manual handoff and edit before send. | Keep for alpha. Improve terminal-output cleaning later. |
-| Visual Workflow Builder Lite supports draggable nodes and preferred route edges; no autonomous execution or scheduled workflows. Routes are preferred manual forwarding paths only. | Low | Auto Forward still requires explicit user action. Route edges express preference, not automation. | Use the ROUTE button on any node to set a preferred forward target. | By design for alpha. Autonomous execution is intentionally out of scope. |
-| No cloud sync, accounts, or team collaboration. | Low | Workspaces are local to the machine and user. | Save `.cmdino.json` workspaces manually if they need to be moved or shared. | Intentional product boundary for alpha. |
-| No license/payment gate yet. | Low | The alpha is not monetization-ready and access is not gated. | Distribute only through the intended alpha channel. | Defer until paid product phase. |
-| Terminal output depends on installed local CLI tools. | Medium | Preset agents will fail readiness checks or fail to start if `claude`, `codex`, `gemini`, `ollama`, or custom commands are not installed/authenticated. | Install and authenticate required CLIs outside CMDino, or use Custom Agent with an available command. | Expected local-first behavior. Improve onboarding copy later. |
-| Some CLI TUIs may render imperfectly in xterm.js. | Medium | Full-screen TUIs, animations, and complex control sequences may not look identical to a native terminal. | Prefer line-oriented CLI modes where available, or use simpler commands for agent workflows. | Known terminal-emulation limitation. Revisit with focused xterm compatibility testing later. |
-| Large Vite/xterm bundle chunk warning remains. | Low | Build succeeds, but the main JS chunk is larger than Vite's default 500 kB warning threshold. Initial frontend load may be heavier than ideal. | None needed for alpha. | Defer code splitting/manual chunks until after alpha unless load time becomes a real issue. |
-| Tauri bundle identifier ends with `.app`. | Low | Current Windows build succeeds. Tauri warns this is not recommended because it can conflict with macOS app bundle naming. | None needed for Windows alpha. | Rename identifier before macOS distribution. |
-| Interactive installer reinstall flow was not rerun in this pass. | Low | The latest bundles were generated and the release EXE launched, but MSI/NSIS installer UI was not stepped through during this QA pass. | Use the existing installer smoke procedure before public upload. | Keep as release checklist item. |
+| Issue | Severity | User impact | Workaround / status |
+| --- | --- | --- | --- |
+| Gemini auth cannot be safely verified automatically. | Low | Gemini can show as installed or not fully verified even when the user is authenticated. | Start the agent and handle any CLI prompt directly. Keep as an alpha limitation. |
+| CLI PATH can differ between the system shell and app environment. | Medium | A CLI that works in a user shell may be missing from the Tauri app process. | Add the CLI to the system/user PATH visible to desktop apps, then restart CMDino. |
+| Transcript export is best-effort for TUI CLIs. | Medium | Spinners, redraws, and full-screen terminal UIs may still leave noisy transcript lines. | Prefer line-oriented CLI modes when exporting transcripts. |
+| Output deletion does not auto-remove stale attachment references. | Low | Deleted generated files can remain listed as agent attachments until manually removed. Preview/send fails gracefully if the file is gone. | Remove stale attachment chips manually in the Context panel. |
+| No cloud sync, account system, or license gate yet. | Low | Workspaces and outputs are local to one machine. Distribution remains private-alpha oriented. | Move local files manually if needed. |
+| No bulk delete. | Low | Users must delete workspaces and output artifacts one at a time. | Intentional V1 safety constraint. |
+| No autonomous execution. | Low | Workflow routes are visual/manual preferences, not scheduled or automatic agent execution. | Use manual Handoff or Forward controls. |
+| Auto Forward works best with clean recent output. | Medium | Raw TUI or prompt-heavy output can forward noisy context. | Select exact text first or use manual handoff for editing. |
+| Large Vite chunk warning remains. | Low | Build succeeds, but initial app JS is larger than Vite's default warning threshold. | Defer code splitting until load time is a real problem. |
+| Tauri bundle identifier ends with `.app`. | Low | Current Windows build succeeds; Tauri warns this is not ideal for macOS distribution. | Rename before serious macOS packaging. |
+| Rust dead-code warning for `ProbeOutput.duration_ms`. | Low | No runtime impact. | Remove or surface the field in a cleanup pass. |

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { GeneratedOutputFile } from "../domain/attachments";
 import type { TerminalAttachment } from "../domain/orchestration";
+import { groupOutputLibraryFiles } from "../domain/outputLibrary";
 import { fileBridge } from "../orchestration/fileBridge";
 import { deleteOutputFile } from "../memory/memoryBriefBridge";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -8,31 +9,6 @@ import { ConfirmDialog } from "./ConfirmDialog";
 const isTauri = Boolean(
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
 );
-
-const BUILD_KIT_RE = /\b(build|share|release|screenshot|checklist|kit|public)\b/i;
-
-type Group = { label: string; files: GeneratedOutputFile[] };
-
-function groupFiles(files: GeneratedOutputFile[]): Group[] {
-  const memory: GeneratedOutputFile[]     = [];
-  const transcript: GeneratedOutputFile[] = [];
-  const buildKit: GeneratedOutputFile[]   = [];
-  const other: GeneratedOutputFile[]      = [];
-
-  for (const f of files) {
-    if (f.kind === "memory_brief")          memory.push(f);
-    else if (f.kind === "transcript")       transcript.push(f);
-    else if (BUILD_KIT_RE.test(f.fileName)) buildKit.push(f);
-    else                                    other.push(f);
-  }
-
-  const groups: Group[] = [];
-  if (memory.length > 0)     groups.push({ label: "Memory Briefs",            files: memory });
-  if (transcript.length > 0) groups.push({ label: "Transcripts",              files: transcript });
-  if (buildKit.length > 0)   groups.push({ label: "Build Updates / Share Kit", files: buildKit });
-  if (other.length > 0)      groups.push({ label: "Markdown / Other",          files: other });
-  return groups;
-}
 
 function fmtSize(bytes: number): string {
   if (bytes < 1024)    return `${bytes} B`;
@@ -179,7 +155,7 @@ export function OutputLibraryDrawer({
     setTimeout(() => setCopyState("idle"), 1800);
   }
 
-  const groups = groupFiles(outputFiles);
+  const groups = groupOutputLibraryFiles(outputFiles);
 
   return (
     <>

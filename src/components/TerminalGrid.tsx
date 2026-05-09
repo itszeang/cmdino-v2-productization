@@ -1,5 +1,5 @@
 import { TerminalPane } from "./TerminalPane";
-import { TerminalTabs } from "./TerminalTabs";
+import { AgentDock } from "./AgentDock";
 import type { TerminalAgent } from "../domain/terminalAgent";
 import type { TerminalLifecycleState } from "../terminal/useTerminalProcess";
 import type { WorkflowLink, WorkflowLinkKind } from "../domain/workflow";
@@ -7,6 +7,7 @@ import type { AppSettings } from "../domain/appSettings";
 import type { TerminalViewMode } from "../domain/viewMode";
 import type { ReadinessFailure } from "../domain/readiness";
 import type { SessionLogEvent } from "../domain/sessionLog";
+import type { HealthSnapshot } from "../domain/health";
 import type { GeneratedOutputFile } from "../domain/attachments";
 import type { CSSProperties } from "react";
 
@@ -27,14 +28,15 @@ interface Props {
   onReadinessError:     (agentId: string, failure: ReadinessFailure | null) => void;
   settings?:            AppSettings;
   viewMode:             TerminalViewMode;
-  onViewModeChange:     (mode: TerminalViewMode) => void;
   activeTerminalId:     string | null;
-  onActiveTerminalChange: (id: string) => void;
   lifecycleByAgentId:   Record<string, string>;
   onFocusPane:                  (id: string) => void;
   workflowLinks:                WorkflowLink[];
   onFocusTarget:                (id: string) => void;
   onEvent?:                     (event: SessionLogEvent) => void;
+  sessionEntries:               SessionLogEvent[];
+  healthSnapshot:               HealthSnapshot;
+  onDockSelectAgent:            (id: string) => void;
   onRegisterTranscriptGetter?:  (agentId: string, getter: (() => string) | null) => void;
   generatedOutputFiles?:        GeneratedOutputFile[];
   onRefreshGeneratedOutputs?:   () => void;
@@ -48,9 +50,10 @@ export function TerminalGrid({
   onLifecycleChange, onRecordWorkflowLink, onEditAgent,
   readinessErrors, onReadinessError,
   settings,
-  viewMode, onViewModeChange, activeTerminalId, onActiveTerminalChange,
+  viewMode, activeTerminalId,
   lifecycleByAgentId, onFocusPane, workflowLinks, onFocusTarget,
-  onEvent, onRegisterTranscriptGetter,
+  onEvent, sessionEntries, healthSnapshot, onDockSelectAgent,
+  onRegisterTranscriptGetter,
   generatedOutputFiles = [],
   onRefreshGeneratedOutputs,
   onRegisterPaneRef,
@@ -67,15 +70,16 @@ export function TerminalGrid({
   return (
     <div className="terminal-grid" data-view={viewMode}>
 
-      {/* Tabs row — always mounted in both modes */}
-      <TerminalTabs
+      {/* Agent Dock — replaces old TerminalTabs, always mounted in both modes */}
+      <AgentDock
         agents={agents}
         activeTerminalId={activeTerminalId}
         lifecycleByAgentId={lifecycleByAgentId}
-        onTabClick={(id) => {
-          onActiveTerminalChange(id);
-          if (viewMode === "grid") onViewModeChange("focus");
-        }}
+        sessionEntries={sessionEntries}
+        healthSnapshot={healthSnapshot}
+        readinessErrors={readinessErrors}
+        animationSpeed={settings?.animationSpeed}
+        onSelectAgent={onDockSelectAgent}
       />
 
       {/*

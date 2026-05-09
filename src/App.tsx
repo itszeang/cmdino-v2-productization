@@ -427,6 +427,16 @@ export default function App() {
     setViewMode("focus");
   }
 
+  function handleDockSelectAgent(agentId: string) {
+    setActiveTerminalId(agentId);
+    // Focus mode: CSS visibility handles switching with no remount.
+    // Grid mode: select agent and scroll pane into view if registered.
+    if (viewMode === "grid") {
+      const el = paneRefsMap.current.get(agentId);
+      el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }
+
   function handleCreate(form: {
     label: string; command: string; cwd: string; dinoId: string; agentKind: AgentKind;
     initialAttachments?: TerminalAttachment[];
@@ -525,9 +535,7 @@ export default function App() {
               onEditAgent={setEditingAgentId}
               settings={settings}
               viewMode={viewMode}
-              onViewModeChange={setViewMode}
               activeTerminalId={activeTerminalId}
-              onActiveTerminalChange={setActiveTerminalId}
               onFocusPane={handleFocusPane}
               workflowLinks={workflowLinks}
               onFocusTarget={handleFocusTarget}
@@ -535,6 +543,9 @@ export default function App() {
               readinessErrors={readinessErrors}
               onReadinessError={handleReadinessError}
               onEvent={appendEvent}
+              sessionEntries={sessionEntries}
+              healthSnapshot={healthSnapshot}
+              onDockSelectAgent={handleDockSelectAgent}
               onRegisterTranscriptGetter={handleRegisterTranscriptGetter}
               generatedOutputFiles={outputFiles}
               onRefreshGeneratedOutputs={() => { void refreshOutputFiles(); }}

@@ -2265,3 +2265,177 @@ button:focus-visible {
   flex-shrink: 0;
   margin-left: auto;
 }
+
+/* ── Agent Dock ───────────────────────────────────────────────────────────── */
+
+.agent-dock {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 10px;
+  background: var(--app-bg);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+  min-height: 44px;
+}
+.agent-dock::-webkit-scrollbar { display: none; }
+
+.agent-dock-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px 6px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: background 0.1s, border-color 0.1s;
+  outline: none;
+}
+
+/* Top accent line — visible on active item only */
+.agent-dock-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 6px;
+  right: 6px;
+  height: 1px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.agent-dock-item:hover:not([data-active="true"]) {
+  background: var(--button-bg);
+  border-color: var(--border-subtle);
+}
+
+.agent-dock-item[data-active="true"] {
+  background: var(--surface-1);
+  border-color: var(--border-subtle);
+}
+.agent-dock-item[data-active="true"]::before {
+  opacity: 1;
+}
+
+/* Avatar container — gives attention dot an anchor */
+.agent-dock-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 29px;
+  height: 29px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Dormant / exited agents get subtle opacity */
+.agent-dock-item[data-lifecycle="dormant"] .agent-dock-avatar,
+.agent-dock-item[data-lifecycle="exited"]  .agent-dock-avatar,
+.agent-dock-item[data-lifecycle="killed"]  .agent-dock-avatar {
+  opacity: 0.45;
+}
+
+/* Attention marker dot — top-right corner of avatar */
+.agent-dock-attn {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--app-bg);
+  flex-shrink: 0;
+}
+
+/* Label + lifecycle text */
+.agent-dock-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.agent-dock-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 92px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+.agent-dock-item[data-active="true"] .agent-dock-label {
+  color: var(--text-main);
+  font-weight: 650;
+}
+
+.agent-dock-lc {
+  font-size: 9px;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+/* Tooltip — rendered via position:fixed in AgentDock JSX */
+.agent-dock-tooltip {
+  z-index: 400;
+  min-width: 190px;
+  max-width: 260px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 9px 11px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  pointer-events: none;
+  animation: soft-enter-anim 0.12s ease-out both;
+}
+
+.agent-dock-tooltip-name {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--text-main);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-tooltip-row {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.agent-dock-tooltip-key {
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.agent-dock-tooltip-ts {
+  color: var(--text-faint);
+  margin-left: 2px;
+}
+
+.agent-dock-tooltip-issue {
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 4px 7px;
+  border-radius: 5px;
+}
