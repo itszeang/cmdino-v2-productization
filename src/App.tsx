@@ -406,7 +406,7 @@ export default function App() {
 
   function loadDemoWorkspace() {
     if (agents.length > 0) {
-      if (!window.confirm("Replace current workspace with the CMDino Alpha Demo?")) return;
+      if (!window.confirm("Replace current workspace with the demo setup?")) return;
     }
     loadWorkspaceConfig(DEMO_WORKSPACE);
   }

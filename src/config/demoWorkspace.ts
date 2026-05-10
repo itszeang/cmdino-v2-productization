@@ -7,7 +7,7 @@ const GEMINI_ID  = "demo-cfg-gemini-reviewer-03";
 
 export const DEMO_WORKSPACE: CmdinoWorkspaceFile = {
   schemaVersion: 3,
-  workspaceName: "CMDino Alpha Demo",
+  workspaceName: "CMDino Demo Setup",
   terminals: [
     {
       configId:      CLAUDE_ID,

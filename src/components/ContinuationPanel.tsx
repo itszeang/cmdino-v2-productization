@@ -128,7 +128,7 @@ export function ContinuationPanel({ session, outputFiles, onViewOutputs, onLoad,
           onMouseEnter={(e) => { if (!loading) (e.currentTarget as HTMLButtonElement).style.opacity = "0.88"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
         >
-          {loading ? "Loading…" : "Load Last Workspace"}
+          {loading ? "Loading…" : "Continue Work"}
         </button>
         {showOutputs && onViewOutputs && (
           <button
@@ -146,7 +146,7 @@ export function ContinuationPanel({ session, outputFiles, onViewOutputs, onLoad,
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.75"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
           >
-            View Outputs
+            Open Output Shelf
           </button>
         )}
       </div>

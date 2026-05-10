@@ -64,7 +64,7 @@ export function HandoffModal({ sourceAgentId, sourceLabel, initialCapture, runni
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 16px", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0 }}>
-          <span style={{ color: "var(--text-main)", fontSize: 13, fontWeight: 650 }}>Handoff</span>
+          <span style={{ color: "var(--text-main)", fontSize: 13, fontWeight: 650 }}>Review & Send</span>
           <span style={{ color: "var(--text-muted)", fontSize: 12 }}>from {sourceLabel}</span>
           <span style={{ color: "var(--text-faint)", fontSize: 11 }}>({sourceAgentId.slice(0, 8)})</span>
           <button
@@ -158,7 +158,7 @@ export function HandoffModal({ sourceAgentId, sourceLabel, initialCapture, runni
               cursor:       noTargets || !text.trim() ? "not-allowed" : "pointer",
             }}
           >
-            {sending ? "Sending..." : "Send to target"}
+            {sending ? "Sending…" : "Send to Agent"}
           </button>
         </div>
       </div>

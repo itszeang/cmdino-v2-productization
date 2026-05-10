@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import type { GeneratedOutputFile } from "../domain/attachments";
 import type { TerminalAttachment } from "../domain/orchestration";
-import { groupOutputLibraryFiles } from "../domain/outputLibrary";
+import { groupOutputLibraryFiles, kindReadableLabel, kindPurposeHint } from "../domain/outputLibrary";
 import { fileBridge } from "../orchestration/fileBridge";
 import { deleteOutputFile } from "../memory/memoryBriefBridge";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { MarkdownArtifactReader } from "./MarkdownArtifactReader";
+import { ArtifactReaderModal } from "./ArtifactReaderModal";
+import type { ArtifactReaderAction } from "./ArtifactReaderModal";
 
 const isTauri = Boolean(
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
@@ -22,13 +25,6 @@ function relTime(ts: number): string {
   if (diff < 3_600_000)  return `${Math.floor(diff / 60_000)}m ago`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
   return `${Math.floor(diff / 86_400_000)}d ago`;
-}
-
-function kindLabel(kind: GeneratedOutputFile["kind"]): string {
-  if (kind === "memory_brief") return "MEM";
-  if (kind === "transcript")   return "TXP";
-  if (kind === "markdown")     return "MD";
-  return "TXT";
 }
 
 function kindColor(kind: GeneratedOutputFile["kind"]): string {
@@ -60,8 +56,9 @@ export function OutputLibraryDrawer({
   const [previewLoading,  setPreviewLoading]  = useState(false);
   const [previewError,    setPreviewError]    = useState<string | null>(null);
   const [previewTruncated,setPreviewTruncated]= useState(false);
-  const [copyState, setCopyState] = useState<"idle" | "copied-content" | "copied-path" | "error">("idle");
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [copyState,    setCopyState]    = useState<"idle" | "copied-content" | "copied-path" | "error">("idle");
+  const [deleteConfirm,setDeleteConfirm]= useState(false);
+  const [showReader,   setShowReader]   = useState(false);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -187,13 +184,14 @@ export function OutputLibraryDrawer({
           borderBottom: "1px solid var(--border-subtle)",
           flexShrink: 0,
         }}>
-          <span style={{
-            flex: 1,
-            fontWeight: 700, fontSize: 13, letterSpacing: 0.2,
-            color: "var(--text-main)",
-          }}>
-            Output Library
-          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, letterSpacing: 0.2, color: "var(--text-main)" }}>
+              Output Shelf
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 1 }}>
+              Memory, logs, and share files
+            </div>
+          </div>
           <button
             className="cmd-pill-btn"
             style={{ fontSize: 11, padding: "3px 9px" }}
@@ -275,31 +273,28 @@ export function OutputLibraryDrawer({
                             (e.currentTarget as HTMLButtonElement).style.background = "transparent";
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+                        <div style={{ marginBottom: 2 }}>
                           <span style={{
-                            fontSize: 8, fontWeight: 700, letterSpacing: 0.5,
-                            color, background: `${color}18`,
-                            border: `1px solid ${color}40`,
-                            padding: "1px 4px", borderRadius: 999,
-                            flexShrink: 0,
+                            fontSize: 9, fontWeight: 600, letterSpacing: 0.2,
+                            color, marginRight: 5,
                           }}>
-                            {kindLabel(file.kind)}
+                            {kindReadableLabel(file.kind)}
                           </span>
-                          <span style={{
-                            fontSize: 11, color: "var(--text-main)",
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            flex: 1,
-                          }}>
-                            {file.fileName}
-                          </span>
+                        </div>
+                        <div style={{
+                          fontSize: 11, color: "var(--text-main)",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          marginBottom: 2,
+                        }}>
+                          {file.fileName}
                         </div>
                         <div style={{
                           fontSize: 9, color: "var(--text-faint)",
                           display: "flex", gap: 4,
                         }}>
-                          <span>{fmtSize(file.sizeBytes)}</span>
-                          <span>·</span>
                           <span>{relTime(file.modifiedAt)}</span>
+                          <span>·</span>
+                          <span>{fmtSize(file.sizeBytes)}</span>
                         </div>
                       </button>
                     );
@@ -331,10 +326,18 @@ export function OutputLibraryDrawer({
                 }}>
                   <div style={{
                     fontSize: 11, fontWeight: 600, color: "var(--text-main)",
-                    marginBottom: 6,
+                    marginBottom: 2,
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
                     {selected.fileName}
+                  </div>
+                  <div style={{
+                    fontSize: 9, color: "var(--text-faint)", marginBottom: 6, lineHeight: 1.4,
+                  }}>
+                    {kindReadableLabel(selected.kind)} · {relTime(selected.modifiedAt)} · {fmtSize(selected.sizeBytes)}
+                    <span style={{ marginLeft: 6, fontStyle: "italic" }}>
+                      {kindPurposeHint(selected.kind)}
+                    </span>
                   </div>
                   <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                     <button
@@ -344,24 +347,24 @@ export function OutputLibraryDrawer({
                       disabled={!canAttach}
                       title={
                         !activeAgent      ? "No active agent" :
-                        alreadyAttached   ? "Already attached to active agent" :
-                        `Attach to ${activeAgent.label}`
+                        alreadyAttached   ? "Already added to active agent" :
+                        `Add to ${activeAgent.label}`
                       }
                     >
                       {alreadyAttached
-                        ? "Attached"
+                        ? "Added"
                         : activeAgent
-                        ? `Attach → ${activeAgent.label}`
-                        : "Attach"}
+                        ? `Add to ${activeAgent.label}`
+                        : "Add to Agent"}
                     </button>
                     <button
                       className="cmd-pill-btn"
                       style={{ fontSize: 10, padding: "3px 8px" }}
                       onClick={() => { void handleCopyContent(); }}
                       disabled={!previewContent}
-                      title="Copy preview content to clipboard"
+                      title="Copy text to clipboard"
                     >
-                      {copyState === "copied-content" ? "Copied!" : "Copy Content"}
+                      {copyState === "copied-content" ? "Copied!" : "Copy Text"}
                     </button>
                     <button
                       className="cmd-pill-btn"
@@ -369,7 +372,16 @@ export function OutputLibraryDrawer({
                       onClick={() => { void handleCopyPath(); }}
                       title="Copy file path to clipboard"
                     >
-                      {copyState === "copied-path" ? "Copied!" : "Copy Path"}
+                      {copyState === "copied-path" ? "Copied!" : "Copy File Path"}
+                    </button>
+                    <button
+                      className="cmd-pill-btn"
+                      style={{ fontSize: 10, padding: "3px 8px" }}
+                      onClick={() => setShowReader(true)}
+                      disabled={!previewContent && !previewLoading}
+                      title="Open full artifact reader"
+                    >
+                      Open Reader
                     </button>
                     {isTauri && (
                       <button
@@ -390,7 +402,7 @@ export function OutputLibraryDrawer({
                 </div>
 
                 {/* Preview body */}
-                <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}>
+                <div style={{ flex: 1, overflowY: "auto" }}>
                   {previewLoading && (
                     <div style={{ color: "var(--text-faint)", fontSize: 11 }}>Loading…</div>
                   )}
@@ -404,18 +416,15 @@ export function OutputLibraryDrawer({
                       {previewTruncated && (
                         <div style={{
                           fontSize: 9, color: "var(--text-faint)",
-                          marginBottom: 8, fontStyle: "italic",
+                          marginBottom: 4, fontStyle: "italic",
                         }}>
                           Truncated at 256 KiB
                         </div>
                       )}
-                      <pre style={{
-                        margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word",
-                        fontSize: 11, lineHeight: 1.6,
-                        color: "var(--text-main)", fontFamily: "inherit",
-                      }}>
-                        {previewContent}
-                      </pre>
+                      <MarkdownArtifactReader
+                        content={previewContent}
+                        isLog={selected?.kind === "transcript" || selected?.kind === "text"}
+                      />
                     </>
                   )}
                 </div>
@@ -451,6 +460,41 @@ export function OutputLibraryDrawer({
           onCancel={() => setDeleteConfirm(false)}
         />
       )}
+      {showReader && selected && (() => {
+        const readerActions: ArtifactReaderAction[] = [
+          {
+            label: alreadyAttached ? "Added" : activeAgent ? `Add to ${activeAgent.label}` : "Add to Agent",
+            onClick: handleAttach,
+            disabled: !canAttach,
+            accent: canAttach,
+          },
+          {
+            label: copyState === "copied-content" ? "Copied!" : "Copy Text",
+            onClick: () => { void handleCopyContent(); },
+            disabled: !previewContent,
+          },
+          {
+            label: copyState === "copied-path" ? "Copied!" : "Copy File Path",
+            onClick: () => { void handleCopyPath(); },
+          },
+        ];
+        return (
+          <ArtifactReaderModal
+            title={selected.fileName}
+            artifactType={kindReadableLabel(selected.kind)}
+            sourceLabel="Output Shelf"
+            path={selected.path}
+            isAttached={alreadyAttached}
+            content={previewContent}
+            truncated={previewTruncated}
+            loading={previewLoading}
+            error={previewError}
+            isLog={selected.kind === "transcript" || selected.kind === "text"}
+            actions={readerActions}
+            onClose={() => setShowReader(false)}
+          />
+        );
+      })()}
     </>
   );
 }

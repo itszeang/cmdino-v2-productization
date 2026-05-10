@@ -244,7 +244,7 @@ export function WorkflowPanel({
       >
         {/* ── Header ── */}
         <div className="workflow-header" style={{ height: HEADER_H }}>
-          <span className="workflow-kicker">Workflow</span>
+          <span className="workflow-kicker">Agent Map</span>
           <span className="workflow-meta">
             {agents.length} terminal{agents.length !== 1 ? "s" : ""}
             {drawLinks.length > 0 ? ` · ${drawLinks.length} link${drawLinks.length !== 1 ? "s" : ""}` : ""}
@@ -275,11 +275,11 @@ export function WorkflowPanel({
           onClick={() => { if (routeSource) setRouteSource(null); }}
         >
           {agents.length === 0 && (
-            <div className="workflow-empty">No Dino terminals</div>
+            <div className="workflow-empty">No agents yet</div>
           )}
           {agents.length > 0 && drawLinks.length === 0 && !routeSource && (
             <div className="workflow-hint">
-              Drag to arrange · use Route on a node to wire a preferred handoff path
+              Drag to arrange · click Route on a node to set a preferred send path
             </div>
           )}
 

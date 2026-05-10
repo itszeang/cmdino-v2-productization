@@ -459,16 +459,16 @@ export function TerminalPane({
           <StripBtn
             onClick={() => { showAttPanel ? setShowAttPanel(false) : openAttPanel(); }}
             accent={showAttPanel}
-            title={showAttPanel ? "Close context panel" : "Manage context attachments"}
+            title={showAttPanel ? "Close context panel" : "Add files for this agent"}
           >
-            {atts.length > 0 ? `Context (${atts.length})` : "Context"}
+            {atts.length > 0 ? `Add Context (${atts.length})` : "Add Context"}
           </StripBtn>
           <div className="pane-strip-sep" />
           <StripBtn
             onClick={handleOpenHandoff}
             disabled={!isAlive}
-            title={isAlive ? "Handoff output to another terminal" : "Start terminal first"}
-          >Handoff</StripBtn>
+            title={isAlive ? "Review and send output to another agent" : "Start terminal first"}
+          >Review & Send</StripBtn>
         </div>
 
         {/* Middle/right: forward flow */}
@@ -509,7 +509,7 @@ export function TerminalPane({
               `Forward to ${effectiveFwdTarget.label}`
             }
           >
-            {forwarding ? "…" : "Forward"}
+            {forwarding ? "…" : "Send Latest"}
           </StripBtn>
           {fwdError && (
             <span style={{ color: "var(--danger)", fontSize: 9, whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -695,7 +695,7 @@ export function TerminalPane({
               onMouseEnter={(e) => { if (!readinessChecking) (e.currentTarget as HTMLButtonElement).style.opacity = "0.88"; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
             >
-              {readinessChecking ? "CHECKING…" : "START"}
+              {readinessChecking ? "Checking…" : "Start"}
             </button>
           </div>
         )}

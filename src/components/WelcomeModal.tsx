@@ -62,16 +62,13 @@ export function WelcomeModal({
 
         {/* Header */}
         <div className="cmd-modal-header">
-          <img
-            src="/app-icon.png"
-            alt=""
-            aria-hidden="true"
-            style={{ width: 28, height: 28, borderRadius: 8, display: "block", flexShrink: 0 }}
-          />
+          <span className="cmdino-product-mark cmdino-product-mark--sm" aria-hidden="true">
+            &gt;_
+          </span>
           <div className="cmd-modal-title-group">
             <span className="cmd-modal-title">Set up CMDino</span>
             <span className="cmd-modal-subtitle">
-              CMDino runs local CLI tools you install and authenticate on this machine.
+              CMDino runs local CLI agents on your machine. Alpha build - local-first, no cloud sync.
             </span>
           </div>
         </div>
@@ -146,7 +143,7 @@ export function WelcomeModal({
               style={{ fontSize: 11, padding: "7px 13px", borderColor: "transparent" }}
               onClick={() => { onLoadDemo(); onDismiss(dontShow); }}
             >
-              Load Demo
+              Try Demo Setup
             </button>
             <button
               className="cmd-pill-btn"
@@ -163,7 +160,7 @@ export function WelcomeModal({
                 style={{ fontSize: 11, padding: "7px 13px" }}
                 onClick={() => { onDeployAgent(); onDismiss(dontShow); }}
               >
-                Deploy First Agent
+                Start First Agent
               </button>
             )}
 
@@ -173,7 +170,7 @@ export function WelcomeModal({
                 className="cmd-pill-btn cmd-pill-btn--primary"
                 onClick={() => { onDeployAgent(); onDismiss(dontShow); }}
               >
-                Deploy First Agent
+                Start First Agent
               </button>
             )}
             {primaryTier === "template" && (
@@ -189,7 +186,7 @@ export function WelcomeModal({
                 className="cmd-pill-btn cmd-pill-btn--primary"
                 onClick={onOpenHealth}
               >
-                Open Health
+                Open Setup Check
               </button>
             )}
           </div>

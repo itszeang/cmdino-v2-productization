@@ -178,7 +178,7 @@ export function SettingsPanel({ settings, onUpdate, onReset, onClose, onShowOnbo
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px" }}>
           <span style={{ color: "var(--text-faint)", fontSize: 9 }}>
-            Saved to localStorage automatically
+            Saved locally on this machine
           </span>
           <button
             className="cmd-pill-btn cmd-pill-btn--danger"
@@ -192,21 +192,21 @@ export function SettingsPanel({ settings, onUpdate, onReset, onClose, onShowOnbo
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 16px 10px" }}>
-          <span style={{ color: "var(--text-faint)", fontSize: 8, letterSpacing: 0.5 }}>
-            CMDino V1 Alpha
+          <span style={{ color: "var(--text-faint)", fontSize: 8, letterSpacing: 0, lineHeight: 1.4, flex: 1, minWidth: 0, paddingRight: 8 }}>
+            CMDino Alpha - Local-first desktop build
             {settings.animationSpeed === DEFAULT_SETTINGS.animationSpeed
              && settings.dinoScale === DEFAULT_SETTINGS.dinoScale
              && settings.terminalFontScale === DEFAULT_SETTINGS.terminalFontScale
              && settings.themeMode === DEFAULT_SETTINGS.themeMode
-              ? "" : " - Modified"}
+              ? "" : " - custom visual settings"}
           </span>
           <button
             className="cmd-pill-btn"
             style={{ borderColor: "transparent" }}
             onClick={onShowOnboarding}
-            title="Show mission briefing on next launch"
+            title="Show onboarding on next launch"
           >
-            SHOW BRIEFING
+            SHOW ONBOARDING
           </button>
         </div>
       </div>

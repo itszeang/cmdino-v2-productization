@@ -39,31 +39,33 @@ export function EmptyWorkspaceState({
           </div>
         )}
 
-        <img
-          src="/app-icon.png"
-          alt=""
-          aria-hidden="true"
-          className="empty-ws-icon"
-        />
+        <span className="cmdino-product-mark empty-ws-icon" aria-hidden="true">
+          &gt;_
+        </span>
 
-        <h1 className="empty-ws-headline">Build Your First Agent Workspace</h1>
+        <h1 className="empty-ws-headline">Start Your Agent Workspace</h1>
 
         <p className="empty-ws-desc">
-          CMDino is a visual command center for running and coordinating multiple AI CLI agents.
+          CMDino runs local CLI agents on your machine, then gives them a visual workspace for context,
+          handoff, and review.
+        </p>
+
+        <p className="empty-ws-alpha">
+          Alpha build - local-first, no cloud sync.
         </p>
 
         <div className="empty-ws-actions">
           <button className="empty-ws-primary" onClick={onDeployAgent}>
-            Deploy First Agent
+            Start With an Agent
           </button>
 
           <button className="empty-ws-secondary" onClick={onLoadTemplate}>
-            Load Template
+            Use a Template
           </button>
 
           <div className="empty-ws-demo-wrap">
             <button className="empty-ws-secondary" onClick={onLoadDemo}>
-              Load Demo Workflow
+              Try Demo Setup
             </button>
             <span className="empty-ws-demo-hint">
               Instantly load a planner → builder → reviewer chain.
@@ -74,17 +76,17 @@ export function EmptyWorkspaceState({
         <div className="empty-ws-steps">
           <div className="empty-ws-step">
             <span className="empty-ws-step-num">1</span>
-            <span className="empty-ws-step-label">Deploy agents</span>
+            <span className="empty-ws-step-label">Start agents</span>
           </div>
           <span className="empty-ws-step-sep">→</span>
           <div className="empty-ws-step">
             <span className="empty-ws-step-num">2</span>
-            <span className="empty-ws-step-label">Attach context</span>
+            <span className="empty-ws-step-label">Add context</span>
           </div>
           <span className="empty-ws-step-sep">→</span>
           <div className="empty-ws-step">
             <span className="empty-ws-step-num">3</span>
-            <span className="empty-ws-step-label">Handoff work</span>
+            <span className="empty-ws-step-label">Send to agent</span>
           </div>
         </div>
 

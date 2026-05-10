@@ -295,7 +295,7 @@ export function WorkspaceToolbar({
         ))}
       </select>
 
-      <TbBtn onClick={onLoadDemo} title="Load CMDino Alpha Demo workspace">DEMO</TbBtn>
+      <TbBtn onClick={onLoadDemo} title="Load the CMDino demo setup">DEMO</TbBtn>
     </div>
   );
 }

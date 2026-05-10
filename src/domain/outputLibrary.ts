@@ -26,9 +26,23 @@ export function groupOutputLibraryFiles(files: GeneratedOutputFile[]): OutputLib
   }
 
   const groups: OutputLibraryGroup[] = [];
-  if (memory.length > 0) groups.push({ label: "Memory Briefs", files: memory });
-  if (transcript.length > 0) groups.push({ label: "Transcripts", files: transcript });
-  if (buildKit.length > 0) groups.push({ label: "Build Updates / Share Kit", files: buildKit });
-  if (other.length > 0) groups.push({ label: "Markdown / Other", files: other });
+  if (memory.length > 0)     groups.push({ label: "Continue Later", files: memory });
+  if (transcript.length > 0) groups.push({ label: "Terminal Logs",  files: transcript });
+  if (buildKit.length > 0)   groups.push({ label: "Share Progress", files: buildKit });
+  if (other.length > 0)      groups.push({ label: "Other Notes",    files: other });
   return groups;
+}
+
+export function kindReadableLabel(kind: GeneratedOutputFile["kind"]): string {
+  if (kind === "memory_brief") return "Memory Brief";
+  if (kind === "transcript")   return "Terminal Log";
+  if (kind === "markdown")     return "Note";
+  return "Text File";
+}
+
+export function kindPurposeHint(kind: GeneratedOutputFile["kind"]): string {
+  if (kind === "memory_brief") return "Use this to resume context in a future session";
+  if (kind === "transcript")   return "Raw terminal output from this session";
+  if (kind === "markdown")     return "Generated markdown output";
+  return "Generated text file";
 }

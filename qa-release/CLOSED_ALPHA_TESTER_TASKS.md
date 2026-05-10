@@ -1,0 +1,22 @@
+# Closed Alpha Tester Tasks
+
+- [ ] Install app
+- [ ] Launch app
+- [ ] Open Setup Check
+- [ ] Add Custom Agent
+- [ ] Run `echo hello`
+- [ ] Use Template
+- [ ] Open Agent Map
+- [ ] Add Context from Starter Context
+- [ ] Add Context from Local File
+- [ ] Send Into Agent
+- [ ] Save Memory Brief
+- [ ] Export Logs
+- [ ] Share Progress
+- [ ] Open Output Shelf
+- [ ] Open Artifact Reader
+- [ ] Save Workspace
+- [ ] Reopen Workspace
+- [ ] Delete test output
+- [ ] Delete test workspace
+- [ ] Write one confusing moment

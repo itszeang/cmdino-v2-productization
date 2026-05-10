@@ -227,11 +227,10 @@ export function AppSidebar({
 
   return (
     <aside className="app-sidebar">
-      {/* Brand mark — subtle product identity, not a splash banner */}
       <div className="sidebar-brand">
         <span className="sidebar-brand-mark">&gt;_</span>
         <span className="sidebar-brand-title">CMDino</span>
-        <span className="sidebar-brand-subtitle">alpha</span>
+        <span className="sidebar-brand-subtitle">Alpha build</span>
       </div>
 
       <div className="sidebar-top">
@@ -239,54 +238,50 @@ export function AppSidebar({
           className="sidebar-cta"
           onClick={onAddTerminal}
           disabled={maxReached}
-          title={maxReached ? `Maximum ${maxTerminals} agents reached` : "Deploy a new agent"}
+          title={maxReached ? `Maximum ${maxTerminals} agents reached` : "Add a new agent"}
         >
-          + Agent
+          Add Agent
         </button>
       </div>
 
       <div className="sidebar-sections">
+
+        {/* ── Start ── */}
         <div className="sidebar-section">
-          <div className="sidebar-label">Workspace</div>
-          <SidebarRow icon="demo" onClick={onLoadDemo} title="Load CMDino Alpha Demo">
-            Demo
+          <div className="sidebar-label">Start</div>
+          <SidebarRow icon="demo" onClick={onLoadDemo} title="Load the CMDino demo workflow">
+            Try Demo Setup
           </SidebarRow>
-          <SidebarRow icon="workflow" onClick={onOpenWorkflow} title="Open workflow canvas">
-            Workflow
+        </div>
+
+        {/* ── Work ── */}
+        <div className="sidebar-section">
+          <div className="sidebar-label">Work</div>
+          <SidebarRow icon="workflow" onClick={onOpenWorkflow} title="View your agent map and workflow connections">
+            Agent Map
           </SidebarRow>
-          <SidebarRow
-            icon="health"
-            onClick={onOpenHealth}
-            title="View provider health and CLI status"
-            trailing={healthAggregateDot(healthSnapshot)}
-          >
-            Health
+          <SidebarRow icon="history" onClick={onOpenHistory} title="View session activity log">
+            Activity
           </SidebarRow>
           <SidebarRow
             icon="start"
             onClick={onStartAll}
             disabled={terminalCount === 0}
-            title={terminalCount === 0 ? "No terminals to start" : "Start all dormant terminals"}
+            title={terminalCount === 0 ? "No agents to start" : "Start all dormant agents"}
           >
-            Start All
+            Start Agents
           </SidebarRow>
         </div>
 
-        <div className="sidebar-section">
-          <div className="sidebar-label">Files</div>
-          <SidebarRow icon="new" onClick={onNew} title="Clear workspace and start fresh">
-            New Workspace
-          </SidebarRow>
-          <SidebarRow icon="save" onClick={onSave} title="Save current workspace to disk">
-            Save
-          </SidebarRow>
-
+        {/* ── Outputs ── */}
+        <div className="sidebar-section sidebar-section--secondary">
+          <div className="sidebar-label">Outputs</div>
           <SidebarRow
             icon="library"
             onClick={onOpenOutputLibrary}
             title={outputFileCount > 0 ? `Browse ${outputFileCount} generated file${outputFileCount !== 1 ? "s" : ""}` : "Browse generated output files"}
           >
-            Output Library
+            Output Shelf
             {outputFileCount > 0 && (
               <span style={{
                 marginLeft: "auto",
@@ -300,10 +295,53 @@ export function AppSidebar({
               </span>
             )}
           </SidebarRow>
+          <SidebarRow
+            icon="share"
+            onClick={onGenerateBuildUpdateKit}
+            disabled={!canGenerateBuildKit}
+            title={canGenerateBuildKit ? "Generate a shareable progress update in the outputs folder" : "Add an agent or run a session first"}
+          >
+            Share Progress
+          </SidebarRow>
+          <SidebarRow
+            icon="memory"
+            onClick={onGenerateMemoryBriefs}
+            disabled={terminalCount === 0}
+            title={terminalCount === 0 ? "No agents to generate briefs for" : "Save markdown continuity files for current agents"}
+          >
+            Save Memory Brief
+          </SidebarRow>
+          <SidebarRow
+            icon="transcript"
+            onClick={onExportTranscripts}
+            disabled={terminalCount === 0}
+            title={terminalCount === 0 ? "No agents to export logs for" : "Export terminal output to markdown files"}
+          >
+            Export Logs
+          </SidebarRow>
+        </div>
 
-          <div className="sidebar-select-wrapper" title="Load a saved workspace">
+        {/* ── Fix & Manage ── */}
+        <div className="sidebar-section sidebar-section--secondary sidebar-section--divider">
+          <div className="sidebar-label">Fix & Manage</div>
+          <SidebarRow
+            icon="health"
+            onClick={onOpenHealth}
+            title="Check provider availability and CLI setup"
+            trailing={healthAggregateDot(healthSnapshot)}
+          >
+            Setup Check
+          </SidebarRow>
+          <SidebarRow icon="new" onClick={onNew} title="Clear workspace and start fresh">
+            New Workspace
+          </SidebarRow>
+          <SidebarRow icon="save" onClick={onSave} title="Save current workspace to disk">
+            Save Workspace
+          </SidebarRow>
+
+          <div className="sidebar-select-wrapper" title="Open a saved workspace">
             <SidebarIcon name="load" />
-            <span className="sidebar-select-label">Load Workspace</span>
+            <span className="sidebar-select-label">Open Workspace</span>
             <span className="sidebar-select-arrow">v</span>
             <select
               className="sidebar-select-native"
@@ -324,10 +362,10 @@ export function AppSidebar({
               className="cmd-pill-btn"
               style={{ flex: 1, fontSize: 10, padding: "4px 6px" }}
               disabled={!selectedWorkspace}
-              title={selectedWorkspace ? `Load "${selectedWorkspace}"` : "Select a workspace first"}
+              title={selectedWorkspace ? `Open "${selectedWorkspace}"` : "Select a workspace first"}
               onClick={() => { if (selectedWorkspace) onLoad(selectedWorkspace); }}
             >
-              Load
+              Open
             </button>
             <button
               className="cmd-pill-btn cmd-pill-btn--danger"
@@ -340,52 +378,18 @@ export function AppSidebar({
             </button>
           </div>
 
-        </div>
-
-        <div className="sidebar-section sidebar-section--secondary">
-          <div className="sidebar-label">Session</div>
-          <SidebarRow icon="history" onClick={onOpenHistory} title="View session event history">
-            History
-          </SidebarRow>
-          <SidebarRow
-            icon="memory"
-            onClick={onGenerateMemoryBriefs}
-            disabled={terminalCount === 0}
-            title={terminalCount === 0 ? "No agents to generate briefs for" : "Generate markdown continuity files for current agents"}
-          >
-            Memory Briefs
-          </SidebarRow>
-          <SidebarRow
-            icon="transcript"
-            onClick={onExportTranscripts}
-            disabled={terminalCount === 0}
-            title={terminalCount === 0 ? "No agents to export transcripts for" : "Export buffered terminal output to markdown files"}
-          >
-            Transcripts
+          <SidebarRow icon="settings" onClick={onOpenSettings} title="Visual and agent settings">
+            Settings
           </SidebarRow>
         </div>
 
-        <div className="sidebar-section sidebar-section--secondary sidebar-section--divider">
-          <div className="sidebar-label">Share</div>
-          <SidebarRow
-            icon="share"
-            onClick={onGenerateBuildUpdateKit}
-            disabled={!canGenerateBuildKit}
-            title={canGenerateBuildKit ? "Generate build-in-public markdown kit in outputs folder" : "Deploy an agent or run a session first"}
-          >
-            Build Kit
-          </SidebarRow>
-        </div>
       </div>
 
       <div className="sidebar-bottom">
         <div className="sidebar-count">
           <span>{terminalCount} / {maxTerminals}</span>
-          <span>terminals</span>
+          <span>agents</span>
         </div>
-        <SidebarRow icon="settings" onClick={onOpenSettings} title="Visual and agent settings">
-          Settings
-        </SidebarRow>
       </div>
     </aside>
   );
