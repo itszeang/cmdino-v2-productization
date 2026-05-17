@@ -9,13 +9,15 @@ Run from the repo root:
 ```powershell
 npm.cmd run build
 npm.cmd run test:unit
+cargo check --manifest-path src-tauri\Cargo.toml
 git status --short
 ```
 
 Expected result:
 
-- Build exits successfully.
-- Unit tests exit successfully.
+- Build exits successfully with no TypeScript errors.
+- Unit tests exit successfully (all 152 tests pass).
+- `cargo check` exits successfully (one known warning for `ProbeOutput.duration_ms` is acceptable).
 - `git status --short` only shows intentional changes.
 
 ## Manual Smoke Test
@@ -41,6 +43,7 @@ Run in the desktop app or Tauri dev app:
 - Final output can be saved.
 - Step artifacts can be saved.
 - Build draft can be saved.
+- Memory brief can be generated from the workflow final panel.
 - Output Shelf shows saved workflow artifacts.
 - Workflow History shows the run.
 - Workflow History detail shows steps and linked artifact paths.
@@ -78,46 +81,59 @@ Run this before pushing any Chat, Agent Workspace, TerminalGrid, or TerminalPane
 - Switch Chat -> Agents at least three more times.
 - Confirm `Capture Result From Agent` still works after switching.
 
-## Failure Fixtures
+## Result Fixtures
+
+Use the current `CMDINO_RESULT_START` / `CMDINO_RESULT_END` format. Required fields: `status`, `summary`, `artifacts` (array), `handoff` (object with `target` and `message`), `next` (string array).
 
 Use this completed fixture:
 
 ```txt
-<CMDINO_RESULT>
+CMDINO_RESULT_START
 {
-  "status": "completed",
+  "status": "success",
   "summary": "Completed the requested review and found no runtime changes needed.",
-  "handoff": "Continue to the next checkpoint with the summarized findings.",
-  "needs_user_action": false
+  "artifacts": [],
+  "handoff": {
+    "target": "next agent or user",
+    "message": "Continue to the next checkpoint with the summarized findings."
+  },
+  "next": []
 }
-</CMDINO_RESULT>
+CMDINO_RESULT_END
 ```
 
 Use this intervention fixture:
 
 ```txt
-<CMDINO_RESULT>
+CMDINO_RESULT_START
 {
   "status": "needs_user_action",
   "summary": "Need user confirmation before changing files.",
-  "handoff": "Ask the user whether docs-only edits are allowed.",
-  "needs_user_action": true,
-  "userActionReason": "Permission required before editing."
+  "artifacts": [],
+  "handoff": {
+    "target": "user",
+    "message": "Ask the user whether docs-only edits are allowed."
+  },
+  "next": ["Confirm with user before proceeding."]
 }
-</CMDINO_RESULT>
+CMDINO_RESULT_END
 ```
 
 Use this failed fixture:
 
 ```txt
-<CMDINO_RESULT>
+CMDINO_RESULT_START
 {
   "status": "failed",
   "summary": "The requested task cannot proceed because required project context is missing.",
-  "handoff": "Open the correct project folder and retry.",
-  "needs_user_action": false
+  "artifacts": [],
+  "handoff": {
+    "target": "user",
+    "message": "Open the correct project folder and retry."
+  },
+  "next": []
 }
-</CMDINO_RESULT>
+CMDINO_RESULT_END
 ```
 
 ## Known Non-Blocking Warnings

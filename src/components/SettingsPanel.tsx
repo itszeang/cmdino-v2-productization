@@ -1,11 +1,9 @@
 import type { AppSettings } from "../domain/appSettings";
 import { DEFAULT_SETTINGS } from "../domain/appSettings";
-import type { HealthSnapshot, HealthStatus } from "../domain/health";
+import type { HealthSnapshot } from "../domain/health";
+import { HEALTH_STATUS_LABELS } from "../domain/health";
 
-const HEALTH_STATUS_LABEL: Record<HealthStatus, string> = {
-  ready: "Ready", missing: "Missing", auth_required: "Auth needed",
-  offline: "Offline", error: "Error", unknown: "Not verified", installed: "Installed",
-};
+const HEALTH_STATUS_LABEL = HEALTH_STATUS_LABELS;
 
 function settingsHealthSummary(snapshot: HealthSnapshot): { label: string; color: string } {
   if (snapshot.status === "idle")     return { label: "Not scanned",  color: "var(--text-faint)" };

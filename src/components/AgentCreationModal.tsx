@@ -5,6 +5,7 @@ import { PRESET_BRAINS, getBrainById, buildBrainAttachments } from "../config/pr
 import type { AgentKind } from "../domain/agentKind";
 import type { TerminalAttachment } from "../domain/orchestration";
 import type { HealthSnapshot, HealthProviderId, HealthStatus } from "../domain/health";
+import { HEALTH_STATUS_LABELS } from "../domain/health";
 import { DEFAULT_FALLBACK_AGENT_CWD } from "../domain/agentCwd";
 
 const PRESET_PROVIDER: Record<AgentPresetId, HealthProviderId> = {
@@ -16,24 +17,17 @@ const PRESET_PROVIDER: Record<AgentPresetId, HealthProviderId> = {
 };
 
 const HEALTH_BADGE_COLOR: Record<HealthStatus, string | null> = {
-  ready:         "var(--success)",
-  missing:       "var(--danger)",
-  auth_required: "var(--warning)",
-  offline:       "var(--warning)",
-  error:         "var(--danger)",
-  unknown:       null,
-  installed:     "var(--text-muted)",
+  ready:                   "var(--success)",
+  missing:                 "var(--danger)",
+  auth_required:           "var(--warning)",
+  auth_check_inconclusive: "var(--text-muted)",
+  offline:                 "var(--warning)",
+  error:                   "var(--danger)",
+  unknown:                 null,
+  installed:               "var(--text-muted)",
 };
 
-const HEALTH_BADGE_LABEL: Record<HealthStatus, string> = {
-  ready:         "Ready",
-  missing:       "Missing",
-  auth_required: "Auth needed",
-  offline:       "Offline",
-  error:         "Error",
-  unknown:       "",
-  installed:     "Installed",
-};
+const HEALTH_BADGE_LABEL = HEALTH_STATUS_LABELS;
 
 interface FormState {
   presetId:         AgentPresetId | null;
@@ -239,6 +233,13 @@ export function AgentCreationModal({ onConfirm, onCancel, providerHealth, defaul
               title: "Installed — auth not verified",
               footer: "Deploy is allowed. Authentication will be checked when the agent starts.",
               showHint: true,
+            },
+            auth_check_inconclusive: {
+              bg: "var(--surface-2)", border: "var(--border-subtle)",
+              titleColor: "var(--text-muted)",
+              title: "Auth unverifiable — deploy allowed",
+              footer: "CMDino could not confirm auth status. Start the agent — it will prompt for login if needed.",
+              showHint: false,
             },
           };
 

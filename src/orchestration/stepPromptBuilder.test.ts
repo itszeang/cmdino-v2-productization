@@ -40,28 +40,48 @@ describe("stepPromptBuilder", () => {
       agentRole: "reviewer",
     });
 
-    expect(prompt.body).toContain("<CMDINO_RESULT>");
+    expect(prompt.body).toContain("CMDINO_RESULT_START");
+    expect(prompt.body).toContain("CMDINO_RESULT_END");
     expect(prompt.body).toContain("needs_user_action");
     expect(prompt.body).toContain("Do not perform destructive actions");
   });
 
-  it("includes exactly one CMDINO_RESULT and one CMDINO_HANDOFF instruction section", () => {
+  it("includes exactly one CMDINO_RESULT instruction section", () => {
     const prompt = buildStepPrompt({
       userTask: "Review handoff protocol.",
       stepLabel: "Reviewer",
       agentRole: "reviewer",
     });
 
-    expect(prompt.body.split("<CMDINO_RESULT>")).toHaveLength(2);
-    expect(prompt.body.split("</CMDINO_RESULT>")).toHaveLength(2);
-    expect(prompt.body.split("<CMDINO_HANDOFF>")).toHaveLength(2);
-    expect(prompt.body.split("</CMDINO_HANDOFF>")).toHaveLength(2);
-    expect(prompt.body).toContain("Do not include terminal banners, logs, prompts, or unrelated output.");
+    expect(prompt.body.split("\n").filter((line) => line === "CMDINO_RESULT_START")).toHaveLength(1);
+    expect(prompt.body.split("\n").filter((line) => line === "CMDINO_RESULT_END")).toHaveLength(1);
     expect(prompt.body).toContain("CMDino will treat your response as incomplete");
-    expect(prompt.body).toContain("Even if you only planned, reviewed, analyzed, or decided not to modify files, you still MUST include both blocks.");
+    expect(prompt.body).toContain("Even if you only planned, reviewed, analyzed, or decided not to modify files, you still MUST include the block.");
     expect(prompt.body).toContain("Do not ask the user to continue.");
     expect(prompt.body).toContain("Do not end with an unstructured summary.");
     expect(prompt.body).toContain("Do not stop after a normal explanation.");
+  });
+
+  it("includes allowed status values in the structured contract", () => {
+    const prompt = buildStepPrompt({
+      userTask: "Review UI.",
+      stepLabel: "Reviewer",
+      agentRole: "reviewer",
+    });
+
+    expect(prompt.body).toContain('"status": "success"');
+    expect(prompt.body).toContain('Allowed status values: "success", "needs_user_action", "failed".');
+  });
+
+  it("includes handoff and next fields in the structured contract", () => {
+    const prompt = buildStepPrompt({
+      userTask: "Review UI.",
+      stepLabel: "Reviewer",
+      agentRole: "reviewer",
+    });
+
+    expect(prompt.body).toContain('"handoff": { "target": "next agent or user", "message": "What the next agent or user needs to know." }');
+    expect(prompt.body).toContain('"next": ["Suggested next checkpoint or user action."]');
   });
 
   it("references context files without inlining their content", () => {
@@ -84,8 +104,12 @@ describe("stepPromptBuilder", () => {
   it("builds the standalone result contract", () => {
     const contract = buildCmdinoResultContract();
 
-    expect(contract).toContain('"status": "completed"');
+    expect(contract).toContain("CMDINO_RESULT_START");
+    expect(contract).toContain('"status": "success"');
     expect(contract).toContain('"summary"');
-    expect(contract).toContain("</CMDINO_RESULT>");
+    expect(contract).toContain('"artifacts"');
+    expect(contract).toContain('"handoff"');
+    expect(contract).toContain('"next"');
+    expect(contract).toContain("CMDINO_RESULT_END");
   });
 });

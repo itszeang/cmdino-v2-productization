@@ -69,13 +69,13 @@ export function getTerminalSubmitStrategy(agentKind?: string): TerminalSubmitStr
  */
 export function buildPromptFileInstruction(promptFilePath: string): string {
   return buildTerminalSubmitLine(
-    `Open and follow the task instructions in "${promptFilePath}". Do not repeat or echo the file. Treat it as your task instructions, execute the requested workflow step, then reply ONLY with exactly one CMDINO_RESULT block and exactly one CMDINO_HANDOFF block. Even if you only planned or reviewed, still include both blocks. Do not stop without those blocks.`,
+    `Open and follow the task instructions in "${promptFilePath}". Do not repeat or echo the file. Treat it as your task instructions, execute the requested workflow step, then reply ONLY with exactly one CMDINO_RESULT_START / CMDINO_RESULT_END block. Even if you only planned or reviewed, still include the block. Do not stop without it.`,
   );
 }
 
 export function buildWorkflowResultCorrectionInstruction(): string {
   return buildTerminalSubmitLine(
-    "Your previous response is incomplete. Do not redo the task. Reply ONLY with exactly one CMDINO_RESULT block and exactly one CMDINO_HANDOFF block for your previous answer. Do not repeat the explanation. Do not stop without both blocks.",
+    "Your previous response is incomplete. Do not redo the task. Reply ONLY with exactly one CMDINO_RESULT_START / CMDINO_RESULT_END block for your previous answer. Do not repeat the explanation. Do not stop without that block.",
   );
 }
 
@@ -87,24 +87,21 @@ export function buildWorkflowRecoveryPrompt(): string {
     "Do not repeat the full explanation.",
     "Do not continue implementation.",
     "",
-    "Reply ONLY with exactly one CMDINO_RESULT block and exactly one CMDINO_HANDOFF block for your previous answer.",
+    "Reply ONLY with exactly one CMDINO_RESULT_START / CMDINO_RESULT_END block for your previous answer.",
     "",
     "Use this format:",
     "",
-    "<CMDINO_RESULT>",
+    "CMDINO_RESULT_START",
     "{",
-    '  "status": "completed",',
+    '  "status": "success",',
     '  "summary": "Briefly summarize your previous answer.",',
-    '  "handoff": "Clean handoff for the next agent or user.",',
-    '  "needs_user_action": false,',
-    '  "user_action_reason": "",',
-    '  "next_agent_instruction": "Suggested instruction for the next workflow step."',
+    '  "artifacts": [],',
+    '  "handoff": { "target": "next agent or user", "message": "Clean handoff for the next agent or user." },',
+    '  "next": ["Suggested instruction for the next workflow step."]',
     "}",
-    "</CMDINO_RESULT>",
+    "CMDINO_RESULT_END",
     "",
-    "<CMDINO_HANDOFF>",
-    "Clean handoff text only. No terminal banners, logs, prompts, thinking text, or unrelated output.",
-    "</CMDINO_HANDOFF>",
+    'Allowed status values: "success", "needs_user_action", "failed".',
   ].join("\n");
 }
 

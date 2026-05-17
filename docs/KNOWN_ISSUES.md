@@ -1,7 +1,7 @@
 # CMDino Known Issues
 
-Date: 2026-05-09
-Status: Phase 1 Product Trust known issues
+Date: 2026-05-17
+Status: Pre-closed-alpha known issues
 
 | Issue | Severity | User impact | Workaround / status |
 | --- | --- | --- | --- |

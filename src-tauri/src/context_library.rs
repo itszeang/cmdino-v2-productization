@@ -163,3 +163,71 @@ pub fn read_project_context_file(
     let full = root.join(&rel);
     fs::read_to_string(&full).map_err(|e| format!("read context file: {e}"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_project_root(name: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        std::env::temp_dir().join(format!("cmdino-{name}-{stamp}"))
+    }
+
+    #[test]
+    fn read_manifest_creates_and_persists_empty_manifest() {
+        let root = temp_project_root("context-empty");
+        fs::create_dir_all(&root).expect("create temp project");
+        let project_root = root.to_string_lossy().into_owned();
+
+        let result = read_project_context_manifest(project_root.clone()).expect("read manifest");
+
+        assert_eq!(result.manifest.version, 1);
+        assert_eq!(result.manifest.project_root, project_root);
+        assert!(result.manifest.files.is_empty());
+        assert!(root.join(".cmdino").join("context").join("manifest.json").exists());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn write_then_read_manifest_preserves_context_entries() {
+        let root = temp_project_root("context-persist");
+        fs::create_dir_all(&root).expect("create temp project");
+        let project_root = root.to_string_lossy().into_owned();
+        let manifest = CmdinoContextManifest {
+            version: 1,
+            project_root: "stale-root".to_string(),
+            files: vec![ContextLibraryFile {
+                id: "file-1".to_string(),
+                title: "Project Brief".to_string(),
+                target: "global".to_string(),
+                agent_id: None,
+                agent_label: None,
+                relative_path: ".cmdino/context/global/project-brief.md".to_string(),
+                created_at: "2026-05-17T00:00:00.000Z".to_string(),
+                updated_at: "2026-05-17T00:00:00.000Z".to_string(),
+            }],
+        };
+
+        write_project_context_manifest(project_root.clone(), manifest).expect("write manifest");
+        let result = read_project_context_manifest(project_root.clone()).expect("read manifest");
+
+        assert_eq!(result.manifest.project_root, project_root);
+        assert_eq!(result.manifest.files.len(), 1);
+        assert_eq!(result.manifest.files[0].relative_path, ".cmdino/context/global/project-brief.md");
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn context_file_paths_cannot_escape_project_context_directory() {
+        assert!(validate_context_relative_path(".cmdino/context/global/brief.md").is_ok());
+        assert!(validate_context_relative_path(".cmdino/context/../secret.md").is_err());
+        assert!(validate_context_relative_path("C:\\secret.md").is_err());
+        assert!(validate_context_relative_path(".cmdino/context/global/brief.txt").is_err());
+    }
+}

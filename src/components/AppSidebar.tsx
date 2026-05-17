@@ -48,6 +48,7 @@ interface AppSidebarProps {
   onOpenHistory:             () => void;
   onStartAll:                () => void;
   onGenerateMemoryBriefs:    () => void;
+  canGenerateMemoryBrief:    boolean;
   onExportTranscripts:       () => void;
   onGenerateBuildUpdateKit:  () => void;
   canGenerateBuildKit:       boolean;
@@ -228,6 +229,7 @@ export function AppSidebar({
   onOpenHistory,
   onStartAll,
   onGenerateMemoryBriefs,
+  canGenerateMemoryBrief,
   onExportTranscripts,
   onGenerateBuildUpdateKit,
   canGenerateBuildKit,
@@ -366,8 +368,8 @@ export function AppSidebar({
           <SidebarRow
             icon="memory"
             onClick={onGenerateMemoryBriefs}
-            disabled={terminalCount === 0}
-            title={terminalCount === 0 ? "No agents to generate briefs for" : "Save markdown continuity files for current agents"}
+            disabled={!canGenerateMemoryBrief}
+            title={canGenerateMemoryBrief ? "Save a project continuity brief for tomorrow or another agent" : "Start work, run a workflow, or generate an output first"}
           >
             Save Memory Brief
           </SidebarRow>

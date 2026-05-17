@@ -23,7 +23,26 @@ describe("extractHandoffText", () => {
     });
   });
 
-  it("falls back to CMDINO_RESULT handoff", () => {
+  it("falls back to CMDINO_RESULT structured handoff", () => {
+    const result = extractHandoffText([
+      "CMDINO_RESULT_START",
+      JSON.stringify({
+        status: "success",
+        summary: "done",
+        artifacts: [],
+        handoff: { target: "Reviewer", message: "Use this next." },
+        next: [],
+      }),
+      "CMDINO_RESULT_END",
+    ].join("\n"));
+
+    expect(result).toEqual({
+      text: "Use this next.",
+      source: "cmdino_result",
+    });
+  });
+
+  it("falls back to legacy CMDINO_RESULT handoff", () => {
     const result = extractHandoffText([
       "<CMDINO_RESULT>",
       JSON.stringify({

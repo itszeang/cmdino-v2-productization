@@ -123,7 +123,7 @@ pub fn write_memory_briefs(
 
     for file in &files {
         let safe_name = sanitize_file_name(&file.file_name);
-        if !safe_name.ends_with(".md") {
+        if !safe_name.ends_with(".md") && !safe_name.ends_with(".txt") {
             continue;
         }
         let path = dir.join(&safe_name);

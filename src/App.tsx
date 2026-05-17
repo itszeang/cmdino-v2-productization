@@ -79,7 +79,7 @@ import {
 } from "./domain/workflowResultCapture";
 import { buildWorkflowFinalSummary } from "./domain/workflowSummary";
 import {
-  buildWorkflowBuildPublicDraftArtifact,
+  buildWorkflowBuildPublicKitArtifact,
   buildWorkflowFinalOutputArtifact,
   buildWorkflowStepArtifacts,
 } from "./domain/workflowArtifacts";
@@ -552,8 +552,8 @@ export default function App() {
       alert("Memory brief export requires the desktop app.");
       return;
     }
-    if (agents.length === 0) {
-      alert("No agents to generate briefs for.");
+    if (agents.length === 0 && !currentRun && sessionEntries.length === 0 && outputFiles.length === 0) {
+      alert("No project context is available for a memory brief yet.");
       return;
     }
     try {
@@ -562,6 +562,11 @@ export default function App() {
         agents,
         workflowLinks,
         sessionEntries,
+        currentRun,
+        outputFiles,
+        workflowArtifactPaths: currentRun
+          ? workflowRunHistoryEntries.find((entry) => entry.id === currentRun.id)?.artifactPaths ?? []
+          : [],
         generatedAt: Date.now(),
       });
       const result = await writeMemoryBriefs(briefs);
@@ -913,7 +918,15 @@ export default function App() {
 
   function handleCaptureWorkflowResultFromAgent(input: {
     agentId: string;
-  }): { ok: true; text: string; message: string; source: WorkflowResultCapture["source"]; agentLabel: string } | { ok: false; message: string } {
+  }): {
+    ok: true;
+    text: string;
+    rawCapturedOutput: string;
+    cleanedCapturedOutput: string;
+    message: string;
+    source: WorkflowResultCapture["source"];
+    agentLabel: string;
+  } | { ok: false; message: string } {
     const target = agents.find((agent) => agent.id === input.agentId);
     const captureGetter = workflowResultCaptureRef.current.get(input.agentId);
     const failureReason = getWorkflowResultCaptureFailureReason({
@@ -936,7 +949,7 @@ export default function App() {
         text: "",
         source: "latest_output",
       });
-      const text = capture.text;
+      const text = capture.cleanedCapturedOutput;
       if (!text.trim()) {
         return {
           ok: false,
@@ -952,6 +965,8 @@ export default function App() {
       return {
         ok: true,
         text,
+        rawCapturedOutput: capture.rawCapturedOutput,
+        cleanedCapturedOutput: capture.cleanedCapturedOutput,
         source: capture.source,
         agentLabel: target?.label ?? input.agentId,
         message: `Captured from ${target?.label ?? input.agentId} using ${sourceLabel}. Review the textarea before parsing.`,
@@ -989,7 +1004,7 @@ export default function App() {
       setActiveTerminalId(target.id);
       return {
         ok: true,
-        message: `Asked ${target.label} to finish with CMDINO_RESULT and CMDINO_HANDOFF.`,
+        message: `Asked ${target.label} to finish with CMDINO_RESULT_START / CMDINO_RESULT_END.`,
       };
     } catch (err) {
       return {
@@ -1004,17 +1019,17 @@ export default function App() {
     if (!parsed.ok) {
       const detail =
         parsed.reason === "missing_block"
-          ? "Missing <CMDINO_RESULT> block. Ask the agent to finish with CMDINO_RESULT and CMDINO_HANDOFF, then capture or paste again."
+          ? "Missing CMDINO_RESULT_START / CMDINO_RESULT_END block. Ask the agent to finish with the structured result block, then capture or paste again."
           : parsed.reason === "invalid_json"
-            ? "CMDino found a result block, but the JSON inside it is invalid. Ask the agent to resend valid JSON inside CMDINO_RESULT."
-            : "CMDino found a result block, but the JSON shape was invalid. Required fields: status, summary, handoff, needs_user_action.";
+            ? "CMDino found a result block, but the JSON inside it is invalid. Ask the agent to resend valid JSON inside CMDINO_RESULT_START / CMDINO_RESULT_END."
+            : "CMDino found a result block, but the JSON shape was invalid. Required fields: status, summary, artifacts, handoff, next.";
       appendChatMessage(createSystemStatusMessage(
         `Could not parse CMDINO_RESULT: ${detail}`,
       ));
       return parsed;
     }
 
-    if (parsed.result.status === "completed") {
+    if (parsed.result.status === "success") {
       appendChatMessage(createWorkflowProgressMessage({
         workflowRunId: currentRun?.id,
         title: "Checkpoint completed",
@@ -1024,7 +1039,7 @@ export default function App() {
       const intervention = createWorkflowIntervention({
         kind: "needs_user_input",
         title: "Workflow needs user action",
-        message: parsed.result.userActionReason ?? parsed.result.summary,
+        message: parsed.result.handoff.message || parsed.result.summary,
         workflowRunId: currentRun?.id,
         stepId: currentRun?.currentStepId,
       });
@@ -1079,6 +1094,18 @@ export default function App() {
     if (!currentRun?.currentStepId) return;
     const currentIndex = currentRun.steps.findIndex((step) => step.id === currentRun.currentStepId);
     const currentStep = currentRun.steps[currentIndex];
+    const parsed = currentStep?.parsedOutput as Record<string, unknown> | undefined;
+    if (
+      currentStep?.status !== "completed" ||
+      parsed?.status !== "success" ||
+      !Array.isArray(parsed.artifacts) ||
+      !Array.isArray(parsed.next)
+    ) {
+      appendChatMessage(createSystemStatusMessage(
+        "Parse a valid CMDINO_RESULT before continuing to the next checkpoint.",
+      ));
+      return;
+    }
     const nextStep = currentRun.steps.slice(currentIndex + 1).find((step) => step.status === "pending");
     const finalMarkdown = buildWorkflowFinalSummary(currentRun);
     continueToNextStep();
@@ -1133,8 +1160,40 @@ export default function App() {
     return saveWorkflowArtifact(buildWorkflowStepArtifacts, "Workflow step artifacts");
   }
 
-  function handleSaveWorkflowBuildPublicDraft() {
-    return saveWorkflowArtifact(buildWorkflowBuildPublicDraftArtifact, "Build-in-public draft");
+  function handleGenerateBuildPublicKit() {
+    return saveWorkflowArtifact(buildWorkflowBuildPublicKitArtifact, "Build-in-Public kit");
+  }
+
+  async function handleGenerateMemoryBriefsForWorkflow(): Promise<{ ok: boolean; message: string }> {
+    if (!isTauri) return { ok: false, message: "Memory brief export requires the desktop app." };
+    try {
+      const briefs = buildMemoryBriefs({
+        workspaceName,
+        agents,
+        workflowLinks,
+        sessionEntries,
+        currentRun,
+        outputFiles,
+        workflowArtifactPaths: currentRun
+          ? workflowRunHistoryEntries.find((entry) => entry.id === currentRun.id)?.artifactPaths ?? []
+          : [],
+        generatedAt: Date.now(),
+      });
+      const result = await writeMemoryBriefs(briefs);
+      if (currentRun && result.files.length > 0) {
+        addWorkflowRunArtifactPaths(currentRun.id, result.files);
+      }
+      void refreshOutputFiles();
+      return {
+        ok: true,
+        message: `Generated ${result.count} memory brief${result.count === 1 ? "" : "s"} saved to Output Shelf.`,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        message: `Memory brief generation failed: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
   }
 
   function handleResumeWorkflowRun(entry: WorkflowRunHistoryEntry): { ok: boolean; message: string } {
@@ -1156,17 +1215,24 @@ export default function App() {
       currentRun.id !== entry.id &&
       !["completed", "failed", "cancelled"].includes(currentRun.status),
     );
-    if (hasActiveIncompleteRun && !window.confirm("Replace the current incomplete workflow run with this saved run?")) {
-      return { ok: false, message: "Resume cancelled. Current workflow run was left unchanged." };
-    }
 
     restoreRun(entry.run);
     setActiveSurface("chat");
     setShowWorkflowHistory(false);
-    appendChatMessage(createSystemStatusMessage(
-      `Resumed workflow run: ${entry.userTask}. No prompt was sent automatically.`,
-    ));
-    return { ok: true, message: "Resumed workflow run in Chat. Continue manually from the current checkpoint." };
+
+    const notices: string[] = [
+      `Resumed: ${entry.userTask}.`,
+      "No prompt was sent automatically.",
+    ];
+    if (hasActiveIncompleteRun) {
+      notices.push("Previous incomplete run was replaced.");
+    }
+    if (runningAgentIds.size > 0) {
+      notices.push(`${runningAgentIds.size} agent${runningAgentIds.size !== 1 ? "s" : ""} still running — check their output before sending the next prompt.`);
+    }
+
+    appendChatMessage(createSystemStatusMessage(notices.join(" ")));
+    return { ok: true, message: "Resumed in Chat. Continue manually from the current checkpoint." };
   }
 
   function isAgentTeamDeployed(teamId?: string | null): boolean {
@@ -1190,9 +1256,23 @@ export default function App() {
   const currentStep = currentRun?.currentStepId
     ? currentRun.steps.find((step) => step.id === currentRun.currentStepId) ?? null
     : null;
+  const currentStepIndex = currentRun && currentStep
+    ? currentRun.steps.findIndex((step) => step.id === currentStep.id)
+    : -1;
+  const previousCompletedStep = currentRun && currentStepIndex > 0
+    ? [...currentRun.steps.slice(0, currentStepIndex)].reverse().find((step) => step.status === "completed")
+    : null;
+  const previousParsedOutput = previousCompletedStep?.parsedOutput as { handoff?: unknown } | undefined;
+  const previousHandoff = previousParsedOutput?.handoff as { target?: unknown } | string | undefined;
+  const previousHandoffTarget = typeof previousHandoff === "string"
+    ? previousHandoff
+    : typeof previousHandoff?.target === "string"
+      ? previousHandoff.target
+      : undefined;
   const suggestedWorkflowTargetId = currentStep ? suggestTargetAgentForStep({
     preferredProvider: currentStep.preferredProvider,
     role: currentStep.agentRole,
+    handoffTarget: previousHandoffTarget,
     agents: agents.map((agent) => ({
       id: agent.id,
       label: agent.label,
@@ -1241,6 +1321,7 @@ export default function App() {
         onOpenHistory={() => setShowHistory(true)}
         onStartAll={() => { void handleStartAll(); }}
         onGenerateMemoryBriefs={() => { void handleGenerateMemoryBriefs(); }}
+        canGenerateMemoryBrief={agents.length > 0 || Boolean(currentRun) || sessionEntries.length > 0 || outputFiles.length > 0}
         onExportTranscripts={() => { void handleExportTranscripts(); }}
         onGenerateBuildUpdateKit={() => { void handleGenerateBuildUpdateKit(); }}
         canGenerateBuildKit={agents.length > 0 || sessionEntries.length > 0}
@@ -1308,7 +1389,8 @@ export default function App() {
                   onSendWorkflowResultCorrectionToAgent={handleSendWorkflowResultCorrectionToAgent}
                   onSaveWorkflowFinalOutput={handleSaveWorkflowFinalOutput}
                   onSaveWorkflowStepArtifacts={handleSaveWorkflowStepArtifacts}
-                  onSaveWorkflowBuildPublicDraft={handleSaveWorkflowBuildPublicDraft}
+                  onGenerateBuildPublicKit={handleGenerateBuildPublicKit}
+                  onGenerateMemoryBriefs={handleGenerateMemoryBriefsForWorkflow}
                   onParseResult={handleParseWorkflowResult}
                   onContinueWorkflow={handleContinueWorkflow}
                   onCancelWorkflow={cancelRun}
@@ -1466,6 +1548,8 @@ export default function App() {
         <WorkflowRunHistoryPanel
           entries={workflowRunHistoryEntries}
           currentProjectId={currentProject?.id}
+          currentAgentTeamId={selectedTeamId}
+          hasRunningAgents={runningAgentIds.size > 0}
           onResumeRun={handleResumeWorkflowRun}
           onOpenOutputLibrary={() => {
             setShowOutputLibrary(true);
@@ -1514,6 +1598,7 @@ export default function App() {
           outputFiles={outputFiles}
           agents={agents}
           activeTerminalId={activeTerminalId}
+          workflowRunEntries={workflowRunHistoryEntries}
           onAttach={addAttachment}
           onRefresh={() => { void refreshOutputFiles(); }}
           onClose={() => setShowOutputLibrary(false)}

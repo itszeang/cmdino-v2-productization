@@ -1,11 +1,14 @@
 import type { TerminalAgent } from "./terminalAgent";
 import type { WorkflowLink } from "./workflow";
 import type { SessionLogEvent } from "./sessionLog";
+import type { GeneratedOutputFile } from "./attachments";
+import type { WorkflowRun, WorkflowRunStep } from "./workflowRun";
 
 export interface MemoryBriefFile {
   fileName: string;
   content: string;
   agentConfigId: string;
+  kind: "memory_brief";
 }
 
 export interface BuildMemoryBriefsInput {
@@ -13,15 +16,11 @@ export interface BuildMemoryBriefsInput {
   agents: TerminalAgent[];
   workflowLinks: WorkflowLink[];
   sessionEntries: SessionLogEvent[];
+  currentRun?: WorkflowRun | null;
+  outputFiles?: GeneratedOutputFile[];
+  workflowArtifactPaths?: string[];
   generatedAt: number;
 }
-
-const CANONICAL_KINDS: Record<string, string> = {
-  claude:  "CLAUDE_SESSION_MEMORY.md",
-  codex:   "CODEX_SESSION_MEMORY.md",
-  gemini:  "GEMINI_SESSION_MEMORY.md",
-  ollama:  "OLLAMA_SESSION_MEMORY.md",
-};
 
 function sanitizeLabel(label: string): string {
   const clean = label
@@ -46,11 +45,6 @@ function isUsableTimestamp(ts: unknown): ts is number {
   );
 }
 
-function formatWorkflowUpdatedAt(ts: unknown): string {
-  if (!isUsableTimestamp(ts)) return "recently configured";
-  return `last updated: ${fmtTs(ts)}`;
-}
-
 function buildAttachmentsTable(agent: TerminalAgent): string {
   if (agent.attachments.length === 0) return "No attachments currently configured.\n";
   const header = "| File | Source | Path |\n| --- | --- | --- |";
@@ -61,6 +55,24 @@ function buildAttachmentsTable(agent: TerminalAgent): string {
     return `| ${att.fileName} | ${source} | ${att.path} |`;
   });
   return `${header}\n${rows.join("\n")}\n`;
+}
+
+function bulletList(items: string[], fallback: string): string {
+  const cleanItems = items.map((item) => item.trim()).filter(Boolean);
+  return cleanItems.length > 0
+    ? cleanItems.map((item) => `- ${item}`).join("\n") + "\n"
+    : `- ${fallback}\n`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function truncateInline(value: string, limit = 360): string {
+  const clean = value.replace(/\s+/g, " ").trim();
+  return clean.length > limit ? `${clean.slice(0, limit - 3)}...` : clean;
 }
 
 function formatEventType(type: string, payload: Record<string, unknown>): string {
@@ -104,158 +116,246 @@ function formatEventType(type: string, payload: Record<string, unknown>): string
   }
 }
 
-function buildRecentActions(agent: TerminalAgent, entries: SessionLogEvent[]): string {
-  const relevant = entries.filter(
-    (ev) => ev.agentConfigId === agent.configId || ev.agentLabel === agent.label,
-  );
-  const limited = relevant.slice(-20);
-  if (limited.length === 0) return "No matching session events recorded.\n";
-  const sorted = [...limited].sort((a, b) => a.ts - b.ts);
-  return sorted
-    .map((ev) => `- ${fmtTs(ev.ts)} - ${formatEventType(ev.type, ev.payload)}`)
-    .join("\n") + "\n";
+function extractOutputText(payload: Record<string, unknown>): string {
+  for (const key of ["text", "output", "content", "chunk", "cleanOutput"]) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) return truncateInline(value);
+  }
+  return "";
+}
+
+function buildRecentAgentOutput(agent: TerminalAgent, entries: SessionLogEvent[]): string {
+  const outputs = entries
+    .filter((ev) => (
+      (ev.agentConfigId === agent.configId || ev.agentLabel === agent.label) &&
+      ev.type === "terminal_output"
+    ))
+    .slice(-3)
+    .map((ev) => extractOutputText(ev.payload))
+    .filter(Boolean);
+  return outputs.length > 0
+    ? outputs.map((item) => `  - ${item}`).join("\n")
+    : "  - No captured terminal output summary available.";
 }
 
 function resolveAgentLabel(configId: string, agents: TerminalAgent[]): string {
   return agents.find((a) => a.configId === configId)?.label ?? configId;
 }
 
-function buildIncomingHandoffs(agent: TerminalAgent, links: WorkflowLink[], agents: TerminalAgent[]): string {
-  const incoming = links.filter(
-    (l) => l.targetConfigId === agent.configId && l.kind === "handoff",
-  );
-  if (incoming.length === 0) return "None.\n";
-  return (
-    incoming
-      .map((l) => {
-        const srcLabel = resolveAgentLabel(l.sourceConfigId, agents);
-        return `- From ${srcLabel}: handoff link, count ${l.count}, ${formatWorkflowUpdatedAt(l.updatedAt)}`;
-      })
-      .join("\n") + "\n"
-  );
+function parsedSummary(step: WorkflowRunStep): string {
+  const parsed = asRecord(step.parsedOutput);
+  const summary = typeof parsed?.summary === "string" ? parsed.summary : step.summary;
+  return summary?.trim() || "No summary recorded.";
 }
 
-function buildOutgoingHandoffs(agent: TerminalAgent, links: WorkflowLink[], agents: TerminalAgent[]): string {
-  const outgoing = links.filter(
-    (l) => l.sourceConfigId === agent.configId && l.kind === "handoff",
-  );
-  if (outgoing.length === 0) return "None.\n";
-  return (
-    outgoing
-      .map((l) => {
-        const tgtLabel = resolveAgentLabel(l.targetConfigId, agents);
-        return `- To ${tgtLabel}: handoff link, count ${l.count}, ${formatWorkflowUpdatedAt(l.updatedAt)}`;
-      })
-      .join("\n") + "\n"
-  );
+function parsedHandoff(step: WorkflowRunStep): string {
+  const parsed = asRecord(step.parsedOutput);
+  const handoff = parsed?.handoff;
+  if (typeof handoff === "string") return handoff.trim();
+  const record = asRecord(handoff);
+  return typeof record?.message === "string" ? record.message.trim() : "";
 }
 
-function buildPreferredRoutes(agent: TerminalAgent, links: WorkflowLink[], agents: TerminalAgent[]): string {
-  const outRoutes = links.filter((l) => l.sourceConfigId === agent.configId && l.kind === "route");
-  const inRoutes  = links.filter((l) => l.targetConfigId === agent.configId && l.kind === "route");
-  const lines: string[] = [];
-  for (const l of outRoutes) {
-    lines.push(`- Outgoing preferred route: ${agent.label} -> ${resolveAgentLabel(l.targetConfigId, agents)}`);
+function parsedNext(step: WorkflowRunStep): string[] {
+  const parsed = asRecord(step.parsedOutput);
+  const next = parsed?.next;
+  return Array.isArray(next)
+    ? next.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+}
+
+function buildProjectSection(workspaceName: string, agents: TerminalAgent[], generatedAt: number): string {
+  return [
+    `Generated: ${fmtTs(generatedAt)}`,
+    `Workspace: ${workspaceName}`,
+    `Agents: ${agents.length > 0 ? agents.map((agent) => agent.label).join(", ") : "No agents configured."}`,
+  ].join("\n") + "\n";
+}
+
+function buildCurrentGoalSection(run?: WorkflowRun | null): string {
+  if (!run) return "No active workflow run is available. Resume by reviewing the completed work and choosing the next task.\n";
+  return [
+    `Task: ${run.userTask || "No user task recorded."}`,
+    `Mode: ${run.mode}`,
+    `Status: ${run.status}`,
+  ].join("\n") + "\n";
+}
+
+function buildCompletedSection(run: WorkflowRun | null | undefined, entries: SessionLogEvent[]): string {
+  const completedSteps = run?.steps
+    .filter((step) => step.status === "completed")
+    .map((step) => `${step.label}: ${parsedSummary(step)}`) ?? [];
+  const notableEvents = entries
+    .filter((event) => ["manual_handoff", "auto_forward", "workspace_saved", "workspace_loaded"].includes(event.type))
+    .slice(-8)
+    .map((event) => `${formatEventType(event.type, event.payload)} (${event.agentLabel})`);
+  return bulletList([...completedSteps, ...notableEvents], "No completed workflow steps or notable session actions recorded.");
+}
+
+function buildWorkflowStateSection(run?: WorkflowRun | null): string {
+  if (!run) return "No active workflow run state was captured.\n";
+  const current = run.currentStepId
+    ? run.steps.find((step) => step.id === run.currentStepId)
+    : null;
+  const stepLines = run.steps.map((step, index) => {
+    const currentMarker = step.id === run.currentStepId ? " current" : "";
+    return `- ${index + 1}. ${step.label} (${step.agentRole}) - ${step.status}${currentMarker}`;
+  });
+  return [
+    `Run ID: ${run.id}`,
+    `Run status: ${run.status}`,
+    `Current step: ${current ? current.label : "No active step"}`,
+    `Started: ${isUsableTimestamp(run.startedAt) ? fmtTs(run.startedAt) : "not recorded"}`,
+    `Completed: ${isUsableTimestamp(run.completedAt) ? fmtTs(run.completedAt) : "not recorded"}`,
+    "",
+    ...stepLines,
+  ].join("\n") + "\n";
+}
+
+function buildArtifactPaths(outputFiles: GeneratedOutputFile[] = [], workflowArtifactPaths: string[] = []): string {
+  const outputLines = outputFiles.map((file) => `${file.fileName} [${file.kind}] - ${file.path}`);
+  const workflowLines = workflowArtifactPaths.map((path) => `Workflow artifact - ${path}`);
+  return bulletList([...workflowLines, ...outputLines], "No Output Shelf artifacts were captured.");
+}
+
+function buildAgentOutputsSection(agents: TerminalAgent[], entries: SessionLogEvent[], outputFiles: GeneratedOutputFile[], workflowArtifactPaths: string[]): string {
+  const agentSections = agents.length > 0
+    ? agents.map((agent) => [
+        `### ${agent.label}`,
+        `- Kind: ${agent.agentKind ?? "custom"}`,
+        `- Working directory: ${agent.cwd ?? "(not set)"}`,
+        "- Current attachments:",
+        buildAttachmentsTable(agent).trim(),
+        "- Recent terminal output:",
+        buildRecentAgentOutput(agent, entries),
+      ].join("\n")).join("\n\n")
+    : "No agents configured.";
+  return [
+    agentSections,
+    "",
+    "### Artifact Links / Paths",
+    buildArtifactPaths(outputFiles, workflowArtifactPaths).trim(),
+  ].join("\n") + "\n";
+}
+
+function buildDecisionsSection(run: WorkflowRun | null | undefined, links: WorkflowLink[], agents: TerminalAgent[]): string {
+  const workflowDecisions = run?.steps.flatMap((step) => {
+    const lines: string[] = [];
+    const handoff = parsedHandoff(step);
+    if (handoff) lines.push(`${step.label} handoff: ${handoff}`);
+    for (const next of parsedNext(step)) lines.push(`${step.label} next: ${next}`);
+    return lines;
+  }) ?? [];
+  const routeDecisions = links.map((link) => {
+    const src = resolveAgentLabel(link.sourceConfigId, agents);
+    const target = resolveAgentLabel(link.targetConfigId, agents);
+    return `${src} -> ${target} (${link.kind}, count ${link.count})`;
+  });
+  return bulletList([...workflowDecisions, ...routeDecisions], "No explicit decisions or handoffs were recorded.");
+}
+
+function buildKnownIssuesSection(run: WorkflowRun | null | undefined, entries: SessionLogEvent[]): string {
+  const failedSteps = run?.steps
+    .filter((step) => step.status === "failed" || step.status === "needs_intervention")
+    .map((step) => `${step.label}: ${step.status} - ${parsedSummary(step)}`) ?? [];
+  const errorEvents = entries
+    .filter((event) => event.type === "terminal_error" || event.type === "runtime_error")
+    .slice(-8)
+    .map((event) => `${event.agentLabel}: ${formatEventType(event.type, event.payload)}`);
+  return bulletList([...failedSteps, ...errorEvents], "No known issues recorded.");
+}
+
+function buildNextPrompt(run: WorkflowRun | null | undefined, agents: TerminalAgent[]): string {
+  if (!run) {
+    return "Review this memory brief, inspect the Output Shelf artifacts, and propose the next concrete project step before making changes.";
   }
-  for (const l of inRoutes) {
-    lines.push(`- Incoming preferred route: ${resolveAgentLabel(l.sourceConfigId, agents)} -> ${agent.label}`);
+  const current = run.currentStepId
+    ? run.steps.find((step) => step.id === run.currentStepId)
+    : null;
+  const latestNext = [...run.steps].reverse().flatMap(parsedNext)[0];
+  const target = current?.label ?? agents[0]?.label ?? "the next agent";
+  if (run.status === "completed") {
+    return `Review the completed workflow "${run.userTask}" using this memory brief and the linked artifacts. Confirm the result, identify any missing verification, and propose the next project task.`;
   }
-  if (lines.length === 0) return "None configured.\n";
-  return lines.join("\n") + "\n";
-}
-
-function bestNextTarget(agent: TerminalAgent, links: WorkflowLink[], agents: TerminalAgent[]): string {
-  const route = links.find((l) => l.sourceConfigId === agent.configId && l.kind === "route");
-  if (route) return resolveAgentLabel(route.targetConfigId, agents);
-  const handoff = links.find((l) => l.sourceConfigId === agent.configId && l.kind === "handoff");
-  if (handoff) return resolveAgentLabel(handoff.targetConfigId, agents);
-  return "None configured";
+  return [
+    `Continue the CMDino workflow for: ${run.userTask}`,
+    `Target checkpoint/agent: ${target}`,
+    latestNext ? `Use this next action: ${latestNext}` : "Review the current workflow state, then continue only after the user confirms the next checkpoint.",
+    "Preserve the explicit human review step before sending or applying follow-up work.",
+  ].join("\n");
 }
 
 function buildBrief(
-  agent:         TerminalAgent,
   workspaceName: string,
-  links:         WorkflowLink[],
-  entries:       SessionLogEvent[],
-  generatedAt:   number,
-  allAgents:     TerminalAgent[],
+  agents: TerminalAgent[],
+  links: WorkflowLink[],
+  entries: SessionLogEvent[],
+  currentRun: WorkflowRun | null | undefined,
+  outputFiles: GeneratedOutputFile[],
+  workflowArtifactPaths: string[],
+  generatedAt: number,
 ): string {
-  return `# CMDino Session Memory - ${agent.label}
+  return `# CMDino Memory Brief
 
-Generated: ${fmtTs(generatedAt)}
-Workspace: ${workspaceName}
-
-## Agent Identity
-- Label: ${agent.label}
-- Kind: ${agent.agentKind ?? "custom"}
-- Config ID: ${agent.configId}
-- Dino: ${agent.dinoId}
-
-## Launch Context
-- Command: \`${agent.launchCommand ?? "(not set)"}\`
-- Working directory: \`${agent.cwd ?? "(not set)"}\`
-
-## Current Attachments
-${buildAttachmentsTable(agent)}
-## Recent Session Actions
-${buildRecentActions(agent, entries)}
-## Incoming Handoffs
-${buildIncomingHandoffs(agent, links, allAgents)}
-## Outgoing Handoffs
-${buildOutgoingHandoffs(agent, links, allAgents)}
-## Workflow Preferred Routes
-${buildPreferredRoutes(agent, links, allAgents)}
-## Recommended Next-Session Context Notes
-- Start this agent with the command above from the working directory above.
-- Reattach or send the listed attachments if the agent needs its role/context files.
-- Review recent actions before asking the agent to continue.
-- Preferred next handoff target: ${bestNextTarget(agent, links, allAgents)}.
-- This file does not include full terminal transcripts.
+## Project
+${buildProjectSection(workspaceName, agents, generatedAt)}
+## Current Goal
+${buildCurrentGoalSection(currentRun)}
+## Completed
+${buildCompletedSection(currentRun, entries)}
+## Current Workflow State
+${buildWorkflowStateSection(currentRun)}
+## Agent Outputs
+${buildAgentOutputsSection(agents, entries, outputFiles, workflowArtifactPaths)}
+## Decisions
+${buildDecisionsSection(currentRun, links, agents)}
+## Known Issues
+${buildKnownIssuesSection(currentRun, entries)}
+## Next Recommended Prompt
+\`\`\`text
+${buildNextPrompt(currentRun, agents)}
+\`\`\`
 
 ## Source Limits
 - Generated locally by CMDino.
 - No API calls.
 - No LLM summarization.
-- Uses current agent config, attachment metadata, session events, and workflow links only.
+- Uses current project/workflow state, agent config, attachment metadata, session events, and Output Shelf metadata only.
 `;
 }
 
 export function buildMemoryBriefs(input: BuildMemoryBriefsInput): MemoryBriefFile[] {
-  const { workspaceName, agents, workflowLinks, sessionEntries, generatedAt } = input;
+  const {
+    workspaceName,
+    agents,
+    workflowLinks,
+    sessionEntries,
+    currentRun,
+    outputFiles = [],
+    workflowArtifactPaths = [],
+    generatedAt,
+  } = input;
 
   const validConfigIds = new Set(agents.map((a) => a.configId));
   const activeLinks = workflowLinks.filter(
     (l) => validConfigIds.has(l.sourceConfigId) && validConfigIds.has(l.targetConfigId),
   );
 
-  // Count agents per kind to determine canonical vs label-based filenames
-  const kindCount = new Map<string, number>();
-  for (const agent of agents) {
-    const k = (agent.agentKind ?? "custom").toLowerCase();
-    kindCount.set(k, (kindCount.get(k) ?? 0) + 1);
-  }
+  const content = buildBrief(
+    workspaceName,
+    agents,
+    activeLinks,
+    sessionEntries,
+    currentRun,
+    outputFiles,
+    workflowArtifactPaths,
+    generatedAt,
+  );
 
-  const usedFileNames = new Set<string>();
-
-  return agents.map((agent) => {
-    const kind = (agent.agentKind ?? "custom").toLowerCase();
-    const canonical = CANONICAL_KINDS[kind];
-    let fileName: string;
-
-    if (canonical && (kindCount.get(kind) ?? 0) === 1) {
-      fileName = canonical;
-    } else {
-      fileName = `${sanitizeLabel(agent.label)}_SESSION_MEMORY.md`;
-    }
-
-    // Dedup: if name already taken, append short config id suffix
-    if (usedFileNames.has(fileName)) {
-      const suffix = agent.configId.slice(0, 6).toUpperCase();
-      fileName = fileName.replace("_SESSION_MEMORY.md", `_${suffix}_SESSION_MEMORY.md`);
-    }
-    usedFileNames.add(fileName);
-
-    const content = buildBrief(agent, workspaceName, activeLinks, sessionEntries, generatedAt, agents);
-    return { fileName, content, agentConfigId: agent.configId };
-  });
+  return [{
+    fileName: `${sanitizeLabel(workspaceName)}_PROJECT_MEMORY_BRIEF.md`,
+    content,
+    agentConfigId: "project",
+    kind: "memory_brief",
+  }];
 }

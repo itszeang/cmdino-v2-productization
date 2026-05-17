@@ -35,6 +35,18 @@ describe("agentTargetSuggestion", () => {
     })).toBe("reviewer");
   });
 
+  it("uses a handoff target to suggest the next agent", () => {
+    expect(suggestTargetAgentForStep({
+      preferredProvider: "gemini",
+      role: "reviewer",
+      handoffTarget: "Gemini Reviewer",
+      agents: [
+        { id: "codex", label: "Codex Builder", kind: "codex", isRunning: true },
+        { id: "gemini", label: "Gemini Reviewer", kind: "gemini", isRunning: true },
+      ],
+    })).toBe("gemini");
+  });
+
   it("returns null when there is no useful suggestion", () => {
     expect(suggestTargetAgentForStep({
       preferredProvider: "ollama",

@@ -1,9 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { GeneratedOutputFile } from "../domain/attachments";
 import type { TerminalAttachment } from "../domain/orchestration";
-import { groupOutputLibraryFiles, kindReadableLabel, kindPurposeHint, outputFileDisplayLabel } from "../domain/outputLibrary";
+import {
+  artifactColor,
+  artifactPurposeHint,
+  buildEditedOutputVersionFileName,
+  getOutputVersionMetadata,
+  groupOutputLibraryFiles,
+  isEditableOutputArtifact,
+  kindReadableLabel,
+  outputFileDisplayLabel,
+  outputVersionLabel,
+} from "../domain/outputLibrary";
+import type { WorkflowRunHistoryEntry } from "../domain/workflowRunHistory";
 import { fileBridge } from "../orchestration/fileBridge";
-import { deleteOutputFile } from "../memory/memoryBriefBridge";
+import { deleteOutputFile, writeOutputFiles } from "../memory/memoryBriefBridge";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { MarkdownArtifactReader } from "./MarkdownArtifactReader";
 import { ArtifactReaderModal } from "./ArtifactReaderModal";
@@ -27,26 +38,21 @@ function relTime(ts: number): string {
   return `${Math.floor(diff / 86_400_000)}d ago`;
 }
 
-function kindColor(kind: GeneratedOutputFile["kind"]): string {
-  if (kind === "memory_brief") return "#c084fc";
-  if (kind === "transcript")   return "#60a5fa";
-  if (kind === "markdown")     return "#34d399";
-  return "#9ca3af";
-}
-
 interface Props {
-  outputFiles:      GeneratedOutputFile[];
-  agents:           Array<{ id: string; label: string; attachments: TerminalAttachment[] }>;
-  activeTerminalId: string | null;
-  onAttach:         (agentId: string, path: string, source: "user" | "preset" | "generated") => void;
-  onRefresh:        () => void;
-  onClose:          () => void;
+  outputFiles:         GeneratedOutputFile[];
+  agents:              Array<{ id: string; label: string; attachments: TerminalAttachment[] }>;
+  activeTerminalId:    string | null;
+  workflowRunEntries?: WorkflowRunHistoryEntry[];
+  onAttach:            (agentId: string, path: string, source: "user" | "preset" | "generated") => void;
+  onRefresh:           () => void;
+  onClose:             () => void;
 }
 
 export function OutputLibraryDrawer({
   outputFiles,
   agents,
   activeTerminalId,
+  workflowRunEntries = [],
   onAttach,
   onRefresh,
   onClose,
@@ -59,6 +65,7 @@ export function OutputLibraryDrawer({
   const [copyState,    setCopyState]    = useState<"idle" | "copied-content" | "copied-path" | "error">("idle");
   const [deleteConfirm,setDeleteConfirm]= useState(false);
   const [showReader,   setShowReader]   = useState(false);
+  const [versionNotice,setVersionNotice]= useState("");
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -78,6 +85,7 @@ export function OutputLibraryDrawer({
     setPreviewError(null);
     setPreviewContent(null);
     setPreviewTruncated(false);
+    setVersionNotice("");
 
     fileBridge.readPreview(selected.path)
       .then((result) => {
@@ -104,10 +112,51 @@ export function OutputLibraryDrawer({
     activeAgent.attachments.some((att) => att.path === selected.path),
   );
   const canAttach = Boolean(activeAgent && selected && !alreadyAttached);
+  const canEditSelected = Boolean(selected && previewContent !== null && isEditableOutputArtifact(selected));
+
+  const artifactRunMap = useMemo(() => {
+    const map = new Map<string, WorkflowRunHistoryEntry>();
+    for (const entry of workflowRunEntries) {
+      for (const p of entry.artifactPaths ?? []) {
+        const name = (p.split(/[/\\]/).pop() ?? p).toLowerCase();
+        if (!map.has(name)) map.set(name, entry);
+      }
+    }
+    return map;
+  }, [workflowRunEntries]);
+
+  const sourceRun = selected ? (artifactRunMap.get(selected.fileName.toLowerCase()) ?? null) : null;
 
   function handleAttach() {
     if (!activeAgent || !selected || alreadyAttached) return;
     onAttach(activeAgent.id, selected.path, "generated");
+  }
+
+  async function handleSaveEditedArtifact(content: string): Promise<{ ok: boolean; message: string }> {
+    if (!selected || !isTauri) {
+      return { ok: false, message: "Saving edited artifacts requires the desktop app." };
+    }
+    if (!isEditableOutputArtifact(selected)) {
+      return { ok: false, message: "This artifact type is read-only." };
+    }
+    const fileName = buildEditedOutputVersionFileName(
+      selected.fileName,
+      outputFiles.map((file) => file.fileName),
+    );
+    try {
+      const result = await writeOutputFiles([{ fileName, content }]);
+      if (result.count === 0) {
+        return { ok: false, message: "Edited artifact was not saved." };
+      }
+      setVersionNotice(`Saved ${fileName}. Refreshing Output Shelf.`);
+      onRefresh();
+      return { ok: true, message: `Saved new version: ${fileName}` };
+    } catch (err) {
+      return {
+        ok: false,
+        message: `Could not save edited version: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
   }
 
   async function handleCopyContent() {
@@ -186,10 +235,10 @@ export function OutputLibraryDrawer({
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 13, letterSpacing: 0.2, color: "var(--text-main)" }}>
-              Generated Output Dashboard
+              Output Shelf
             </div>
             <div style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 1 }}>
-              Preview, copy, delete, and attach generated outputs as context
+              Workflow results, memory briefs, build notes, and terminal logs.
             </div>
           </div>
           <button
@@ -237,16 +286,21 @@ export function OutputLibraryDrawer({
             ) : (
               groups.map((group) => (
                 <div key={group.label}>
-                  <div style={{
-                    padding: "8px 12px 4px",
-                    fontSize: 9, fontWeight: 700, letterSpacing: 0.8,
-                    color: "var(--text-faint)", textTransform: "uppercase",
-                  }}>
-                    {group.label}
+                  <div style={{ padding: "10px 12px 2px" }}>
+                    <div style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: 0.8,
+                      color: "var(--text-faint)", textTransform: "uppercase",
+                    }}>
+                      {group.label}
+                    </div>
+                    <div style={{ fontSize: 9, color: "var(--text-faint)", opacity: 0.7, marginTop: 1 }}>
+                      {group.hint}
+                    </div>
                   </div>
                   {group.files.map((file) => {
                     const isSelected = selected?.path === file.path;
-                    const color = kindColor(file.kind);
+                    const color = artifactColor(file);
+                    const fileRun = artifactRunMap.get(file.fileName.toLowerCase());
                     return (
                       <button
                         key={file.path}
@@ -273,13 +327,21 @@ export function OutputLibraryDrawer({
                             (e.currentTarget as HTMLButtonElement).style.background = "transparent";
                         }}
                       >
-                        <div style={{ marginBottom: 2 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
                           <span style={{
-                            fontSize: 9, fontWeight: 600, letterSpacing: 0.2,
-                            color, marginRight: 5,
+                            fontSize: 9, fontWeight: 700, letterSpacing: 0.2, color,
                           }}>
                             {outputFileDisplayLabel(file)}
                           </span>
+                          {getOutputVersionMetadata(file.fileName).isEditedVersion && (
+                            <span style={{
+                              fontSize: 8, color: "var(--text-faint)",
+                              border: "1px solid var(--border-subtle)",
+                              borderRadius: 3, padding: "0 3px",
+                            }}>
+                              edited
+                            </span>
+                          )}
                         </div>
                         <div style={{
                           fontSize: 11, color: "var(--text-main)",
@@ -288,6 +350,15 @@ export function OutputLibraryDrawer({
                         }}>
                           {file.fileName}
                         </div>
+                        {fileRun && (
+                          <div style={{
+                            fontSize: 9, color: "var(--accent)",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            marginBottom: 2,
+                          }}>
+                            {fileRun.userTask || "Untitled workflow"}
+                          </div>
+                        )}
                         <div style={{
                           fontSize: 9, color: "var(--text-faint)",
                           display: "flex", gap: 4,
@@ -334,11 +405,28 @@ export function OutputLibraryDrawer({
                   <div style={{
                     fontSize: 9, color: "var(--text-faint)", marginBottom: 6, lineHeight: 1.4,
                   }}>
+                    <span style={{ color: artifactColor(selected), fontWeight: 600 }}>
+                      {outputFileDisplayLabel(selected)}
+                    </span>
+                    {" · "}
                     {kindReadableLabel(selected.kind)} · {relTime(selected.modifiedAt)} · {fmtSize(selected.sizeBytes)}
-                    <span style={{ marginLeft: 6, fontStyle: "italic" }}>
-                      {kindPurposeHint(selected.kind)}
+                    {getOutputVersionMetadata(selected.fileName).isEditedVersion
+                      ? ` · ${outputVersionLabel(selected.fileName)}`
+                      : ""}
+                    <span style={{ display: "block", marginTop: 2, fontStyle: "italic" }}>
+                      {artifactPurposeHint(selected)}
                     </span>
                   </div>
+                  {sourceRun && (
+                    <div style={{
+                      fontSize: 9, color: "var(--accent)", marginBottom: 6,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}
+                      title={`From workflow run: ${sourceRun.id}`}
+                    >
+                      From workflow: {sourceRun.userTask || "Untitled workflow"}
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                     <button
                       className="cmd-pill-btn"
@@ -383,6 +471,16 @@ export function OutputLibraryDrawer({
                     >
                       Open Reader
                     </button>
+                    {canEditSelected && (
+                      <button
+                        className="cmd-pill-btn"
+                        style={{ fontSize: 10, padding: "3px 8px" }}
+                        onClick={() => setShowReader(true)}
+                        title="Open full artifact reader and use Edit mode"
+                      >
+                        Edit
+                      </button>
+                    )}
                     {isTauri && (
                       <button
                         className="cmd-pill-btn cmd-pill-btn--danger"
@@ -397,6 +495,11 @@ export function OutputLibraryDrawer({
                   {copyState === "error" && (
                     <div style={{ fontSize: 9, color: "var(--danger, #f87171)", marginTop: 4 }}>
                       Clipboard unavailable
+                    </div>
+                  )}
+                  {versionNotice && (
+                    <div style={{ fontSize: 9, color: "var(--success)", marginTop: 4 }}>
+                      {versionNotice}
                     </div>
                   )}
                 </div>
@@ -441,7 +544,7 @@ export function OutputLibraryDrawer({
             fontSize: 10, color: "var(--text-faint)",
             flexShrink: 0,
           }}>
-            {outputFiles.length} file{outputFiles.length !== 1 ? "s" : ""} generated
+            {outputFiles.length} artifact{outputFiles.length !== 1 ? "s" : ""} on shelf · local only, not synced
           </div>
         )}
       </div>
@@ -490,6 +593,8 @@ export function OutputLibraryDrawer({
             loading={previewLoading}
             error={previewError}
             isLog={selected.kind === "transcript" || selected.kind === "text"}
+            editable={canEditSelected}
+            onSaveEdit={handleSaveEditedArtifact}
             actions={readerActions}
             onClose={() => setShowReader(false)}
           />

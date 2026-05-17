@@ -59,6 +59,18 @@ describe("workflowSummary", () => {
     expect(workflowStepHandoff(makeRun().steps[0])).toBe("Builder should update the onboarding screen copy.");
   });
 
+  it("extracts handoff message from structured parsed output", () => {
+    const run = makeRun();
+    run.steps[0].parsedOutput = {
+      handoff: {
+        target: "Builder",
+        message: "Use the new structured handoff.",
+      },
+    };
+
+    expect(workflowStepHandoff(run.steps[0])).toBe("Use the new structured handoff.");
+  });
+
   it("builds a final summary without claiming code changed automatically", () => {
     const markdown = buildWorkflowFinalSummary(makeRun());
 

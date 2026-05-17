@@ -10,7 +10,7 @@ import {
   nextStepAfterCurrent,
   workflowStepHandoff,
 } from "../domain/workflowSummary";
-import { buildBuildInPublicDraft, buildWorkflowStepArtifactsMarkdown } from "../domain/workflowArtifacts";
+import { buildWorkflowStepArtifactsMarkdown } from "../domain/workflowArtifacts";
 import type { CmdinoResultParseResult } from "../orchestration/cmdinoResultParser";
 import type { BuiltStepPrompt } from "../orchestration/stepPromptBuilder";
 import { AgentTeamSelector } from "./AgentTeamSelector";
@@ -42,6 +42,8 @@ interface MainTaskChatProps {
   }) => {
     ok: true;
     text: string;
+    rawCapturedOutput: string;
+    cleanedCapturedOutput: string;
     message: string;
     source: "selected_text" | "latest_output";
     agentLabel: string;
@@ -51,7 +53,8 @@ interface MainTaskChatProps {
   }) => Promise<{ ok: boolean; message: string }>;
   onSaveWorkflowFinalOutput?: () => Promise<{ ok: boolean; message: string }>;
   onSaveWorkflowStepArtifacts?: () => Promise<{ ok: boolean; message: string }>;
-  onSaveWorkflowBuildPublicDraft?: () => Promise<{ ok: boolean; message: string }>;
+  onGenerateBuildPublicKit?: () => Promise<{ ok: boolean; message: string }>;
+  onGenerateMemoryBriefs?: () => Promise<{ ok: boolean; message: string }>;
   onParseResult?: (text: string) => CmdinoResultParseResult;
   onContinueWorkflow?: () => void;
   onCancelWorkflow?: () => void;
@@ -69,7 +72,7 @@ function formatTime(ts: number): string {
 
 function parseFailureTitle(result: CmdinoResultParseResult): string {
   if (result.ok) return "";
-  if (result.reason === "missing_block") return "Missing CMDINO_RESULT block";
+  if (result.reason === "missing_block") return "Missing CMDINO_RESULT_START block";
   if (result.reason === "invalid_json") return "Result block JSON is invalid";
   return "Result block shape is invalid";
 }
@@ -77,12 +80,28 @@ function parseFailureTitle(result: CmdinoResultParseResult): string {
 function parseFailureDetail(result: CmdinoResultParseResult): string {
   if (result.ok) return "";
   if (result.reason === "missing_block") {
-    return "Ask the agent to finish with CMDINO_RESULT and CMDINO_HANDOFF, then capture or paste again.";
+    return "Ask the agent to finish with CMDINO_RESULT_START / CMDINO_RESULT_END, then capture or paste again.";
   }
   if (result.reason === "invalid_json") {
     return "CMDino found the block, but JSON parsing failed. Ask the agent to resend valid JSON inside the block.";
   }
-  return "Required fields: status, summary, handoff, and needs_user_action.";
+  return "Required fields: status, summary, artifacts, handoff, and next.";
+}
+
+function hasValidParsedResult(step: WorkflowRun["steps"][number] | null): boolean {
+  const parsed = step?.parsedOutput;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+  const record = parsed as Record<string, unknown>;
+  return (
+    step?.status === "completed" &&
+    record.status === "success" &&
+    typeof record.summary === "string" &&
+    Array.isArray(record.artifacts) &&
+    record.handoff !== null &&
+    typeof record.handoff === "object" &&
+    !Array.isArray(record.handoff) &&
+    Array.isArray(record.next)
+  );
 }
 
 function InterventionChatCard({
@@ -243,7 +262,8 @@ export function MainTaskChat({
   onCaptureWorkflowResultFromAgent,
   onSaveWorkflowFinalOutput,
   onSaveWorkflowStepArtifacts,
-  onSaveWorkflowBuildPublicDraft,
+  onGenerateBuildPublicKit,
+  onGenerateMemoryBriefs,
   onParseResult,
   onSendWorkflowResultCorrectionToAgent,
   onContinueWorkflow,
@@ -257,6 +277,8 @@ export function MainTaskChat({
 }: MainTaskChatProps) {
   const [taskText, setTaskText] = useState("");
   const [resultText, setResultText] = useState("");
+  const [rawCapturedOutput, setRawCapturedOutput] = useState("");
+  const [cleanedCapturedOutput, setCleanedCapturedOutput] = useState("");
   const [parseResult, setParseResult] = useState<CmdinoResultParseResult | null>(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [copyNotice, setCopyNotice] = useState("");
@@ -278,7 +300,7 @@ export function MainTaskChat({
   const currentStepIndex = currentRun && currentStep
     ? currentRun.steps.findIndex((step) => step.id === currentStep.id)
     : -1;
-  const canContinue = currentStep?.status === "completed";
+  const canContinue = hasValidParsedResult(currentStep);
   const previousSteps = currentRun
     ? completedStepSummaries({
         ...currentRun,
@@ -379,6 +401,8 @@ export function MainTaskChat({
     setCorrectionNotice("");
     setArtifactNotice("");
     setCopyStatus("");
+    setRawCapturedOutput("");
+    setCleanedCapturedOutput("");
     setParseResult(null);
   }, [currentRun?.id, currentRun?.currentStepId]);
 
@@ -461,15 +485,17 @@ export function MainTaskChat({
       setCaptureNotice(result.message);
       return;
     }
-    const extraction = extractStructuredWorkflowOutput(result.text);
+    const extraction = extractStructuredWorkflowOutput(result.rawCapturedOutput);
+    setRawCapturedOutput(extraction.rawCapturedOutput || result.rawCapturedOutput);
+    setCleanedCapturedOutput(extraction.cleanedCapturedOutput || result.cleanedCapturedOutput);
     setParseResult(null);
     setCaptureMeta(`Captured from ${result.agentLabel}: ${result.source === "selected_text" ? "selected terminal text" : "latest clean output block"}.`);
     if (extraction.validForParse) {
       setResultText(extraction.structuredText);
       setCaptureNotice(extraction.warning ?? result.message);
     } else {
-      setResultText("");
-      setCaptureNotice(extraction.warning ?? "Captured output has no structured blocks. Ask the agent to finish with CMDINO_RESULT and CMDINO_HANDOFF.");
+      setResultText(extraction.cleanedCapturedOutput);
+      setCaptureNotice(extraction.warning ?? "Captured output has no structured result block. Ask the agent to finish with CMDINO_RESULT_START / CMDINO_RESULT_END.");
     }
   }
 
@@ -960,11 +986,30 @@ export function MainTaskChat({
                   {captureMeta && (
                     <span className="chat-capture-meta">{captureMeta}</span>
                   )}
+                  {(rawCapturedOutput || cleanedCapturedOutput) && (
+                    <details className="chat-previous-context">
+                      <summary>Review captured transcript</summary>
+                      <div className="chat-previous-context-list">
+                        {cleanedCapturedOutput && (
+                          <div className="chat-previous-context-item">
+                            <strong>Cleaned capture</strong>
+                            <span>{cleanedCapturedOutput}</span>
+                          </div>
+                        )}
+                        {rawCapturedOutput && rawCapturedOutput !== cleanedCapturedOutput && (
+                          <div className="chat-previous-context-item">
+                            <strong>Raw transcript</strong>
+                            <span>{rawCapturedOutput}</span>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  )}
                   <textarea
                     ref={resultTextareaRef}
                     value={resultText}
                     onChange={(e) => setResultText(e.target.value)}
-                    placeholder={'Paste output containing <CMDINO_RESULT>{...}</CMDINO_RESULT>'}
+                    placeholder={"Paste output containing CMDINO_RESULT_START ... CMDINO_RESULT_END"}
                   />
                   {canContinue && (
                     <div className="chat-continuation-review">
@@ -1061,12 +1106,6 @@ export function MainTaskChat({
                       Copy Step Artifacts
                     </button>
                     <button
-                      className="chat-ghost-btn"
-                      onClick={() => { void copyText(buildBuildInPublicDraft(currentRun), "Build draft copied"); }}
-                    >
-                      Copy Build Draft
-                    </button>
-                    <button
                       className="chat-submit-btn"
                       onClick={() => { void saveArtifact("final", onSaveWorkflowFinalOutput); }}
                       disabled={!onSaveWorkflowFinalOutput || savingArtifact !== null}
@@ -1082,10 +1121,17 @@ export function MainTaskChat({
                     </button>
                     <button
                       className="chat-ghost-btn"
-                      onClick={() => { void saveArtifact("draft", onSaveWorkflowBuildPublicDraft); }}
-                      disabled={!onSaveWorkflowBuildPublicDraft || savingArtifact !== null}
+                      onClick={() => { void saveArtifact("build-public-kit", onGenerateBuildPublicKit); }}
+                      disabled={!onGenerateBuildPublicKit || savingArtifact !== null}
                     >
-                      {savingArtifact === "draft" ? "Saving..." : "Save Build Draft"}
+                      {savingArtifact === "build-public-kit" ? "Generating..." : "Generate Build-in-Public Kit"}
+                    </button>
+                    <button
+                      className="chat-ghost-btn"
+                      onClick={() => { void saveArtifact("memory-briefs", onGenerateMemoryBriefs); }}
+                      disabled={!onGenerateMemoryBriefs || savingArtifact !== null}
+                    >
+                      {savingArtifact === "memory-briefs" ? "Generating..." : "Generate Memory Brief"}
                     </button>
                   </div>
                   {artifactNotice && (

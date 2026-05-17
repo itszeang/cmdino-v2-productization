@@ -163,22 +163,20 @@ describe("workflowPromptSend", () => {
       expect(buildPromptFileInstruction(path)).toContain(path);
     });
 
-    it("requires both workflow result blocks", () => {
+    it("requires the structured workflow result block", () => {
       const instruction = buildPromptFileInstruction("C:\\project\\.cmdino\\runs\\r1\\s1-prompt.md");
       expect(instruction).toContain("Do not repeat or echo the file");
       expect(instruction).toContain("Treat it as your task instructions");
-      expect(instruction).toContain("exactly one CMDINO_RESULT block");
-      expect(instruction).toContain("exactly one CMDINO_HANDOFF block");
-      expect(instruction).toContain("Do not stop without those blocks.");
+      expect(instruction).toContain("exactly one CMDINO_RESULT_START / CMDINO_RESULT_END block");
+      expect(instruction).toContain("Do not stop without it.");
     });
   });
 
   describe("buildWorkflowResultCorrectionInstruction", () => {
-    it("asks the agent to finish with both required blocks", () => {
+    it("asks the agent to finish with the required result block", () => {
       const instruction = buildWorkflowResultCorrectionInstruction();
       expect(instruction).toContain("previous response is incomplete");
-      expect(instruction).toContain("exactly one CMDINO_RESULT block");
-      expect(instruction).toContain("exactly one CMDINO_HANDOFF block");
+      expect(instruction).toContain("exactly one CMDINO_RESULT_START / CMDINO_RESULT_END block");
       expect(instruction.includes("\r")).toBe(false);
       expect(instruction.includes("\n")).toBe(false);
     });
@@ -199,26 +197,21 @@ describe("workflowPromptSend", () => {
       expect(buildWorkflowRecoveryPrompt()).toContain("Do not redo the task.");
     });
 
-    it("says reply ONLY with both blocks", () => {
+    it("says reply ONLY with the structured result block", () => {
       const prompt = buildWorkflowRecoveryPrompt();
-      expect(prompt).toContain("Reply ONLY with exactly one CMDINO_RESULT block");
-      expect(prompt).toContain("CMDINO_HANDOFF block");
+      expect(prompt).toContain("Reply ONLY with exactly one CMDINO_RESULT_START / CMDINO_RESULT_END block");
     });
 
     it("includes the exact CMDINO_RESULT schema", () => {
       const prompt = buildWorkflowRecoveryPrompt();
-      expect(prompt).toContain("<CMDINO_RESULT>");
-      expect(prompt).toContain("</CMDINO_RESULT>");
-      expect(prompt).toContain('"status": "completed"');
+      expect(prompt).toContain("CMDINO_RESULT_START");
+      expect(prompt).toContain("CMDINO_RESULT_END");
+      expect(prompt).toContain('"status": "success"');
       expect(prompt).toContain('"summary"');
+      expect(prompt).toContain('"artifacts"');
       expect(prompt).toContain('"handoff"');
-      expect(prompt).toContain('"needs_user_action"');
-    });
-
-    it("includes the CMDINO_HANDOFF block", () => {
-      const prompt = buildWorkflowRecoveryPrompt();
-      expect(prompt).toContain("<CMDINO_HANDOFF>");
-      expect(prompt).toContain("</CMDINO_HANDOFF>");
+      expect(prompt).toContain('"next"');
+      expect(prompt).toContain('Allowed status values: "success", "needs_user_action", "failed".');
     });
 
     it("does not say redo or repeat the full explanation", () => {

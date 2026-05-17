@@ -1,26 +1,20 @@
 import type { HealthSnapshot, HealthStatus, HealthProviderId } from "../domain/health";
+import { HEALTH_STATUS_LABELS } from "../domain/health";
 
 const PROVIDER_ORDER: HealthProviderId[] = ["claude", "codex", "gemini", "ollama", "custom"];
 
-const STATUS_LABEL: Record<HealthStatus, string> = {
-  ready:         "Ready",
-  installed:     "Installed",
-  auth_required: "Auth needed",
-  offline:       "Offline",
-  missing:       "Missing",
-  unknown:       "Not verified",
-  error:         "Check failed",
-};
+const STATUS_LABEL = HEALTH_STATUS_LABELS;
 
 // Welcome-context colors: missing is amber (not red-heavy), per founder notes
 const STATUS_COLOR: Record<HealthStatus, string> = {
-  ready:         "#86efac",
-  installed:     "var(--text-muted)",
-  auth_required: "#fbbf24",
-  offline:       "#fbbf24",
-  missing:       "#fbbf24",
-  unknown:       "var(--text-faint)",
-  error:         "#fca5a5",
+  ready:                   "#86efac",
+  installed:               "var(--text-muted)",
+  auth_required:           "#fbbf24",
+  auth_check_inconclusive: "var(--text-muted)",
+  offline:                 "#fbbf24",
+  missing:                 "#fbbf24",
+  unknown:                 "var(--text-faint)",
+  error:                   "#fca5a5",
 };
 
 function buildSummaryLine(snapshot: HealthSnapshot): string {
@@ -30,7 +24,7 @@ function buildSummaryLine(snapshot: HealthSnapshot): string {
 
   const cli       = Object.values(snapshot.providers).filter(p => p.id !== "custom");
   const ready     = cli.filter(p => p.status === "ready");
-  const installed = cli.filter(p => p.status === "installed");
+  const installed = cli.filter(p => p.status === "installed" || p.status === "auth_check_inconclusive");
   const authNeeded = cli.filter(p => p.status === "auth_required");
   const offline   = cli.filter(p => p.status === "offline");
   const missing   = cli.filter(p => p.status === "missing");

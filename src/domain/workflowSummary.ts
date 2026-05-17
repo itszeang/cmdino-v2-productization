@@ -17,7 +17,11 @@ function parsedRecord(step?: WorkflowRunStep | null): Record<string, unknown> | 
 
 export function workflowStepHandoff(step?: WorkflowRunStep | null): string {
   const handoff = parsedRecord(step)?.handoff;
-  return typeof handoff === "string" ? handoff.trim() : "";
+  if (typeof handoff === "string") return handoff.trim();
+  const record = handoff && typeof handoff === "object" && !Array.isArray(handoff)
+    ? handoff as Record<string, unknown>
+    : null;
+  return typeof record?.message === "string" ? record.message.trim() : "";
 }
 
 export function completedStepSummaries(run: WorkflowRun): CompletedStepSummary[] {

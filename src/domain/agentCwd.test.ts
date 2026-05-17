@@ -91,4 +91,13 @@ describe("agentCwd", () => {
       label: "Different cwd",
     });
   });
+
+  it("includes the selected project path in cwd mismatch warnings", () => {
+    const health = getAgentCwdHealth({
+      agentCwd: PROJECT_A,
+      selectedProjectRoot: PROJECT_B,
+    });
+
+    expect(health.warning).toContain(PROJECT_B);
+  });
 });

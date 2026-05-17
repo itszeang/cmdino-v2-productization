@@ -2,26 +2,29 @@ import { describe, expect, it } from "vitest";
 import { hasCmdinoResultBlock, parseCmdinoResult } from "./cmdinoResultParser";
 
 function block(json: string): string {
-  return `<CMDINO_RESULT>\n${json}\n</CMDINO_RESULT>`;
+  return `CMDINO_RESULT_START\n${json}\nCMDINO_RESULT_END`;
 }
 
 describe("cmdinoResultParser", () => {
-  it("parses a valid completed block", () => {
+  it("parses a valid success block", () => {
     const parsed = parseCmdinoResult(block(JSON.stringify({
-      status: "completed",
+      status: "success",
       summary: "Built the UI shell.",
-      handoff: "Review the UI next.",
-      needs_user_action: false,
-      user_action_reason: "",
-      next_agent_instruction: "Check accessibility.",
+      artifacts: [
+        { type: "file", path: "src/App.tsx", description: "Updated shell." },
+      ],
+      handoff: { target: "Reviewer", message: "Review the UI next." },
+      next: ["Check accessibility."],
     })));
 
     expect(parsed.ok).toBe(true);
     if (parsed.ok) {
-      expect(parsed.result.status).toBe("completed");
+      expect(parsed.result.status).toBe("success");
       expect(parsed.result.summary).toBe("Built the UI shell.");
       expect(parsed.result.needsUserAction).toBe(false);
-      expect(parsed.result.nextAgentInstruction).toBe("Check accessibility.");
+      expect(parsed.result.artifacts[0]).toMatchObject({ type: "file", path: "src/App.tsx" });
+      expect(parsed.result.handoff.message).toBe("Review the UI next.");
+      expect(parsed.result.next).toEqual(["Check accessibility."]);
     }
   });
 
@@ -29,16 +32,16 @@ describe("cmdinoResultParser", () => {
     const parsed = parseCmdinoResult(block(JSON.stringify({
       status: "needs_user_action",
       summary: "Permission prompt blocked the run.",
-      handoff: "",
-      needs_user_action: true,
-      user_action_reason: "Codex requested file write permission.",
+      artifacts: [],
+      handoff: { target: "User", message: "Codex requested file write permission." },
+      next: ["Approve or deny the write request."],
     })));
 
     expect(parsed.ok).toBe(true);
     if (parsed.ok) {
       expect(parsed.result.status).toBe("needs_user_action");
       expect(parsed.result.needsUserAction).toBe(true);
-      expect(parsed.result.userActionReason).toContain("permission");
+      expect(parsed.result.handoff.message).toContain("permission");
     }
   });
 
@@ -68,14 +71,56 @@ describe("cmdinoResultParser", () => {
 
   it("supports extra text before and after the result block", () => {
     const parsed = parseCmdinoResult(`Here is the work.\n${block(JSON.stringify({
-      status: "completed",
+      status: "success",
       summary: "Finished.",
-      handoff: "Next.",
-      needs_user_action: false,
+      artifacts: [],
+      handoff: { target: "User", message: "Next." },
+      next: [],
     }))}\nThanks.`);
 
     expect(parsed.ok).toBe(true);
     if (parsed.ok) expect(parsed.result.summary).toBe("Finished.");
   });
-});
 
+  it("parses the last CMDINO_RESULT block when stale blocks are present", () => {
+    const stale = block(JSON.stringify({
+      status: "failed",
+      summary: "Stale failure.",
+      artifacts: [],
+      handoff: { target: "User", message: "Ignore this." },
+      next: [],
+    }));
+    const latest = block(JSON.stringify({
+      status: "success",
+      summary: "Latest result.",
+      artifacts: [],
+      handoff: { target: "Reviewer", message: "Use this one." },
+      next: [],
+    }));
+
+    const parsed = parseCmdinoResult([stale, "retry logs", latest].join("\n"));
+
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.result.summary).toBe("Latest result.");
+      expect(parsed.result.handoff.message).toBe("Use this one.");
+    }
+  });
+
+  it("normalizes legacy completed CMDINO_RESULT blocks for older captured output", () => {
+    const parsed = parseCmdinoResult(`<CMDINO_RESULT>
+${JSON.stringify({
+  status: "completed",
+  summary: "Legacy output.",
+  handoff: "Legacy handoff.",
+  needs_user_action: false,
+})}
+</CMDINO_RESULT>`);
+
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.result.status).toBe("success");
+      expect(parsed.result.handoff.message).toBe("Legacy handoff.");
+    }
+  });
+});

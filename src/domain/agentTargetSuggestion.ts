@@ -29,12 +29,14 @@ export function suggestTargetAgentForStep(input: {
   agents: TargetSuggestionAgent[];
   preferredProvider?: string;
   role?: AgentRole | string;
+  handoffTarget?: string | null;
 }): string | null {
   const running = input.agents.filter((agent) => agent.isRunning);
   if (running.length === 0) return null;
 
   const provider = normalized(input.preferredProvider);
   const role = normalized(input.role);
+  const handoffTarget = normalized(input.handoffTarget ?? undefined);
   const roleTokens = roleSearchTokens(role);
 
   const isProviderMatch = (agent: TargetSuggestionAgent) => {
@@ -46,6 +48,18 @@ export function suggestTargetAgentForStep(input: {
     const label = normalized(agent.label);
     return roleTokens.some((token) => label.includes(token));
   };
+  const isHandoffTargetMatch = (agent: TargetSuggestionAgent) => {
+    if (!handoffTarget) return false;
+    const label = normalized(agent.label);
+    const kind = normalized(agent.kind);
+    return label.includes(handoffTarget) || kind === handoffTarget;
+  };
+
+  const providerAndHandoffMatch = running.find((agent) => isProviderMatch(agent) && isHandoffTargetMatch(agent));
+  if (providerAndHandoffMatch) return providerAndHandoffMatch.id;
+
+  const handoffTargetMatch = running.find((agent) => isHandoffTargetMatch(agent));
+  if (handoffTargetMatch) return handoffTargetMatch.id;
 
   const providerAndRoleMatch = running.find((agent) => isProviderMatch(agent) && isRoleMatch(agent));
   if (providerAndRoleMatch) return providerAndRoleMatch.id;

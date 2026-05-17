@@ -19,6 +19,47 @@ interface StartRunInput {
   }>;
 }
 
+function parsedRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function stepHasValidParsedResult(step?: WorkflowRunStep | null): boolean {
+  const parsed = parsedRecord(step?.parsedOutput);
+  return Boolean(
+    step?.status === "completed" &&
+    parsed &&
+    parsed.status === "success" &&
+    typeof parsed.summary === "string" &&
+    Array.isArray(parsed.artifacts) &&
+    parsed.handoff &&
+    typeof parsed.handoff === "object" &&
+    Array.isArray(parsed.next),
+  );
+}
+
+function stepHandoffMessage(step: WorkflowRunStep): string {
+  const parsed = parsedRecord(step.parsedOutput);
+  const handoff = parsed?.handoff;
+  if (typeof handoff === "string") return handoff;
+  const handoffRecord = parsedRecord(handoff);
+  return typeof handoffRecord?.message === "string" ? handoffRecord.message : "";
+}
+
+function stepArtifactSummaries(step: WorkflowRunStep): string[] {
+  const artifacts = parsedRecord(step.parsedOutput)?.artifacts;
+  if (!Array.isArray(artifacts)) return [];
+  return artifacts.flatMap((artifact): string[] => {
+    const record = parsedRecord(artifact);
+    if (!record) return [];
+    const type = typeof record.type === "string" ? record.type : "artifact";
+    const description = typeof record.description === "string" ? record.description : "";
+    const path = typeof record.path === "string" && record.path ? ` (${record.path})` : "";
+    return [`${step.label}: ${type}${path}${description ? ` - ${description}` : ""}`];
+  });
+}
+
 export function useWorkflowOrchestrator(): {
   currentRun: WorkflowRun | null;
   startRun: (input: StartRunInput) => WorkflowRun;
@@ -75,7 +116,7 @@ export function useWorkflowOrchestrator(): {
     if (!currentRun?.currentStepId) return null;
     const step = currentRun.steps.find((item) => item.id === currentRun.currentStepId);
     if (!step) return null;
-    const completedSteps = currentRun.steps.filter((item) => item.status === "completed");
+    const completedSteps = currentRun.steps.filter(stepHasValidParsedResult);
     return buildStepPrompt({
       projectName: input.projectName,
       projectPath: input.projectPath,
@@ -85,10 +126,9 @@ export function useWorkflowOrchestrator(): {
       agentTeamName: input.agentTeamName,
       contextReferences: input.contextReferences,
       previousSummaries: completedSteps.map((item) => item.summary ?? "").filter(Boolean),
-      previousHandoffs: completedSteps.map((item) => {
-        const parsed = item.parsedOutput as { handoff?: unknown } | undefined;
-        return typeof parsed?.handoff === "string" ? parsed.handoff : "";
-      }).filter(Boolean),
+      previousArtifacts: completedSteps.flatMap(stepArtifactSummaries),
+      previousHandoffs: completedSteps.map(stepHandoffMessage).filter(Boolean),
+      previousReviewedResults: completedSteps.map((item) => item.rawOutput ?? "").filter(Boolean),
     });
   }, [currentRun]);
 
@@ -103,7 +143,7 @@ export function useWorkflowOrchestrator(): {
       const result = parsed.result;
       const nextSteps = run.steps.map((step) => {
         if (step.id !== currentStepId) return step;
-        if (result.status === "completed") {
+        if (result.status === "success") {
           return {
             ...step,
             status: "completed" as const,
@@ -133,7 +173,7 @@ export function useWorkflowOrchestrator(): {
         };
       });
 
-      if (result.status === "completed") {
+      if (result.status === "success") {
         return {
           ...run,
           status: "waiting_for_user",
@@ -173,7 +213,7 @@ export function useWorkflowOrchestrator(): {
       const currentIndex = run.steps.findIndex((step) => step.id === run.currentStepId);
       if (currentIndex < 0) return run;
       const currentStep = run.steps[currentIndex];
-      if (currentStep.status !== "completed") return run;
+      if (!stepHasValidParsedResult(currentStep)) return run;
 
       const nextStep = run.steps.slice(currentIndex + 1).find((step) => step.status === "pending");
       if (!nextStep) {

@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  buildResumePreview,
   isWorkflowRunResumable,
   prioritizeWorkflowRunHistory,
+  resumeProjectMismatch,
   workflowRunStatusLabel,
   type WorkflowRunHistoryEntry,
 } from "../domain/workflowRunHistory";
+import { outputFileDisplayLabel } from "../domain/outputLibrary";
+import type { GeneratedOutputFile } from "../domain/attachments";
 
 interface WorkflowRunHistoryPanelProps {
   entries: WorkflowRunHistoryEntry[];
   currentProjectId?: string;
+  currentAgentTeamId?: string | null;
+  hasRunningAgents?: boolean;
   onClose: () => void;
   onResumeRun: (entry: WorkflowRunHistoryEntry) => { ok: boolean; message: string };
   onOpenOutputLibrary?: () => void;
@@ -30,14 +36,28 @@ function statusTone(status: string): string {
   return "var(--accent)";
 }
 
+function artifactLabelFromFileName(fileName: string): string {
+  const lower = fileName.toLowerCase();
+  const kind: GeneratedOutputFile["kind"] =
+    lower.includes("session_memory") || lower.includes("_memory") ? "memory_brief"
+    : lower.includes("transcript") ? "transcript"
+    : lower.endsWith(".txt") ? "text"
+    : "markdown";
+  return outputFileDisplayLabel({ path: fileName, fileName, sizeBytes: 0, modifiedAt: 0, kind });
+}
+
 function handoffFromStep(step: WorkflowRunHistoryEntry["run"]["steps"][number]): string {
   const parsed = step.parsedOutput as { handoff?: unknown } | undefined;
-  return typeof parsed?.handoff === "string" ? parsed.handoff : "";
+  if (typeof parsed?.handoff === "string") return parsed.handoff;
+  const handoff = parsed?.handoff as { message?: unknown } | undefined;
+  return typeof handoff?.message === "string" ? handoff.message : "";
 }
 
 export function WorkflowRunHistoryPanel({
   entries,
   currentProjectId,
+  currentAgentTeamId,
+  hasRunningAgents = false,
   onClose,
   onResumeRun,
   onOpenOutputLibrary,
@@ -48,6 +68,7 @@ export function WorkflowRunHistoryPanel({
   );
   const [selectedId, setSelectedId] = useState(orderedEntries[0]?.id ?? "");
   const [notice, setNotice] = useState("");
+  const [confirmingResume, setConfirmingResume] = useState(false);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -65,15 +86,35 @@ export function WorkflowRunHistoryPanel({
     }
   }, [orderedEntries, selectedId]);
 
+  useEffect(() => {
+    setConfirmingResume(false);
+    setNotice("");
+  }, [selectedId]);
+
   const selected = orderedEntries.find((entry) => entry.id === selectedId) ?? orderedEntries[0] ?? null;
   const projectCount = currentProjectId
     ? entries.filter((entry) => entry.projectWorkspaceId === currentProjectId).length
     : entries.length;
 
-  function handleResume() {
+  const resumePreview = selected
+    ? buildResumePreview(selected, { currentProjectId, currentAgentTeamId, hasRunningAgents })
+    : null;
+
+  function handleResumeClick() {
+    if (!selected || !resumePreview?.canResume) return;
+    setConfirmingResume(true);
+    setNotice("");
+  }
+
+  function handleConfirmResume() {
     if (!selected) return;
+    setConfirmingResume(false);
     const result = onResumeRun(selected);
     setNotice(result.message);
+  }
+
+  function handleCancelResume() {
+    setConfirmingResume(false);
   }
 
   return (
@@ -143,6 +184,7 @@ export function WorkflowRunHistoryPanel({
               </div>
             ) : orderedEntries.map((entry) => {
               const active = entry.id === selected?.id;
+              const otherProject = resumeProjectMismatch(entry, currentProjectId);
               return (
                 <button
                   key={entry.id}
@@ -161,15 +203,33 @@ export function WorkflowRunHistoryPanel({
                     fontFamily: "inherit",
                   }}
                 >
-                  <div style={{
-                    color: "var(--text-main)",
-                    fontSize: 12,
-                    fontWeight: 750,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}>
-                    {entry.userTask || "Untitled workflow"}
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, overflow: "hidden" }}>
+                    <div style={{
+                      color: "var(--text-main)",
+                      fontSize: 12,
+                      fontWeight: 750,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      flex: 1,
+                      minWidth: 0,
+                    }}>
+                      {entry.userTask || "Untitled workflow"}
+                    </div>
+                    {otherProject && (
+                      <span style={{
+                        fontSize: 9,
+                        fontWeight: 750,
+                        color: "var(--warning)",
+                        border: "1px solid var(--warning)",
+                        borderRadius: 4,
+                        padding: "1px 4px",
+                        flexShrink: 0,
+                        whiteSpace: "nowrap",
+                      }}>
+                        other project
+                      </span>
+                    )}
                   </div>
                   <div style={{
                     display: "flex",
@@ -235,15 +295,87 @@ export function WorkflowRunHistoryPanel({
                   ))}
                 </div>
 
-                {isWorkflowRunResumable(selected) && (
-                  <button
-                    type="button"
-                    className="chat-submit-btn"
-                    style={{ alignSelf: "flex-start" }}
-                    onClick={handleResume}
-                  >
-                    Resume Run
-                  </button>
+                {resumePreview && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {resumePreview.warnings.map((w) => (
+                      <div
+                        key={w.kind}
+                        style={{
+                          background: w.blocksResume
+                            ? "rgba(239,68,68,0.07)"
+                            : "rgba(251,191,36,0.07)",
+                          border: `1px solid ${w.blocksResume ? "var(--danger)" : "var(--warning)"}`,
+                          borderRadius: 8,
+                          padding: "8px 10px",
+                          color: w.blocksResume ? "var(--danger)" : "var(--warning)",
+                          fontSize: 11,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {w.message}
+                      </div>
+                    ))}
+
+                    {isWorkflowRunResumable(selected) && resumePreview.canResume && !confirmingResume && (
+                      <button
+                        type="button"
+                        className="chat-submit-btn"
+                        style={{ alignSelf: "flex-start" }}
+                        onClick={handleResumeClick}
+                      >
+                        Resume Run
+                      </button>
+                    )}
+
+                    {confirmingResume && (
+                      <div style={{
+                        background: "var(--surface-0)",
+                        border: "1px solid var(--border-strong)",
+                        borderRadius: 8,
+                        padding: "10px 12px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}>
+                        <div style={{ color: "var(--text-main)", fontSize: 12, fontWeight: 700 }}>
+                          Confirm resume
+                        </div>
+                        <div style={{ color: "var(--text-faint)", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>
+                          What will be restored
+                        </div>
+                        <ul style={{ margin: 0, padding: "0 0 0 14px", display: "flex", flexDirection: "column", gap: 3 }}>
+                          {resumePreview.restoreItems.map((item) => (
+                            <li key={item} style={{ color: "var(--text-muted)", fontSize: 11, lineHeight: 1.5 }}>
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                        {resumePreview.warnings.filter((w) => !w.blocksResume).length > 0 && (
+                          <div style={{ color: "var(--text-faint)", fontSize: 10, fontStyle: "italic", lineHeight: 1.4 }}>
+                            {resumePreview.warnings.filter((w) => !w.blocksResume).map((w) => w.message).join(" ")}
+                          </div>
+                        )}
+                        <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                          <button
+                            type="button"
+                            className="chat-submit-btn"
+                            style={{ fontSize: 11, padding: "4px 12px" }}
+                            onClick={handleConfirmResume}
+                          >
+                            Confirm Resume
+                          </button>
+                          <button
+                            type="button"
+                            className="chat-ghost-btn"
+                            style={{ fontSize: 11 }}
+                            onClick={handleCancelResume}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 <div style={{
@@ -316,11 +448,25 @@ export function WorkflowRunHistoryPanel({
                   </div>
                   {selected.artifactPaths?.length ? (
                     <div style={{ display: "grid", gap: 5, marginTop: 8 }}>
-                      {selected.artifactPaths.map((path) => (
-                        <code key={path} style={{ color: "var(--text-faint)", fontSize: 10, wordBreak: "break-all" }}>
-                          {path}
-                        </code>
-                      ))}
+                      {selected.artifactPaths.map((path) => {
+                        const fileName = path.split(/[/\\]/).pop() ?? path;
+                        const label = artifactLabelFromFileName(fileName);
+                        return (
+                          <div key={path} style={{
+                            border: "1px solid var(--border-subtle)",
+                            borderRadius: 6,
+                            padding: "6px 8px",
+                            background: "var(--surface-0)",
+                          }}>
+                            <div style={{ color: "var(--text-main)", fontSize: 11, fontWeight: 600, marginBottom: 2 }}>
+                              {label}
+                            </div>
+                            <code style={{ color: "var(--text-faint)", fontSize: 9, wordBreak: "break-all" }}>
+                              {fileName}
+                            </code>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 8 }}>

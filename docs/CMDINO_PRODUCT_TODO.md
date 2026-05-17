@@ -213,19 +213,14 @@ Tasks:
 - Tauri bundle identifier ends with `.app`.
 - Rust dead-code warning for `ProbeOutput.duration_ms`.
 - Final app icon assets required.
-- V2 orchestration domain foundation exists, but CMDino Chat, workflow runner, and intervention UI are not implemented yet.
 - Project workspace entry is frontend-only for now; framework/package manager detection still needs native folder inspection.
-- CMDino Chat Shell now has explicit workflow prompt sends to selected running agents, but workflow result capture and autonomous execution are not implemented yet.
-- Sprint 4 checkpoint orchestrator is manual and frontend-only; prompt send/copy, result paste, and continue actions require explicit user action.
-- Sprint 5 intervention state is connected to manual workflow results; automatic runtime error to intervention bridging is still future work.
-- Sprint 6 prompt send is explicit/manual only. It reuses the existing terminal bridge write path and does not add auto-send or backend workflow execution.
-- Sprint 7 result capture is explicit/manual only. It reuses terminal selection/latest-output capture helpers and does not parse, complete, or continue workflow steps automatically.
-- Sprint 8 continuation polish improves timeline, handoff review, parse recovery, and final summary clarity. It still does not send, capture, parse, or continue automatically.
-- Sprint 9 workflow artifacts use the existing local Output Shelf write path. Saves are explicit, local-only, and do not add cloud sync or autonomous execution.
-- Sprint 10 agent team selection is frontend-only and manual. It persists the selected chat team locally, suggests a matching running target agent by provider/role, and does not add auto-send, auto-capture, or backend orchestration.
-- Sprint 11 workflow history is localStorage-backed and separate from Activity Log. It stores recent workflow run snapshots and linked Output Shelf artifact paths for inspect/resume, with no cloud sync or automatic resume.
-- Sprint 12 dogfood QA is documented in `docs/DOGFOOD_WORKFLOW_QA.md` and `docs/PRE_PUSH_VALIDATION_CHECKLIST.md`. This pass fixed stale Chat copy and the Chat/Agents terminal unmount blocker, but full desktop dogfood with live CLI agents remains required.
-- Sprint 13 defines the full feature behavior contract (`docs/CMDINO_FEATURE_BEHAVIOR_CONTRACT.md`) and fixes navigation/surface regressions discovered during dogfood. Root cause of the Chat navigation bug was `setProjectEntryDismissed(false)` being called on project selection (backwards) and `onOpenChat` not dismissing the project gate. Chat, Agents, Workflow History, Output Shelf, and Setup surfaces must be deterministic and preserve state across switching.
+- All workflow pipeline stages (Chat, orchestrator, prompt send, result capture, parser, artifacts, history) are implemented and wired. Autonomous execution and auto-pipe remain explicitly out of scope.
+- Workflow prompt send is explicit/manual only. Uses file-based handoff (`writePromptFile`) to avoid TUI paste fragmentation. No auto-send or backend orchestration.
+- Workflow result capture is explicit/manual only. Uses terminal selection or latest-output block. No auto-capture or auto-step-completion.
+- Checkpoint continuation requires explicit user action at each step. No auto-advance.
+- Workflow artifacts (final output, step artifacts, build-in-public kit, memory brief) use the existing local Output Shelf write path. Saves are explicit and local-only.
+- Workflow history is localStorage-backed and separate from Activity Log. Stores up to 50 run snapshots with linked artifact paths. No cloud sync or automatic resume.
+- Full live-agent desktop dogfood with real CLI agents remains required before closed-alpha handoff.
 
 ## Dogfood QA Findings
 

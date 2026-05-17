@@ -1,4 +1,5 @@
 import type { HealthSnapshot, ProviderHealth, HealthStatus } from "../domain/health";
+import { HEALTH_STATUS_LABELS } from "../domain/health";
 
 interface Props {
   snapshot:  HealthSnapshot;
@@ -6,31 +7,24 @@ interface Props {
   onClose:   () => void;
 }
 
-const STATUS_LABEL: Record<HealthStatus, string> = {
-  ready:         "Ready",
-  missing:       "Missing",
-  auth_required: "Auth needed",
-  offline:       "Offline",
-  error:         "Error",
-  unknown:       "Not verified",
-  installed:     "Installed",
-};
+const STATUS_LABEL = HEALTH_STATUS_LABELS;
 
-// missing/error = red; auth/offline = amber; installed/unknown = neutral muted
+// missing/error = red; auth/offline = amber; inconclusive/installed/unknown = neutral muted
 const STATUS_COLOR: Record<HealthStatus, string> = {
-  ready:         "var(--success)",
-  missing:       "var(--danger)",
-  auth_required: "var(--warning)",
-  offline:       "var(--warning)",
-  error:         "var(--danger)",
-  unknown:       "var(--text-faint)",
-  installed:     "var(--text-muted)",
+  ready:                   "var(--success)",
+  missing:                 "var(--danger)",
+  auth_required:           "var(--warning)",
+  auth_check_inconclusive: "var(--text-muted)",
+  offline:                 "var(--warning)",
+  error:                   "var(--danger)",
+  unknown:                 "var(--text-faint)",
+  installed:               "var(--text-muted)",
 };
 
 function ProviderCard({ p }: { p: ProviderHealth }) {
   const color   = STATUS_COLOR[p.status];
   const label   = STATUS_LABEL[p.status];
-  const neutral = p.status === "unknown" || p.status === "installed";
+  const neutral = p.status === "unknown" || p.status === "installed" || p.status === "auth_check_inconclusive";
 
   return (
     <div className="health-card">

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { MarkdownArtifactReader } from "./MarkdownArtifactReader";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -23,6 +23,8 @@ interface Props {
   error?:        string | null;
   isLog?:        boolean;
   actions?:      ArtifactReaderAction[];
+  editable?:     boolean;
+  onSaveEdit?:   (content: string) => Promise<{ ok: boolean; message: string }>;
   onClose:       () => void;
 }
 
@@ -31,13 +33,48 @@ interface Props {
 export function ArtifactReaderModal({
   title, artifactType, sourceLabel, path, isAttached,
   content, truncated, loading, error, isLog,
-  actions, onClose,
+  actions, editable, onSaveEdit, onClose,
 }: Props) {
+  const [mode, setMode] = useState<"read" | "edit">("read");
+  const [draft, setDraft] = useState(content ?? "");
+  const [saveNotice, setSaveNotice] = useState("");
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    setDraft(content ?? "");
+    setMode("read");
+    setSaveNotice("");
+  }, [content, path]);
+
+  async function handleSaveEdit() {
+    if (!onSaveEdit || saving) return;
+    setSaving(true);
+    const result = await onSaveEdit(draft);
+    setSaveNotice(result.message);
+    if (result.ok) setMode("read");
+    setSaving(false);
+  }
+
+  const allActions: ArtifactReaderAction[] = [
+    ...(editable && content !== null ? [{
+      label: mode === "edit" ? "Preview" : "Edit",
+      onClick: () => setMode((value) => value === "edit" ? "read" : "edit"),
+      accent: mode !== "edit",
+    }] : []),
+    ...(mode === "edit" ? [{
+      label: saving ? "Saving..." : "Save New Version",
+      onClick: () => { void handleSaveEdit(); },
+      disabled: saving || !onSaveEdit || draft === (content ?? ""),
+      accent: true,
+    }] : []),
+    ...(actions ?? []),
+  ];
 
   return (
     <div
@@ -70,9 +107,9 @@ export function ArtifactReaderModal({
         </div>
 
         {/* ── Action bar ── */}
-        {actions && actions.length > 0 && (
+        {allActions.length > 0 && (
           <div className="arm-actions">
-            {actions.map((action, i) => {
+            {allActions.map((action, i) => {
               const baseColor  = action.disabled ? "var(--text-faint)" : action.danger ? "var(--danger)" : action.accent ? "var(--text-main)" : "var(--text-muted)";
               const baseBorder = action.disabled ? "transparent" : action.accent ? "var(--border-strong)" : "var(--border-subtle)";
               return (
@@ -108,6 +145,11 @@ export function ArtifactReaderModal({
             })}
           </div>
         )}
+        {saveNotice && (
+          <div className="arm-actions" style={{ color: saveNotice.startsWith("Saved") ? "var(--success)" : "var(--warning)", fontSize: 11 }}>
+            {saveNotice}
+          </div>
+        )}
 
         {/* ── Content ── */}
         <div className="arm-content">
@@ -117,7 +159,28 @@ export function ArtifactReaderModal({
           {error && !loading && (
             <div className="arm-status arm-status--error">{error}</div>
           )}
-          {content !== null && !loading && (
+          {content !== null && !loading && mode === "edit" && (
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              spellCheck={false}
+              style={{
+                width: "100%",
+                minHeight: "100%",
+                boxSizing: "border-box",
+                border: 0,
+                outline: "none",
+                resize: "none",
+                padding: "12px 14px",
+                background: "var(--terminal-bg)",
+                color: "#e5e5e5",
+                fontFamily: '"Cascadia Code", "JetBrains Mono", "Consolas", monospace',
+                fontSize: 12,
+                lineHeight: 1.65,
+              }}
+            />
+          )}
+          {content !== null && !loading && mode === "read" && (
             <>
               {truncated && (
                 <div className="arm-truncation">

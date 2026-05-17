@@ -17,13 +17,21 @@ function extractBetweenMarkers(text: string, start: string, end: string): string
 }
 
 function extractResultHandoff(text: string): string | null {
-  const result = extractBetweenMarkers(text, "<CMDINO_RESULT>", "</CMDINO_RESULT>");
+  const result = extractBetweenMarkers(text, "CMDINO_RESULT_START", "CMDINO_RESULT_END")
+    ?? extractBetweenMarkers(text, "<CMDINO_RESULT>", "</CMDINO_RESULT>");
   if (!result) return null;
   try {
     const parsed = JSON.parse(result) as { handoff?: unknown };
-    return typeof parsed.handoff === "string" && parsed.handoff.trim()
-      ? parsed.handoff.trim()
-      : null;
+    if (typeof parsed.handoff === "string" && parsed.handoff.trim()) {
+      return parsed.handoff.trim();
+    }
+    if (parsed.handoff && typeof parsed.handoff === "object" && !Array.isArray(parsed.handoff)) {
+      const handoff = parsed.handoff as Record<string, unknown>;
+      return typeof handoff.message === "string" && handoff.message.trim()
+        ? handoff.message.trim()
+        : null;
+    }
+    return null;
   } catch {
     return null;
   }

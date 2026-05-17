@@ -44,6 +44,17 @@ export function isWorkflowRunResumable(entry: WorkflowRunHistoryEntry): boolean 
   );
 }
 
+export function resumeProjectMismatch(
+  entry: WorkflowRunHistoryEntry,
+  currentProjectId?: string,
+): boolean {
+  return Boolean(
+    entry.projectWorkspaceId &&
+    currentProjectId &&
+    entry.projectWorkspaceId !== currentProjectId,
+  );
+}
+
 export function buildWorkflowRunHistoryEntry(
   run: WorkflowRun,
   input: {
@@ -130,6 +141,95 @@ export function prioritizeWorkflowRunHistory(
     const bProject = b.projectWorkspaceId === projectWorkspaceId ? 0 : 1;
     return aProject - bProject || b.updatedAt - a.updatedAt;
   });
+}
+
+export interface ResumeWarning {
+  kind: "project_mismatch" | "team_mismatch" | "agents_running";
+  message: string;
+  blocksResume: boolean;
+}
+
+export interface ResumePreview {
+  canResume: boolean;
+  warnings: ResumeWarning[];
+  restoreItems: string[];
+}
+
+export function buildResumePreview(
+  entry: WorkflowRunHistoryEntry,
+  options: {
+    currentProjectId?: string;
+    currentAgentTeamId?: string | null;
+    hasRunningAgents?: boolean;
+  } = {},
+): ResumePreview {
+  const warnings: ResumeWarning[] = [];
+
+  if (resumeProjectMismatch(entry, options.currentProjectId)) {
+    const projectRef = entry.projectName ?? entry.projectWorkspaceId;
+    warnings.push({
+      kind: "project_mismatch",
+      message: projectRef
+        ? `This run belongs to project "${projectRef}". Open that project first, then resume.`
+        : "This run belongs to a different project. Open that project first, then resume.",
+      blocksResume: true,
+    });
+  }
+
+  if (
+    entry.agentTeamId &&
+    options.currentAgentTeamId &&
+    entry.agentTeamId !== options.currentAgentTeamId
+  ) {
+    warnings.push({
+      kind: "team_mismatch",
+      message: `This run used the "${entry.agentTeamName ?? entry.agentTeamId}" team. Your current workspace has a different team. Deploy the matching team before sending prompts.`,
+      blocksResume: false,
+    });
+  }
+
+  if (options.hasRunningAgents) {
+    warnings.push({
+      kind: "agents_running",
+      message: "Some agents are currently running. Resume will not interrupt them — check agent output before sending the next workflow prompt.",
+      blocksResume: false,
+    });
+  }
+
+  const canResume =
+    isWorkflowRunResumable(entry) &&
+    !warnings.some((w) => w.blocksResume);
+
+  const currentStepId = entry.run.currentStepId;
+  const currentStep = currentStepId
+    ? entry.run.steps.find((s) => s.id === currentStepId) ?? null
+    : null;
+  const completed = entry.run.steps.filter((s) => s.status === "completed").length;
+  const total = entry.run.steps.length;
+
+  const restoreItems: string[] = [
+    `Task: "${entry.userTask}"`,
+    currentStep
+      ? `Next checkpoint: ${currentStep.label} (${completed} of ${total} steps completed)`
+      : `All ${total} step${total !== 1 ? "s" : ""} completed`,
+    entry.agentTeamName ? `Team: ${entry.agentTeamName}` : null,
+    "No prompt will be sent automatically — you control the next action.",
+  ].filter(Boolean) as string[];
+
+  return { canResume, warnings, restoreItems };
+}
+
+export function findRunForArtifactFileName(
+  entries: WorkflowRunHistoryEntry[],
+  fileName: string,
+): WorkflowRunHistoryEntry | null {
+  const lower = fileName.toLowerCase();
+  return entries.find((entry) =>
+    entry.artifactPaths?.some((p) => {
+      const pLower = p.toLowerCase();
+      return pLower === lower || pLower.endsWith(`/${lower}`) || pLower.endsWith(`\\${lower}`);
+    }),
+  ) ?? null;
 }
 
 export function parseWorkflowRunHistory(value: string | null): WorkflowRunHistoryEntry[] {

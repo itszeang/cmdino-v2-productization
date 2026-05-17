@@ -187,6 +187,52 @@ fn extract_version(s: &str) -> Option<String> {
     None
 }
 
+/// Classifies `claude auth status` stdout+stderr into one of three outcomes.
+/// Returns "ready", "auth_required", or "auth_check_inconclusive".
+///
+/// Exit code alone is unreliable across Claude CLI versions and Windows
+/// subprocess environments, so output content is the primary signal.
+fn classify_claude_auth_output(stdout: &str, stderr: &str) -> &'static str {
+    let combined = format!("{} {}", stdout, stderr).to_lowercase();
+
+    // Positive: output explicitly confirms the user is authenticated.
+    const POSITIVE: &[&str] = &[
+        "logged in as",
+        "you are logged in",
+        "authenticated",
+        "signed in",
+        "account:",
+        "api key",
+    ];
+    // Negative: output explicitly states the user is NOT authenticated.
+    // Keep these specific — generic error messages should not match.
+    const NEGATIVE: &[&str] = &[
+        "not logged in",
+        "not authenticated",
+        "please log in",
+        "please login",
+        "run `claude login`",
+        "run claude login",
+        "login required",
+        "authentication required",
+        "no api key",
+        "invalid api key",
+        "not signed in",
+    ];
+
+    let has_negative = NEGATIVE.iter().any(|s| combined.contains(s));
+    let has_positive = POSITIVE.iter().any(|s| combined.contains(s));
+
+    // Negative always wins (conservative: flag auth issues explicitly).
+    if has_negative {
+        "auth_required"
+    } else if has_positive {
+        "ready"
+    } else {
+        "auth_check_inconclusive"
+    }
+}
+
 fn probe_claude() -> ProviderHealthDto {
     let t0 = Instant::now();
     if !cmd_on_path("claude") {
@@ -202,28 +248,99 @@ fn probe_claude() -> ProviderHealthDto {
     let auth = run_probe("claude", &["auth", "status"], 2500);
     if auth.timed_out {
         return ProviderHealthDto {
-            id: "claude".into(), status: "installed".into(), confidence: "medium".into(), version,
-            explanation: "Claude CLI is installed. Auth status check timed out — authentication cannot be confirmed.".into(),
-            fix_hint: "Run `claude auth status` to verify. Run `claude login` if not authenticated.".into(),
+            id: "claude".into(), status: "auth_check_inconclusive".into(), confidence: "low".into(), version,
+            explanation: "Claude CLI is installed. Auth status check timed out — start the agent to confirm.".into(),
+            fix_hint: "Run `claude auth status` manually to verify. Run `claude login` if needed.".into(),
             duration_ms: t0.elapsed().as_millis() as u64,
             details: HealthDetails { auth_checked: true, timed_out: true, ..Default::default() },
         };
     }
-    if auth.exit_code == 0 {
-        ProviderHealthDto {
+    // Exit code 0 with no negative output signals: ready.
+    if auth.exit_code == 0 && classify_claude_auth_output(&auth.stdout, &auth.stderr) != "auth_required" {
+        return ProviderHealthDto {
             id: "claude".into(), status: "ready".into(), confidence: "high".into(), version,
             explanation: "Claude CLI found and authenticated.".into(), fix_hint: String::new(),
             duration_ms: t0.elapsed().as_millis() as u64,
             details: HealthDetails { auth_checked: true, raw_exit_code: Some(0), ..Default::default() },
-        }
-    } else {
-        ProviderHealthDto {
+        };
+    }
+    // Non-zero exit: classify by output content — do NOT trust exit code alone.
+    match classify_claude_auth_output(&auth.stdout, &auth.stderr) {
+        "ready" => ProviderHealthDto {
+            id: "claude".into(), status: "ready".into(), confidence: "medium".into(), version,
+            explanation: "Claude CLI is authenticated (verified from output — exit code was non-zero).".into(),
+            fix_hint: String::new(),
+            duration_ms: t0.elapsed().as_millis() as u64,
+            details: HealthDetails { auth_checked: true, raw_exit_code: Some(auth.exit_code), ..Default::default() },
+        },
+        "auth_required" => ProviderHealthDto {
             id: "claude".into(), status: "auth_required".into(), confidence: "high".into(), version,
-            explanation: "Claude CLI installed but not authenticated.".into(),
+            explanation: "Claude CLI is installed but not authenticated.".into(),
             fix_hint: "Run `claude login` to authenticate.".into(),
             duration_ms: t0.elapsed().as_millis() as u64,
             details: HealthDetails { auth_checked: true, raw_exit_code: Some(auth.exit_code), ..Default::default() },
-        }
+        },
+        _ => ProviderHealthDto {
+            id: "claude".into(), status: "auth_check_inconclusive".into(), confidence: "low".into(), version,
+            explanation: "Claude CLI is installed. Authentication could not be confirmed automatically — start the agent to verify.".into(),
+            fix_hint: "Start a Claude agent. It will prompt for login if needed. Or run `claude auth status` manually.".into(),
+            duration_ms: t0.elapsed().as_millis() as u64,
+            details: HealthDetails { auth_checked: true, raw_exit_code: Some(auth.exit_code), ..Default::default() },
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::classify_claude_auth_output;
+
+    #[test]
+    fn positive_signal_logged_in_as() {
+        assert_eq!(classify_claude_auth_output("Logged in as user@example.com", ""), "ready");
+    }
+
+    #[test]
+    fn positive_signal_you_are_logged_in() {
+        assert_eq!(classify_claude_auth_output("You are logged in.", ""), "ready");
+    }
+
+    #[test]
+    fn positive_signal_authenticated_word() {
+        assert_eq!(classify_claude_auth_output("", "Authenticated. Session active."), "ready");
+    }
+
+    #[test]
+    fn negative_signal_not_logged_in() {
+        assert_eq!(classify_claude_auth_output("Not logged in.", ""), "auth_required");
+    }
+
+    #[test]
+    fn negative_signal_run_claude_login_hint() {
+        assert_eq!(classify_claude_auth_output("", "Not authenticated. Run `claude login`."), "auth_required");
+    }
+
+    #[test]
+    fn inconclusive_on_empty_output() {
+        assert_eq!(classify_claude_auth_output("", ""), "auth_check_inconclusive");
+    }
+
+    #[test]
+    fn inconclusive_on_unknown_command_error() {
+        assert_eq!(classify_claude_auth_output("unknown command: auth", ""), "auth_check_inconclusive");
+    }
+
+    #[test]
+    fn inconclusive_on_process_launch_failed() {
+        assert_eq!(classify_claude_auth_output("", "process launch failed"), "auth_check_inconclusive");
+    }
+
+    #[test]
+    fn negative_wins_when_both_signals_present() {
+        // Defensive: if someone was logged in before and message contains both
+        assert_eq!(
+            classify_claude_auth_output("Previously logged in as user. Not logged in.", ""),
+            "auth_required",
+        );
     }
 }
 

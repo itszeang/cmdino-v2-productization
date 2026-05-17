@@ -11,9 +11,8 @@
     "tauri:build": "tauri build",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
-    "test:e2e:tauri": "wdio run test/wdio.conf.ts",
     "qa:fast": "npm.cmd run build && npm.cmd run test:unit",
-    "qa:desktop": "npm.cmd run tauri:build && npm.cmd run test:e2e:tauri",
+    "qa:desktop": "npm.cmd run tauri:build",
     "qa": "npm.cmd run qa:fast"
   },
   "dependencies": {

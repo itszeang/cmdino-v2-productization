@@ -1,4 +1,3 @@
-import { buildHandoffMarkerInstruction } from "../domain/handoffProtocol";
 import type { ContextReferenceGroups } from "../domain/contextLibrary";
 
 export interface StepPromptInput {
@@ -10,6 +9,8 @@ export interface StepPromptInput {
   agentTeamName?: string;
   previousSummaries?: string[];
   previousHandoffs?: string[];
+  previousArtifacts?: string[];
+  previousReviewedResults?: string[];
   outputContract?: string;
   contextReferences?: ContextReferenceGroups;
 }
@@ -21,20 +22,27 @@ export interface BuiltStepPrompt {
 
 export function buildCmdinoResultContract(): string {
   return [
-    "When you finish, include exactly one structured result block:",
+    "Structured response contract - mandatory",
     "",
-    "<CMDINO_RESULT>",
+    "End your response with exactly one machine-readable CMDINO_RESULT block using this format:",
+    "",
+    "CMDINO_RESULT_START",
     "{",
-    '  "status": "completed",',
+    '  "status": "success",',
     '  "summary": "Short summary of what you did or decided.",',
-    '  "handoff": "What the next agent or user needs to know.",',
-    '  "needs_user_action": false,',
-    '  "user_action_reason": "",',
-    '  "next_agent_instruction": "Suggested instruction for the next workflow step."',
+    '  "artifacts": [',
+    '    { "type": "note", "path": ".cmdino/example.md", "description": "Optional artifact path and description." }',
+    "  ],",
+    '  "handoff": { "target": "next agent or user", "message": "What the next agent or user needs to know." },',
+    '  "next": ["Suggested next checkpoint or user action."]',
     "}",
-    "</CMDINO_RESULT>",
+    "CMDINO_RESULT_END",
     "",
-    'Allowed status values: "completed", "needs_user_action", "failed".',
+    'Allowed status values: "success", "needs_user_action", "failed".',
+    'Use "needs_user_action" when authentication, permissions, unclear scope, destructive action approval, or manual review is required.',
+    "If there are no artifacts, use an empty artifacts array.",
+    "If there is no follow-up, use an empty next array.",
+    "Do not wrap this block in Markdown fences.",
   ].join("\n");
 }
 
@@ -42,13 +50,12 @@ function buildFinalWorkflowResponseInstruction(): string {
   return [
     "Final response requirement - mandatory",
     "",
-    "Your final answer MUST end with exactly these two sections:",
-    "1. Exactly one CMDINO_RESULT block.",
-    "2. Exactly one CMDINO_HANDOFF block.",
+    "Your final answer MUST end with exactly one CMDINO_RESULT_START / CMDINO_RESULT_END block.",
+    "The handoff and next-step guidance must be inside that JSON block.",
     "",
-    "If your answer does not include both blocks, CMDino will treat your response as incomplete.",
+    "If your answer does not include this block, CMDino will treat your response as incomplete.",
     "",
-    "Even if you only planned, reviewed, analyzed, or decided not to modify files, you still MUST include both blocks.",
+    "Even if you only planned, reviewed, analyzed, or decided not to modify files, you still MUST include the block.",
     "",
     "Do not ask the user to continue.",
     "Do not end with an unstructured summary.",
@@ -112,7 +119,11 @@ export function buildStepPrompt(input: StepPromptInput): BuiltStepPrompt {
       ...(contextSection ? [contextSection, ""] : []),
       listSection("Previous Step Summaries", input.previousSummaries),
       "",
+      listSection("Previous Step Artifacts", input.previousArtifacts),
+      "",
       listSection("Previous Handoffs", input.previousHandoffs),
+      "",
+      listSection("User-Reviewed Previous Results", input.previousReviewedResults),
       "",
       "Step Output Contract",
       outputContract,
@@ -123,8 +134,6 @@ export function buildStepPrompt(input: StepPromptInput): BuiltStepPrompt {
       "- Keep the response focused on this workflow step.",
       "",
       buildCmdinoResultContract(),
-      "",
-      buildHandoffMarkerInstruction(),
       "",
       buildFinalWorkflowResponseInstruction(),
     ].join("\n"),
