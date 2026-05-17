@@ -33,3 +33,12 @@ export function listOutputFiles(): Promise<GeneratedOutputFile[]> {
 export function deleteOutputFile(fileName: string): Promise<boolean> {
   return invoke<boolean>("delete_output_file", { fileName });
 }
+
+/**
+ * Write a prompt file to `<dir>/<relPath>`, creating intermediate dirs.
+ * relPath must be relative with no `..` components.
+ * Returns the absolute path of the written file.
+ */
+export function writePromptFile(dir: string, relPath: string, content: string): Promise<string> {
+  return invoke<string>("write_prompt_file", { dir, relPath, content });
+}

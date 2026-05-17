@@ -9,6 +9,8 @@ import type { ReadinessFailure } from "../domain/readiness";
 import type { SessionLogEvent } from "../domain/sessionLog";
 import type { HealthSnapshot } from "../domain/health";
 import type { GeneratedOutputFile } from "../domain/attachments";
+import type { CmdinoContextManifest } from "../domain/contextLibrary";
+import type { WorkflowResultCapture } from "../domain/workflowResultCapture";
 import type { CSSProperties } from "react";
 
 // Minimum readable pane width used for browser-measured grid wrapping.
@@ -16,6 +18,7 @@ const GRID_PANE_MIN_WIDTH = 540;
 
 interface Props {
   agents:               TerminalAgent[];
+  selectedProjectRoot?: string;
   onRemove:             (id: string) => void;
   runningAgentIds:      Set<string>;
   onStart:              (id: string) => void;
@@ -38,14 +41,16 @@ interface Props {
   healthSnapshot:               HealthSnapshot;
   onDockSelectAgent:            (id: string) => void;
   onRegisterTranscriptGetter?:  (agentId: string, getter: (() => string) | null) => void;
+  onRegisterWorkflowResultCapture?: (agentId: string, getter: (() => WorkflowResultCapture) | null) => void;
   generatedOutputFiles?:        GeneratedOutputFile[];
   onRefreshGeneratedOutputs?:   () => void;
   onRegisterPaneRef?:           (agentId: string, el: HTMLElement | null) => void;
   onOpenHealth?:                () => void;
+  onContextManifestChange?:     (manifest: CmdinoContextManifest) => void;
 }
 
 export function TerminalGrid({
-  agents, onRemove, runningAgentIds, onStart,
+  agents, selectedProjectRoot, onRemove, runningAgentIds, onStart,
   onAddAttachment, onRemoveAttachment,
   onLifecycleChange, onRecordWorkflowLink, onEditAgent,
   readinessErrors, onReadinessError,
@@ -54,10 +59,12 @@ export function TerminalGrid({
   lifecycleByAgentId, onFocusPane, workflowLinks, onFocusTarget,
   onEvent, sessionEntries, healthSnapshot, onDockSelectAgent,
   onRegisterTranscriptGetter,
+  onRegisterWorkflowResultCapture,
   generatedOutputFiles = [],
   onRefreshGeneratedOutputs,
   onRegisterPaneRef,
   onOpenHealth,
+  onContextManifestChange,
 }: Props) {
   // Grid mode needs dynamic column/row counts — set as inline style only in grid mode.
   // Focus mode: no inline style on layout div (CSS class handles everything).
@@ -73,6 +80,7 @@ export function TerminalGrid({
       {/* Agent Dock — replaces old TerminalTabs, always mounted in both modes */}
       <AgentDock
         agents={agents}
+        selectedProjectRoot={selectedProjectRoot}
         activeTerminalId={activeTerminalId}
         lifecycleByAgentId={lifecycleByAgentId}
         sessionEntries={sessionEntries}
@@ -108,12 +116,14 @@ export function TerminalGrid({
               >
                 <TerminalPane
                   agent={agent}
+                  selectedProjectRoot={selectedProjectRoot}
                   onRemove={onRemove}
                   isRunning={runningAgentIds.has(agent.id)}
                   onStart={() => onStart(agent.id)}
                   allAgents={agents}
                   runningAgentIds={runningAgentIds}
                   onAddAttachment={(path, source) => onAddAttachment(agent.id, path, source)}
+                  onAddAttachmentToAgent={onAddAttachment}
                   onRemoveAttachment={(attId) => onRemoveAttachment(agent.id, attId)}
                   onLifecycleChange={onLifecycleChange}
                   onRecordWorkflowLink={onRecordWorkflowLink}
@@ -128,10 +138,12 @@ export function TerminalGrid({
                   onFocusTarget={onFocusTarget}
                   onEvent={onEvent}
                   onRegisterTranscriptGetter={onRegisterTranscriptGetter}
+                  onRegisterWorkflowResultCapture={onRegisterWorkflowResultCapture}
                   generatedOutputFiles={generatedOutputFiles}
                   onRefreshGeneratedOutputs={onRefreshGeneratedOutputs}
                   onRegisterPaneRef={onRegisterPaneRef}
                   onOpenHealth={onOpenHealth}
+                  onContextManifestChange={onContextManifestChange}
                 />
               </div>
             );

@@ -3,17 +3,21 @@ import type { SessionLogEvent, SessionLogEventType } from "../domain/sessionLog"
 import { DinoLane, type DinoVisualPhase } from "../dino/DinoLane";
 import { LogsPanel }       from "./LogsPanel";
 import { HandoffModal }    from "./HandoffModal";
-import { AttachmentPanel } from "./AttachmentPanel";
+import { ContextLibraryModal } from "./ContextLibraryModal";
 import { RuntimeErrorCard } from "./RuntimeErrorCard";
 import type { TerminalAgent }   from "../domain/terminalAgent";
-import { fileBridge }      from "../orchestration/fileBridge";
+import { extractReviewSendText } from "../domain/handoffProtocol";
+import { getTerminalSubmitStrategy } from "../domain/workflowPromptSend";
 import type { WorkflowLink, WorkflowLinkKind } from "../domain/workflow";
 import type { AppSettings } from "../domain/appSettings";
 import type { TerminalViewMode } from "../domain/viewMode";
 import type { ReadinessFailure } from "../domain/readiness";
 import type { GeneratedOutputFile } from "../domain/attachments";
+import type { CmdinoContextManifest } from "../domain/contextLibrary";
+import type { WorkflowResultCapture } from "../domain/workflowResultCapture";
 import { validateAgentReadiness } from "../readiness/readinessBridge";
 import { terminalBridge }  from "../terminal/terminalBridge";
+import { getAgentCwdHealth } from "../domain/agentCwd";
 import {
   useTerminalProcess,
   type TerminalLifecycleState,
@@ -110,12 +114,14 @@ function StripBtn({
 
 interface Props {
   agent:                          TerminalAgent;
+  selectedProjectRoot?:           string;
   onRemove:                       (id: string) => void;
   isRunning:                      boolean;
   onStart:                        () => void;
   allAgents:                      TerminalAgent[];
   runningAgentIds:                Set<string>;
   onAddAttachment:                (path: string, source?: "user" | "preset" | "generated") => void;
+  onAddAttachmentToAgent?:        (agentId: string, path: string, source?: "user" | "preset" | "generated") => void;
   onRemoveAttachment:             (attachmentId: string) => void;
   onLifecycleChange:              (agentId: string, lifecycle: TerminalLifecycleState) => void;
   onRecordWorkflowLink:           (sourceAgentId: string, targetAgentId: string, kind: WorkflowLinkKind) => void;
@@ -130,17 +136,19 @@ interface Props {
   onFocusTarget:                  (id: string) => void;
   onEvent?:                       (event: SessionLogEvent) => void;
   onRegisterTranscriptGetter?:    (agentId: string, getter: (() => string) | null) => void;
+  onRegisterWorkflowResultCapture?: (agentId: string, getter: (() => WorkflowResultCapture) | null) => void;
   generatedOutputFiles?:          GeneratedOutputFile[];
   onRefreshGeneratedOutputs?:     () => void;
   onRegisterPaneRef?:             (agentId: string, el: HTMLElement | null) => void;
   onOpenHealth?:                  () => void;
+  onContextManifestChange?:       (manifest: CmdinoContextManifest) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function TerminalPane({
-  agent, onRemove, isRunning, onStart,
-  allAgents, runningAgentIds, onAddAttachment, onRemoveAttachment,
+  agent, selectedProjectRoot, onRemove, isRunning, onStart,
+  allAgents, runningAgentIds,
   onLifecycleChange, onRecordWorkflowLink, onEditAgent,
   readinessError, onReadinessError,
   settings,
@@ -148,10 +156,11 @@ export function TerminalPane({
   workflowLinks, onFocusTarget,
   onEvent,
   onRegisterTranscriptGetter,
-  generatedOutputFiles = [],
+  onRegisterWorkflowResultCapture,
   onRefreshGeneratedOutputs,
   onRegisterPaneRef,
   onOpenHealth,
+  onContextManifestChange,
 }: Props) {
   const containerRef      = useRef<HTMLDivElement>(null);
   const paneRootRef       = useRef<HTMLDivElement>(null);
@@ -163,7 +172,7 @@ export function TerminalPane({
     lastRuntimeError, dismissRuntimeError,
     copyVisible, restart, kill,
     getSessionLogs, focusTerminal,
-    sendInput, captureSelectedOrLastLines, captureLastOutputBlock,
+    captureSelectedText, captureSelectedOrLastLines, captureLastOutputBlock,
   } = useTerminalProcess({
     agentId:   agent.id,
     containerRef,
@@ -246,6 +255,22 @@ export function TerminalPane({
     };
   }, [agent.id, getSessionLogs, onRegisterTranscriptGetter]);
 
+  const captureWorkflowResult = useCallback(() => {
+    // Sprint 7 result capture reuses the terminal process' xterm helpers:
+    // selected text first, then the clean output block since the last user input.
+    const selectedText = captureSelectedText().trimEnd();
+    if (selectedText.trim()) return { text: selectedText, source: "selected_text" as const };
+    return { text: captureLastOutputBlock().trimEnd(), source: "latest_output" as const };
+  }, [captureLastOutputBlock, captureSelectedText]);
+
+  useEffect(() => {
+    if (!onRegisterWorkflowResultCapture) return;
+    onRegisterWorkflowResultCapture(agent.id, captureWorkflowResult);
+    return () => {
+      onRegisterWorkflowResultCapture(agent.id, null);
+    };
+  }, [agent.id, captureWorkflowResult, onRegisterWorkflowResultCapture]);
+
   // Register pane root element for drag-drop hit-testing
   useEffect(() => {
     const el = paneRootRef.current;
@@ -295,7 +320,7 @@ export function TerminalPane({
   // ── UI state ───────────────────────────────────────────────────────────────
 
   const [showLogs,          setShowLogs]          = useState(false);
-  const [handoffCapture,    setHandoffCapture]    = useState<string | null>(null);
+  const [handoffCapture,    setHandoffCapture]    = useState<{ outputText: string; selectedText: string } | null>(null);
   const [readinessChecking, setReadinessChecking] = useState(false);
   const [restarting,        setRestarting]        = useState(false);
   const [showAttPanel,      setShowAttPanel]      = useState(false);
@@ -312,6 +337,7 @@ export function TerminalPane({
   const dinoScale = (settings?.dinoScale ?? 1) * VIEW_MODE_DINO_SCALE[viewMode];
   const isAlive        = lifecycle === "running" || lifecycle === "spawning";
   const runningTargets = allAgents.filter((a) => a.id !== agent.id && runningAgentIds.has(a.id));
+  const cwdHealth      = getAgentCwdHealth({ agentCwd: agent.cwd, selectedProjectRoot });
 
   // Defensive: attachments may be undefined on agents created before schema migration
   const atts = agent.attachments ?? [];
@@ -337,20 +363,16 @@ export function TerminalPane({
 
   // ── Attachment panel actions ───────────────────────────────────────────────
 
-  async function handleSendAttachment(path: string, fileName: string) {
-    if (!isAlive) return;
-    try {
-      const r = await fileBridge.readPreview(path);
-      sendInput(r.content);
-      onEvent?.({
-        id: crypto.randomUUID(), ts: Date.now(), workspaceId: "",
-        agentConfigId: agent.configId, agentLabel: agent.label,
-        type: "preset_brain_send",
-        payload: { fileName, path },
-      });
-    } catch (err) {
-      alert(`Read failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
+  async function handleSendContextTextOnce(targetAgentId: string, content: string) {
+    const target = allAgents.find((item) => item.id === targetAgentId);
+    if (!target || !runningAgentIds.has(target.id)) return;
+    await terminalBridge.submitLine(target.id, content, getTerminalSubmitStrategy(target.agentKind));
+    onEvent?.({
+      id: crypto.randomUUID(), ts: Date.now(), workspaceId: "",
+      agentConfigId: agent.configId, agentLabel: agent.label,
+      type: "manual_send",
+      payload: { fileName: "Context Library", path: "cmdino-context://manual-send", targetLabel: target.label },
+    });
   }
 
   function openAttPanel() {
@@ -359,18 +381,31 @@ export function TerminalPane({
   }
 
   function handleOpenHandoff() {
-    setHandoffCapture(captureSelectedOrLastLines(50));
+    setHandoffCapture({
+      outputText: captureLastOutputBlock().trimEnd() || captureSelectedOrLastLines(50),
+      selectedText: captureSelectedText().trimEnd(),
+    });
   }
 
   async function handleForwardToNext() {
     if (!effectiveFwdTarget || !isAlive || !targetIsRunning || forwarding) return;
     setFwdError("");
-    const raw = captureLastOutputBlock().trimEnd();
-    if (!raw) { setFwdError("Nothing clean to forward."); return; }
-    const captured = raw.length > 32768 ? raw.slice(0, 32768) : raw;
+    const extracted = extractReviewSendText({
+      outputText: captureLastOutputBlock().trimEnd(),
+      selectedText: captureSelectedText().trimEnd(),
+    });
+    if (!extracted.text) {
+      setFwdError("No clean handoff found. Select text manually or ask the agent for CMDINO_HANDOFF.");
+      return;
+    }
+    const captured = extracted.text.length > 32768 ? extracted.text.slice(0, 32768) : extracted.text;
     setForwarding(true);
     try {
-      await terminalBridge.write(effectiveFwdTarget.id, captured);
+      await terminalBridge.submitLine(
+        effectiveFwdTarget.id,
+        captured,
+        getTerminalSubmitStrategy(effectiveFwdTarget.agentKind),
+      );
       onRecordWorkflowLink(agent.id, effectiveFwdTarget.id, "handoff");
       onEvent?.({
         id: crypto.randomUUID(), ts: Date.now(), workspaceId: "",
@@ -459,7 +494,7 @@ export function TerminalPane({
           <StripBtn
             onClick={() => { showAttPanel ? setShowAttPanel(false) : openAttPanel(); }}
             accent={showAttPanel}
-            title={showAttPanel ? "Close context panel" : "Add files for this agent"}
+            title={showAttPanel ? "Close context library" : "Open persistent context library for this agent"}
           >
             {atts.length > 0 ? `Add Context (${atts.length})` : "Add Context"}
           </StripBtn>
@@ -506,10 +541,10 @@ export function TerminalPane({
               otherTerminals.length === 0 || !effectiveFwdTarget  ? "No targets"               :
               !targetIsRunning                                    ? "Start target first"        :
               forwarding                                          ? "Forwarding…"              :
-              `Forward to ${effectiveFwdTarget.label}`
+              `Send marked handoff to ${effectiveFwdTarget.label}`
             }
           >
-            {forwarding ? "…" : "Send Latest"}
+            {forwarding ? "…" : "Send Marked"}
           </StripBtn>
           {fwdError && (
             <span style={{ color: "var(--danger)", fontSize: 9, whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -520,6 +555,30 @@ export function TerminalPane({
 
         {/* Far right: status dot + pane controls */}
         <div className="pane-orch-group" style={{ paddingLeft: 6, borderLeft: "1px solid var(--border-subtle)", gap: 1, flexShrink: 0 }}>
+          <span
+            title={cwdHealth.warning ?? agent.cwd ?? cwdHealth.label}
+            style={{
+              maxWidth: 112,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              color:
+                cwdHealth.status === "project"
+                  ? "var(--success)"
+                  : cwdHealth.status === "different"
+                  ? "var(--warning)"
+                  : "var(--text-faint)",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 0,
+              padding: "2px 6px",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: 999,
+              flexShrink: 1,
+            }}
+          >
+            {cwdHealth.label}
+          </span>
           <div
             className={pulse ? "status-dot-pulse" : undefined}
             style={{
@@ -568,15 +627,14 @@ export function TerminalPane({
 
       {/* ── Attachment panel (collapsible) ── */}
       {showAttPanel && (
-        <AttachmentPanel
+        <ContextLibraryModal
           agent={agent}
           allAgents={allAgents}
-          generatedOutputFiles={generatedOutputFiles}
-          isAlive={isAlive}
-          onAddAttachment={onAddAttachment}
-          onRemoveAttachment={onRemoveAttachment}
-          onSendAttachment={handleSendAttachment}
-          onRefreshGeneratedOutputs={() => onRefreshGeneratedOutputs?.()}
+          projectRoot={selectedProjectRoot}
+          runningAgentIds={runningAgentIds}
+          defaultSendTargetAgentId={agent.id}
+          onSendTextOnce={handleSendContextTextOnce}
+          onManifestChange={onContextManifestChange}
           onClose={() => setShowAttPanel(false)}
         />
       )}
@@ -614,6 +672,21 @@ export function TerminalPane({
         )}
 
         {/* Runtime error — compact strip above xterm when process is running */}
+        {cwdHealth.status !== "project" && (
+          <div className="readiness-error readiness-error--strip">
+            <div className="readiness-error-body">
+              <span className="readiness-error-title">{cwdHealth.label}</span>
+              <span className="readiness-error-msg">
+                {cwdHealth.warning}
+                {cwdHealth.status === "different" ? " Stop and recreate or restart the agent with the selected project folder as cwd." : ""}
+              </span>
+            </div>
+            <div className="readiness-error-actions">
+              <button className="readiness-error-btn" onClick={() => onEditAgent(agent.id)}>Settings</button>
+            </div>
+          </div>
+        )}
+
         {lastRuntimeError && isRunning && lastRuntimeError.confidence !== "low" && (
           <RuntimeErrorCard
             error={lastRuntimeError}
@@ -725,8 +798,10 @@ export function TerminalPane({
         <HandoffModal
           sourceAgentId={agent.id}
           sourceLabel={agent.label}
-          initialCapture={handoffCapture}
+          outputText={handoffCapture.outputText}
+          selectedText={handoffCapture.selectedText}
           runningTargets={runningTargets}
+          preferredTargetId={targetIsRunning ? effectiveFwdTarget?.id : undefined}
           onClose={() => setHandoffCapture(null)}
           onSent={(targetId) => {
             onRecordWorkflowLink(agent.id, targetId, "handoff");

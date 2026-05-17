@@ -28,6 +28,14 @@ This is an alpha build: local-first, Windows-focused, no cloud sync, no accounts
 
 ---
 
+## Product Direction Update
+
+CMDino is being realigned from a manual multi-terminal workspace into a project-based, chat-driven multi-agent coding environment.
+
+Existing terminal, map, output, setup, context, and activity systems remain. They are becoming monitoring, debugging, and intervention surfaces for human-in-the-loop agent workflows.
+
+---
+
 ## What It Does
 
 | Concern | How CMDino handles it |

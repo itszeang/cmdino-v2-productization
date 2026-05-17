@@ -5,6 +5,7 @@ import type { TerminalAgent } from "../domain/terminalAgent";
 import type { SessionLogEvent } from "../domain/sessionLog";
 import type { HealthSnapshot } from "../domain/health";
 import type { ReadinessFailure } from "../domain/readiness";
+import { getAgentCwdHealth } from "../domain/agentCwd";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -27,8 +28,10 @@ function deriveAttention(
   readinessErrors: Record<string, ReadinessFailure | null>,
   healthSnapshot:  HealthSnapshot,
   sessionEntries:  SessionLogEvent[],
+  selectedProjectRoot?: string,
 ): "error" | "warn" | null {
   if (lc === "error") return "error";
+  if (getAgentCwdHealth({ agentCwd: agent.cwd, selectedProjectRoot }).status === "different") return "warn";
   const tail = sessionEntries.slice(-60);
   for (let i = tail.length - 1; i >= 0; i--) {
     const e = tail[i];
@@ -98,6 +101,7 @@ const LC_COLOR: Record<string, string> = {
 
 interface Props {
   agents:             TerminalAgent[];
+  selectedProjectRoot?: string;
   activeTerminalId:   string | null;
   lifecycleByAgentId: Record<string, string>;
   sessionEntries:     SessionLogEvent[];
@@ -113,6 +117,7 @@ type TooltipPos = { agentId: string; left: number; top: number };
 
 export function AgentDock({
   agents,
+  selectedProjectRoot,
   activeTerminalId,
   lifecycleByAgentId,
   sessionEntries,
@@ -135,7 +140,8 @@ export function AgentDock({
           const isActive = agent.id === activeTerminalId;
           const state    = lifecycleToDinoState(lc);
           const animRef  = DINO_STATE_MAP[state];
-          const attn     = deriveAttention(agent, lc, readinessErrors, healthSnapshot, sessionEntries);
+          const attn     = deriveAttention(agent, lc, readinessErrors, healthSnapshot, sessionEntries, selectedProjectRoot);
+          const cwdHealth = getAgentCwdHealth({ agentCwd: agent.cwd, selectedProjectRoot });
           const lcColor  = LC_COLOR[lc] ?? "var(--text-faint)";
 
           return (
@@ -176,7 +182,9 @@ export function AgentDock({
               {/* Label + lifecycle */}
               <div className="agent-dock-info">
                 <span className="agent-dock-label">{agent.label}</span>
-                <span className="agent-dock-lc" style={{ color: lcColor }}>{lc}</span>
+                <span className="agent-dock-lc" style={{ color: cwdHealth.status === "different" ? "var(--warning)" : lcColor }}>
+                  {cwdHealth.status === "different" ? "cwd warning" : lc}
+                </span>
               </div>
             </button>
           );
@@ -187,7 +195,8 @@ export function AgentDock({
       {tooltip && tooltipAgent && (() => {
         const agent    = tooltipAgent;
         const lc       = lifecycleByAgentId[agent.id] ?? "dormant";
-        const attn     = deriveAttention(agent, lc, readinessErrors, healthSnapshot, sessionEntries);
+        const attn     = deriveAttention(agent, lc, readinessErrors, healthSnapshot, sessionEntries, selectedProjectRoot);
+        const cwdHealth = getAgentCwdHealth({ agentCwd: agent.cwd, selectedProjectRoot });
         const lcColor  = LC_COLOR[lc] ?? "var(--text-faint)";
         const ev       = lastEvent(sessionEntries, agent);
         const rdFail   = readinessErrors[agent.id];
@@ -207,6 +216,18 @@ export function AgentDock({
               <span className="agent-dock-tooltip-key">lifecycle</span>
               <span style={{ color: lcColor }}>{lc}</span>
             </div>
+            <div className="agent-dock-tooltip-row">
+              <span className="agent-dock-tooltip-key">cwd</span>
+              <span style={{ color: cwdHealth.status === "different" ? "var(--warning)" : "var(--text-main)" }}>
+                {cwdHealth.label}
+              </span>
+            </div>
+            <div className="agent-dock-tooltip-row">
+              <span className="agent-dock-tooltip-key">path</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {agent.cwd ?? "No cwd configured"}
+              </span>
+            </div>
             {ev && (
               <div className="agent-dock-tooltip-row">
                 <span className="agent-dock-tooltip-key">last</span>
@@ -223,7 +244,8 @@ export function AgentDock({
                 }}
               >
                 {rdFail?.message
-                  ?? (lc === "error" ? "Process error" : attn === "error" ? "Runtime error" : "Provider or readiness issue")}
+                  ?? (cwdHealth.status === "different" ? cwdHealth.warning
+                  : lc === "error" ? "Process error" : attn === "error" ? "Runtime error" : "Provider or readiness issue")}
               </div>
             )}
           </div>

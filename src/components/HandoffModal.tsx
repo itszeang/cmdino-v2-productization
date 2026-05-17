@@ -1,19 +1,28 @@
 import { useState } from "react";
 import { terminalBridge } from "../terminal/terminalBridge";
+import { extractReviewSendText } from "../domain/handoffProtocol";
+import { getTerminalSubmitStrategy } from "../domain/workflowPromptSend";
 import type { TerminalAgent } from "../domain/terminalAgent";
 
 interface Props {
   sourceAgentId:  string;
   sourceLabel:    string;
-  initialCapture: string;
+  outputText:     string;
+  selectedText?:  string;
   runningTargets: TerminalAgent[];
+  preferredTargetId?: string;
   onClose:        () => void;
   onSent?:        (targetAgentId: string) => void;
 }
 
-export function HandoffModal({ sourceAgentId, sourceLabel, initialCapture, runningTargets, onClose, onSent }: Props) {
-  const [targetId,  setTargetId]  = useState(runningTargets[0]?.id ?? "");
-  const [text,      setText]      = useState(initialCapture);
+export function HandoffModal({ sourceAgentId, sourceLabel, outputText, selectedText = "", runningTargets, preferredTargetId, onClose, onSent }: Props) {
+  const extracted = extractReviewSendText({ outputText, selectedText });
+  const [targetId,  setTargetId]  = useState(
+    preferredTargetId && runningTargets.some((target) => target.id === preferredTargetId)
+      ? preferredTargetId
+      : runningTargets[0]?.id ?? "",
+  );
+  const [text,      setText]      = useState(extracted.text);
   const [sending,   setSending]   = useState(false);
   const [sendError, setSendError] = useState("");
 
@@ -22,7 +31,8 @@ export function HandoffModal({ sourceAgentId, sourceLabel, initialCapture, runni
     setSending(true);
     setSendError("");
     try {
-      await terminalBridge.write(targetId, text);
+      const target = runningTargets.find((item) => item.id === targetId);
+      await terminalBridge.submitLine(targetId, text, getTerminalSubmitStrategy(target?.agentKind));
       onSent?.(targetId);
       setSending(false);
       onClose();
@@ -65,7 +75,7 @@ export function HandoffModal({ sourceAgentId, sourceLabel, initialCapture, runni
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 16px", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0 }}>
           <span style={{ color: "var(--text-main)", fontSize: 13, fontWeight: 650 }}>Review & Send</span>
-          <span style={{ color: "var(--text-muted)", fontSize: 12 }}>from {sourceLabel}</span>
+            <span style={{ color: "var(--text-muted)", fontSize: 12 }}>clean handoff from {sourceLabel}</span>
           <span style={{ color: "var(--text-faint)", fontSize: 11 }}>({sourceAgentId.slice(0, 8)})</span>
           <button
             onClick={onClose}
@@ -103,8 +113,21 @@ export function HandoffModal({ sourceAgentId, sourceLabel, initialCapture, runni
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "14px 16px", gap: 8, minHeight: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 600 }}>Captured output</span>
+            <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 600 }}>Marked handoff text</span>
             <span style={{ color: "var(--text-faint)", fontSize: 11 }}>edit before sending</span>
+          </div>
+          <div style={{
+            color: extracted.source === "none" ? "var(--warning)" : "var(--text-faint)",
+            fontSize: 11,
+            lineHeight: 1.5,
+          }}>
+            {extracted.source === "handoff_marker"
+              ? "Extracted from CMDINO_HANDOFF markers. Terminal banners and unrelated output were ignored."
+              : extracted.source === "cmdino_result"
+              ? "Extracted from the CMDINO_RESULT handoff field."
+              : extracted.source === "selected_text"
+              ? "Using the text you selected in the terminal."
+              : "No CMDINO_HANDOFF or CMDINO_RESULT handoff was found. Ask the agent for a marked handoff, or paste clean handoff text manually."}
           </div>
           <textarea
             value={text}

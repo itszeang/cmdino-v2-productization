@@ -5,6 +5,7 @@ import { PRESET_BRAINS, getBrainById, buildBrainAttachments } from "../config/pr
 import type { AgentKind } from "../domain/agentKind";
 import type { TerminalAttachment } from "../domain/orchestration";
 import type { HealthSnapshot, HealthProviderId, HealthStatus } from "../domain/health";
+import { DEFAULT_FALLBACK_AGENT_CWD } from "../domain/agentCwd";
 
 const PRESET_PROVIDER: Record<AgentPresetId, HealthProviderId> = {
   "claude-planner":   "claude",
@@ -58,16 +59,16 @@ interface Props {
   onConfirm:       (form: ConfirmPayload) => void;
   onCancel:        () => void;
   providerHealth?: HealthSnapshot;
+  defaultCwd?:     string;
 }
 
-const DEFAULT_CWD = "C:\\Users\\burak";
-
-export function AgentCreationModal({ onConfirm, onCancel, providerHealth }: Props) {
+export function AgentCreationModal({ onConfirm, onCancel, providerHealth, defaultCwd }: Props) {
+  const initialCwd = defaultCwd?.trim() || DEFAULT_FALLBACK_AGENT_CWD;
   const [form, setForm] = useState<FormState>({
     presetId:         null,
     label:            "",
     command:          "",
-    cwd:              DEFAULT_CWD,
+    cwd:              initialCwd,
     dinoId:           DINO_OPTIONS[0].id,
     agentKind:        "custom",
     roleDescription:  "",
@@ -106,7 +107,7 @@ export function AgentCreationModal({ onConfirm, onCancel, providerHealth }: Prop
     onConfirm({
       label:     form.label.trim(),
       command:   form.command.trim(),
-      cwd:       form.cwd.trim() || DEFAULT_CWD,
+      cwd:       form.cwd.trim() || initialCwd,
       dinoId:    form.dinoId,
       agentKind: form.agentKind,
       initialAttachments,
@@ -350,8 +351,14 @@ export function AgentCreationModal({ onConfirm, onCancel, providerHealth }: Prop
             className="modal-input modal-input--mono"
             value={form.cwd}
             onChange={(e) => setForm((f) => ({ ...f, cwd: e.target.value }))}
-            placeholder={DEFAULT_CWD}
+            placeholder={initialCwd}
           />
+          {defaultCwd && (
+            <span className="modal-hint">Defaulting to the selected project folder. You can override it.</span>
+          )}
+          {!defaultCwd && (
+            <span className="modal-hint">No project selected. This agent will use the explicit fallback cwd unless you choose a folder.</span>
+          )}
         </div>
 
         {/* Dino selector */}

@@ -12,11 +12,15 @@ interface Props {
   outputFiles?:         GeneratedOutputFile[];
   onViewOutputs?:       () => void;
   onLoadLastWorkspace?: () => Promise<void>;
+  selectedTeamName?:    string | null;
+  selectedTeamSteps?:   string[];
+  onDeploySelectedTeam?: () => void;
 }
 
 export function EmptyWorkspaceState({
   onDeployAgent, onLoadDemo, onLoadTemplate,
   lastSession, outputFiles = [], onViewOutputs, onLoadLastWorkspace,
+  selectedTeamName, selectedTeamSteps = [], onDeploySelectedTeam,
 }: Props) {
   const [continuationDismissed, setContinuationDismissed] = useState(false);
 
@@ -43,21 +47,36 @@ export function EmptyWorkspaceState({
           &gt;_
         </span>
 
-        <h1 className="empty-ws-headline">Start Your Agent Workspace</h1>
+        <h1 className="empty-ws-headline">
+          {selectedTeamName ? `Deploy ${selectedTeamName}` : "Start Your Agent Workspace"}
+        </h1>
 
         <p className="empty-ws-desc">
-          CMDino runs local CLI agents on your machine, then gives them a visual workspace for context,
-          handoff, and review.
+          {selectedTeamName
+            ? "This team is selected for the workspace, but no agents are deployed yet. Deploy it here before Chat can send workflow prompts."
+            : "CMDino runs local CLI agents on your machine, then gives them a visual workspace for context, handoff, and review."}
         </p>
+
+        {selectedTeamName && selectedTeamSteps.length > 0 && (
+          <p className="empty-ws-alpha">
+            Planned workflow: {selectedTeamSteps.join(" -> ")}
+          </p>
+        )}
 
         <p className="empty-ws-alpha">
           Alpha build - local-first, no cloud sync.
         </p>
 
         <div className="empty-ws-actions">
-          <button className="empty-ws-primary" onClick={onDeployAgent}>
-            Start With an Agent
-          </button>
+          {selectedTeamName ? (
+            <button className="empty-ws-primary" onClick={onDeploySelectedTeam} disabled={!onDeploySelectedTeam}>
+              Deploy this team in Agent Workspace
+            </button>
+          ) : (
+            <button className="empty-ws-primary" onClick={onDeployAgent}>
+              Start With an Agent
+            </button>
+          )}
 
           <button className="empty-ws-secondary" onClick={onLoadTemplate}>
             Use a Template

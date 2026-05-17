@@ -41,7 +41,20 @@
       "Bash(cargo check *)",
       "Skill(update-config)",
       "Bash(npm.cmd run *)",
-      "Bash(cargo build *)"
+      "Bash(cargo build *)",
+      "Bash(where claude *)",
+      "Bash(where codex *)",
+      "Bash(npm list *)",
+      "Bash(npm config *)",
+      "PowerShell($userPath = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); $machinePath = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\); $env:PATH = $machinePath + \";\" + $userPath; Write-Output \"PATH refreshed.\"; & claude --version 2>&1)",
+      "PowerShell(& codex --version 2>&1)",
+      "PowerShell($userPath = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); $machinePath = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\); $env:PATH = $machinePath + \";\" + $userPath; & \"C:\\\\Users\\\\burak\\\\AppData\\\\Roaming\\\\npm\\\\codex.cmd\" --version 2>&1)",
+      "Bash(npm.cmd install *)",
+      "Bash(git restore *)",
+      "Bash(git remote *)",
+      "Bash(gh issue *)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm test *)"
     ]
   }
 }

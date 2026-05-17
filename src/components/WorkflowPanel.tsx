@@ -248,10 +248,11 @@ export function WorkflowPanel({
           <span className="workflow-meta">
             {agents.length} terminal{agents.length !== 1 ? "s" : ""}
             {drawLinks.length > 0 ? ` · ${drawLinks.length} link${drawLinks.length !== 1 ? "s" : ""}` : ""}
+            {" · manual handoff map"}
           </span>
           {routeSource && (
             <span className="workflow-route-banner">
-              Route from {agents.find((a) => a.configId === routeSource)?.label ?? routeSource} — click target
+              Manual route from {agents.find((a) => a.configId === routeSource)?.label ?? routeSource} — click target
             </span>
           )}
           <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
@@ -279,7 +280,7 @@ export function WorkflowPanel({
           )}
           {agents.length > 0 && drawLinks.length === 0 && !routeSource && (
             <div className="workflow-hint">
-              Drag to arrange · click Route on a node to set a preferred send path
+              Drag to arrange. Manual routes only preselect handoff targets; they do not auto-run agents.
             </div>
           )}
 
@@ -318,7 +319,7 @@ export function WorkflowPanel({
               const sw = isRoute ? 2 : Math.min(1 + link.count, 5);
               const marker = isRoute ? "url(#wf-arrow-route)" : "url(#wf-arrow)";
               const label  = isRoute
-                ? "route"
+                ? "manual route"
                 : (link.kind === "handoff" ? "handoff" : "skill send") +
                   (link.count > 1 ? ` ×${link.count}` : "");
 
@@ -408,7 +409,7 @@ export function WorkflowPanel({
                     data-active={String(isRouteSource)}
                     onClick={(e) => handleRouteButtonClick(e, agent.configId)}
                   >
-                    {isRouteSource ? "Cancel" : "Route"}
+                    {isRouteSource ? "Cancel" : "Manual Route"}
                   </button>
                 </div>
               </div>

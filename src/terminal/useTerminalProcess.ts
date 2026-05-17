@@ -82,6 +82,8 @@ export interface TerminalProcessHandle {
   focusTerminal: () => void;
   /** Write raw text into the running PTY. No-op when not running. */
   sendInput: (text: string) => void;
+  /** Return xterm selection only, or an empty string when no selection exists. */
+  captureSelectedText: () => string;
   /** Return xterm selection if any, else last N lines of buffer. */
   captureSelectedOrLastLines: (lastLines?: number) => string;
   /** Return xterm selection if any, else stripped output since the last user input. */
@@ -228,6 +230,16 @@ export function useTerminalProcess({
     terminalBridge.write(agentId, text).catch(() => {});
     resetOnNextChunkRef.current = true;
   }, [agentId]);
+
+  const captureSelectedText = useCallback((): string => {
+    const t = termRef.current;
+    if (!t) return "";
+    try {
+      return t.getSelection().trimEnd();
+    } catch {
+      return "";
+    }
+  }, []);
 
   const captureSelectedOrLastLines = useCallback((lastLines = 50): string => {
     const t = termRef.current;
@@ -640,6 +652,7 @@ export function useTerminalProcess({
     getSessionLogs,
     focusTerminal,
     sendInput,
+    captureSelectedText,
     captureSelectedOrLastLines,
     captureLastOutputBlock,
   };

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ProjectWorkspace } from "../domain/projectWorkspace";
 import type { TerminalViewMode } from "../domain/viewMode";
 
 interface MainHeaderProps {
@@ -6,6 +7,9 @@ interface MainHeaderProps {
   onNameChange:     (name: string) => void;
   viewMode:         TerminalViewMode;
   onToggleViewMode: () => void;
+  currentProject?:  ProjectWorkspace | null;
+  onOpenProject?:   () => void;
+  onClearProject?:  () => void;
 }
 
 export function MainHeader({
@@ -13,6 +17,9 @@ export function MainHeader({
   onNameChange,
   viewMode,
   onToggleViewMode,
+  currentProject,
+  onOpenProject,
+  onClearProject,
 }: MainHeaderProps) {
   const [editing,   setEditing]   = useState(false);
   const [nameInput, setNameInput] = useState(workspaceName);
@@ -51,6 +58,32 @@ export function MainHeader({
             >
               {workspaceName}
             </span>
+          )}
+        </div>
+
+        <div className="project-context-pill">
+          <div className="project-context-copy">
+            {currentProject ? (
+              <>
+                <span className="project-context-name">Project: {currentProject.name}</span>
+                <span className="project-context-path" title={currentProject.rootPath}>
+                  Agents start here by default: {currentProject.rootPath}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="project-context-name">No project selected</span>
+                <span className="project-context-path">Agents use their own working directory.</span>
+              </>
+            )}
+          </div>
+          {currentProject && onClearProject && (
+            <button className="project-context-btn" onClick={onClearProject}>Clear</button>
+          )}
+          {onOpenProject && (
+            <button className="project-context-btn" onClick={onOpenProject}>
+              {currentProject ? "Switch" : "Open"}
+            </button>
           )}
         </div>
 

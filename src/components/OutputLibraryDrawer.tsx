@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { GeneratedOutputFile } from "../domain/attachments";
 import type { TerminalAttachment } from "../domain/orchestration";
-import { groupOutputLibraryFiles, kindReadableLabel, kindPurposeHint } from "../domain/outputLibrary";
+import { groupOutputLibraryFiles, kindReadableLabel, kindPurposeHint, outputFileDisplayLabel } from "../domain/outputLibrary";
 import { fileBridge } from "../orchestration/fileBridge";
 import { deleteOutputFile } from "../memory/memoryBriefBridge";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -186,10 +186,10 @@ export function OutputLibraryDrawer({
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 13, letterSpacing: 0.2, color: "var(--text-main)" }}>
-              Output Shelf
+              Generated Output Dashboard
             </div>
             <div style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 1 }}>
-              Memory, logs, and share files
+              Preview, copy, delete, and attach generated outputs as context
             </div>
           </div>
           <button
@@ -278,7 +278,7 @@ export function OutputLibraryDrawer({
                             fontSize: 9, fontWeight: 600, letterSpacing: 0.2,
                             color, marginRight: 5,
                           }}>
-                            {kindReadableLabel(file.kind)}
+                            {outputFileDisplayLabel(file)}
                           </span>
                         </div>
                         <div style={{
@@ -354,8 +354,8 @@ export function OutputLibraryDrawer({
                       {alreadyAttached
                         ? "Added"
                         : activeAgent
-                        ? `Add to ${activeAgent.label}`
-                        : "Add to Agent"}
+                        ? `Add to ${activeAgent.label} Context`
+                        : "Add to Context"}
                     </button>
                     <button
                       className="cmd-pill-btn"
@@ -463,7 +463,7 @@ export function OutputLibraryDrawer({
       {showReader && selected && (() => {
         const readerActions: ArtifactReaderAction[] = [
           {
-            label: alreadyAttached ? "Added" : activeAgent ? `Add to ${activeAgent.label}` : "Add to Agent",
+            label: alreadyAttached ? "Added" : activeAgent ? `Add to ${activeAgent.label} Context` : "Add to Context",
             onClick: handleAttach,
             disabled: !canAttach,
             accent: canAttach,
@@ -481,7 +481,7 @@ export function OutputLibraryDrawer({
         return (
           <ArtifactReaderModal
             title={selected.fileName}
-            artifactType={kindReadableLabel(selected.kind)}
+            artifactType={outputFileDisplayLabel(selected)}
             sourceLabel="Output Shelf"
             path={selected.path}
             isAttached={alreadyAttached}

@@ -43,6 +43,7 @@ interface Props {
   generatedOutputFiles:      GeneratedOutputFile[];
   isAlive:                   boolean;
   onAddAttachment:           (path: string, source?: "user" | "preset" | "generated") => void;
+  onAddAttachmentToAgent?:   (agentId: string, path: string, source?: "user" | "preset" | "generated") => void;
   onRemoveAttachment:        (id: string) => void;
   onSendAttachment:          (path: string, fileName: string) => Promise<void>;
   onRefreshGeneratedOutputs: () => void;
@@ -98,7 +99,7 @@ function ActionBtn({ onClick, disabled = false, accent = false, danger = false, 
 
 export function AttachmentPanel({
   agent, allAgents, generatedOutputFiles, isAlive,
-  onAddAttachment, onRemoveAttachment, onSendAttachment,
+  onAddAttachment, onAddAttachmentToAgent, onRemoveAttachment, onSendAttachment,
   onRefreshGeneratedOutputs, onClose,
 }: Props) {
   const atts = agent.attachments ?? [];
@@ -227,6 +228,7 @@ export function AttachmentPanel({
   const canAdd     = selected !== null && !isAttached;
   const canSend    = isAttached && isAlive && !sending;
   const canCopy    = selected !== null;
+  const canAddGlobal = Boolean(selected && onAddAttachmentToAgent);
 
   const terminalStateHint = !isAlive
     ? "Start this agent before sending context."
@@ -243,6 +245,15 @@ export function AttachmentPanel({
   function handleAdd() {
     if (!selected || isAttached) return;
     onAddAttachment(selected.path, selected.source);
+    setActiveTab("added_context");
+  }
+
+  function handleAddGlobal() {
+    if (!selected || !onAddAttachmentToAgent) return;
+    for (const target of allAgents) {
+      const alreadyAdded = (target.attachments ?? []).some((att) => att.path === selected.path);
+      if (!alreadyAdded) onAddAttachmentToAgent(target.id, selected.path, selected.source);
+    }
     setActiveTab("added_context");
   }
 
@@ -341,13 +352,14 @@ export function AttachmentPanel({
         onClose={() => setShowReader(false)}
       />
     )}
-    <div className="att-panel">
+    <div className="context-modal-overlay" onClick={onClose}>
+    <div className="att-panel att-panel--modal" onClick={(event) => event.stopPropagation()}>
 
       {/* ── Header ── */}
       <div className="att-header" style={{ flexDirection: "column", alignItems: "flex-start", gap: 3, padding: "8px 12px 7px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-            <span className="att-header-name">Add Context to {agent.label}</span>
+            <span className="att-header-name">Context Library for {agent.label}</span>
             {atts.length > 0 && (
               <span style={{ fontSize: 9, color: "var(--text-faint)", fontWeight: 400 }}>
                 {atts.length} attached
@@ -372,7 +384,8 @@ export function AttachmentPanel({
           </div>
         </div>
         <span style={{ fontSize: 9, color: "var(--text-faint)", lineHeight: 1.4 }}>
-          Add files first. Nothing is sent into the terminal until you choose Send Into Agent.
+          Per-agent context is persisted with the workspace. Global context adds the file to every current agent.
+          Project context files should live under .cmdino/context in Context System V2.
         </span>
       </div>
 
@@ -629,6 +642,12 @@ export function AttachmentPanel({
                     <ActionBtn onClick={handleAdd} accent>Add to Agent</ActionBtn>
                   )}
                   <ActionBtn
+                    onClick={handleAddGlobal}
+                    disabled={!canAddGlobal}
+                  >
+                    Add Global Context
+                  </ActionBtn>
+                  <ActionBtn
                     onClick={() => { void handleSend(); }}
                     disabled={!canSend}
                     accent={canSend}
@@ -710,6 +729,7 @@ export function AttachmentPanel({
           )}
         </div>
       </div>
+    </div>
     </div>
     </>
   );

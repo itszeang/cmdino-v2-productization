@@ -15,6 +15,25 @@ export interface TerminalExitEvent {
   reason: "exited" | "killed" | "error";
 }
 
+export type TerminalEnterSequence = "\r" | "\n" | "\r\n";
+
+export interface TerminalSubmitOptions {
+  enterSequence?: TerminalEnterSequence;
+  delayMs?: number;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function normalizeSubmitLine(text: string): string {
+  return text.replace(/[\r\n]+/g, " ").trimEnd();
+}
+
+function writeTerminal(agentId: string, data: string): Promise<void> {
+  return invoke("write_terminal", { agentId, data });
+}
+
 export const terminalBridge = {
   spawn(agentId: string, cwd: string, cols: number, rows: number): Promise<"spawned" | "already_running"> {
     return invoke<string>("spawn_terminal", { agentId, shell: "cmd.exe", cwd, cols, rows })
@@ -22,7 +41,15 @@ export const terminalBridge = {
   },
 
   write(agentId: string, data: string): Promise<void> {
-    return invoke("write_terminal", { agentId, data });
+    return writeTerminal(agentId, data);
+  },
+
+  async submitLine(agentId: string, text: string, options: TerminalSubmitOptions = {}): Promise<void> {
+    const enterSequence = options.enterSequence ?? "\r";
+    const delayMs = options.delayMs ?? 90;
+    await writeTerminal(agentId, normalizeSubmitLine(text));
+    await delay(delayMs);
+    await writeTerminal(agentId, enterSequence);
   },
 
   resize(agentId: string, cols: number, rows: number): Promise<void> {

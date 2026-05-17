@@ -2,9 +2,11 @@ interface Props {
   title:          string;
   body:           string;
   confirmLabel?:  string;
+  secondaryLabel?: string;
   cancelLabel?:   string;
   destructive?:   boolean;
   onConfirm:      () => void;
+  onSecondary?:    () => void;
   onCancel:       () => void;
 }
 
@@ -12,9 +14,11 @@ export function ConfirmDialog({
   title,
   body,
   confirmLabel = "Confirm",
+  secondaryLabel,
   cancelLabel  = "Cancel",
   destructive  = false,
   onConfirm,
+  onSecondary,
   onCancel,
 }: Props) {
   return (
@@ -57,6 +61,15 @@ export function ConfirmDialog({
           >
             {cancelLabel}
           </button>
+          {secondaryLabel && onSecondary && (
+            <button
+              className="cmd-pill-btn cmd-pill-btn--danger"
+              style={{ fontSize: 11, padding: "5px 12px" }}
+              onClick={onSecondary}
+            >
+              {secondaryLabel}
+            </button>
+          )}
           <button
             className={`cmd-pill-btn${destructive ? " cmd-pill-btn--danger" : ""}`}
             style={{ fontSize: 11, padding: "5px 12px" }}

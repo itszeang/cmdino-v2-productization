@@ -12,6 +12,7 @@ Status: Phase 1 Product Trust known issues
 | No cloud sync, account system, or license gate yet. | Low | Workspaces and outputs are local to one machine. Distribution remains private-alpha oriented. | Move local files manually if needed. |
 | No bulk delete. | Low | Users must delete workspaces and output artifacts one at a time. | Intentional V1 safety constraint. |
 | No autonomous execution. | Low | Workflow routes are visual/manual preferences, not scheduled or automatic agent execution. | Use manual Handoff or Forward controls. |
+| Full live-agent dogfood workflow still needs a desktop pass. | Medium | Source review and automated checks passed, but the complete Project -> Chat -> Agent -> Capture -> Artifacts -> History flow still needs to be run in the GUI with real CLI agents. | Follow `docs/DOGFOOD_WORKFLOW_QA.md` and `docs/PRE_PUSH_VALIDATION_CHECKLIST.md` before closed-alpha handoff. |
 | Auto Forward works best with clean recent output. | Medium | Raw TUI or prompt-heavy output can forward noisy context. | Select exact text first or use manual handoff for editing. |
 | Large Vite chunk warning remains. | Low | Build succeeds, but initial app JS is larger than Vite's default warning threshold. | Defer code splitting until load time is a real problem. |
 | Tauri bundle identifier ends with `.app`. | Low | Current Windows build succeeds; Tauri warns this is not ideal for macOS distribution. | Rename before serious macOS packaging. |

@@ -139,6 +139,36 @@ pub fn write_memory_briefs(
     })
 }
 
+/// Write a prompt file to a path relative to the given project directory.
+/// The relative path must not contain `..` or root components.
+/// Creates intermediate directories as needed.
+/// Returns the absolute path of the written file.
+#[tauri::command]
+pub fn write_prompt_file(dir: String, rel_path: String, content: String) -> Result<String, String> {
+    let base = PathBuf::from(&dir);
+    if !base.is_absolute() {
+        return Err("dir must be an absolute path".to_string());
+    }
+    let rel = PathBuf::from(&rel_path);
+    for component in rel.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                return Err("rel_path must not contain ..".to_string());
+            }
+            std::path::Component::Prefix(_) | std::path::Component::RootDir => {
+                return Err("rel_path must be a relative path".to_string());
+            }
+            _ => {}
+        }
+    }
+    let full = base.join(&rel);
+    if let Some(parent) = full.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("create dirs: {e}"))?;
+    }
+    fs::write(&full, content.as_bytes()).map_err(|e| format!("write prompt file: {e}"))?;
+    Ok(full.to_string_lossy().into_owned())
+}
+
 #[tauri::command]
 pub fn delete_output_file(
     app: tauri::AppHandle,

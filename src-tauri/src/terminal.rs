@@ -188,7 +188,8 @@ pub fn write_terminal(
         .lock()
         .map_err(|_| "terminal state lock poisoned".to_string())?;
     let handle = inner.sessions.get_mut(&agent_id).ok_or("terminal not found")?;
-    handle.writer.write_all(data.as_bytes()).map_err(|e| e.to_string())
+    handle.writer.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
+    handle.writer.flush().map_err(|e| e.to_string())
 }
 
 #[tauri::command]

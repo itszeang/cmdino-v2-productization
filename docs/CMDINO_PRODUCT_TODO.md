@@ -37,6 +37,17 @@ CMDino already has a multi-agent terminal workspace, Agent Dock, workflow map, c
 | Manual Review & Send | ✅ Done | User-reviewed handoff flow exists. | P0 |
 | Send Latest | ✅ Done | Sends recent clean output to a target agent when available. | P1 |
 | Workflow route preference | ✅ Done | Routes are visual/manual preferences, not automation. | P1 |
+| V2 scope recovery + orchestration domain foundation | 🟡 Partial / needs polish | Scope spec, intervention model, workflow run model, project workspace model, and agent team model added; no runtime orchestration yet. | P0 |
+| CMDino Chat Shell | 🟡 Partial / needs polish | Future primary product surface added; captures user tasks and renders workflow/intervention placeholders only. It does not execute workflows or send prompts into terminals. | P0 |
+| Checkpoint workflow orchestrator MVP | 🟡 Partial / needs polish | Frontend-only checkpoint runner can create workflow runs, build step prompts, parse `CMDINO_RESULT` blocks, and move through steps manually. It does not auto-send prompts or run backend automation. | P0 |
+| Intervention integration layer | 🟡 Partial / needs polish | Workflow `needs_user_action` and `failed` results create real frontend interventions, render chat cards, and update the sidebar badge. Runtime/PTTY behavior remains unchanged. | P0 |
+| Explicit workflow prompt send | 🟡 Partial / needs polish | Sprint 6 adds explicit user-controlled prompt sending from a workflow checkpoint to a selected running agent. This is not auto-send or autonomous execution. The user must choose the target agent and click Send Prompt to Agent. | P0 |
+| Explicit workflow result capture | 🟡 Partial / needs polish | Sprint 7 adds explicit user-controlled result capture from the selected target agent. Captured output is reviewed in the chat result panel and parsed with the existing `CMDINO_RESULT` parser. This is not automatic step completion or auto-pipe. | P0 |
+| Checkpoint continuation polish | 🟡 Partial / needs polish | Sprint 8 polishes checkpoint continuation UX. It makes workflow progress, previous summaries, handoffs, continue actions, parse recovery, and final output clearer. It still does not add auto-pipe or autonomous execution. | P0 |
+| Workflow artifact Output Shelf integration | 🟡 Partial / needs polish | Sprint 9 connects workflow results to the Output Shelf. Users can save final workflow output, step summaries/handoffs, and build-in-public drafts as local artifacts. This remains explicit and local-only; no cloud sync or autonomous execution is added. | P0 |
+| Agent team workflow presets | 🟡 Partial / needs polish | Sprint 10 makes Vibe App Builder, Bug Fix Team, UI Polish Team, and Architecture Team selectable in CMDino Chat. Selected teams persist locally and create manual checkpoint steps from the team preset. | P0 |
+| Workflow run history | 🟡 Partial / needs polish | Sprint 11 adds local workflow run history and resume/inspect surfaces. Users can inspect recent workflow runs per project, see step progress, view linked artifacts, and explicitly resume incomplete runs where safe. No cloud sync or automatic resume is added. | P0 |
+| Dogfood workflow QA | 🟡 Partial / needs polish | Sprint 12 adds dogfood workflow QA docs, a pre-push validation checklist, and fixes stale Chat copy found during source-level dogfood review. Full desktop live-agent dogfood still needs to be run. | P0 |
 | Autonomous execution | 🟣 Future / optional | Explicitly out of V1 alpha scope. | P3 |
 
 ### 2. Context / Attachment System
@@ -111,6 +122,7 @@ CMDino already has a multi-agent terminal workspace, Agent Dock, workflow map, c
 | Workspace templates | ✅ Done | Template configs exist for common workflows. | P0 |
 | Welcome/first-run CTA logic | ✅ Done | QA source pass verifies CTA tiering. | P0 |
 | Setup Check onboarding | ✅ Done | Health entry point exists. | P0 |
+| Project workspace entry | 🟡 Partial / needs polish | Project folder selection, recent project state, and default new-agent cwd wiring added; native project detection and chat workflow are future work. | P0 |
 | Quickstart guide | 🟡 Partial / needs polish | QA kit quickstart created in `qa-release/QUICKSTART.md`; final distribution copy still needs feedback URL. | P0 |
 | Dogfood onboarding proof | ❌ Not started | Must prove a real project can be built with CMDino. | P0 |
 
@@ -201,6 +213,26 @@ Tasks:
 - Tauri bundle identifier ends with `.app`.
 - Rust dead-code warning for `ProbeOutput.duration_ms`.
 - Final app icon assets required.
+- V2 orchestration domain foundation exists, but CMDino Chat, workflow runner, and intervention UI are not implemented yet.
+- Project workspace entry is frontend-only for now; framework/package manager detection still needs native folder inspection.
+- CMDino Chat Shell now has explicit workflow prompt sends to selected running agents, but workflow result capture and autonomous execution are not implemented yet.
+- Sprint 4 checkpoint orchestrator is manual and frontend-only; prompt send/copy, result paste, and continue actions require explicit user action.
+- Sprint 5 intervention state is connected to manual workflow results; automatic runtime error to intervention bridging is still future work.
+- Sprint 6 prompt send is explicit/manual only. It reuses the existing terminal bridge write path and does not add auto-send or backend workflow execution.
+- Sprint 7 result capture is explicit/manual only. It reuses terminal selection/latest-output capture helpers and does not parse, complete, or continue workflow steps automatically.
+- Sprint 8 continuation polish improves timeline, handoff review, parse recovery, and final summary clarity. It still does not send, capture, parse, or continue automatically.
+- Sprint 9 workflow artifacts use the existing local Output Shelf write path. Saves are explicit, local-only, and do not add cloud sync or autonomous execution.
+- Sprint 10 agent team selection is frontend-only and manual. It persists the selected chat team locally, suggests a matching running target agent by provider/role, and does not add auto-send, auto-capture, or backend orchestration.
+- Sprint 11 workflow history is localStorage-backed and separate from Activity Log. It stores recent workflow run snapshots and linked Output Shelf artifact paths for inspect/resume, with no cloud sync or automatic resume.
+- Sprint 12 dogfood QA is documented in `docs/DOGFOOD_WORKFLOW_QA.md` and `docs/PRE_PUSH_VALIDATION_CHECKLIST.md`. This pass fixed stale Chat copy and the Chat/Agents terminal unmount blocker, but full desktop dogfood with live CLI agents remains required.
+- Sprint 13 defines the full feature behavior contract (`docs/CMDINO_FEATURE_BEHAVIOR_CONTRACT.md`) and fixes navigation/surface regressions discovered during dogfood. Root cause of the Chat navigation bug was `setProjectEntryDismissed(false)` being called on project selection (backwards) and `onOpenChat` not dismissing the project gate. Chat, Agents, Workflow History, Output Shelf, and Setup surfaces must be deterministic and preserve state across switching.
+
+## Dogfood QA Findings
+
+- Completed test paths: source-level review of Project -> Chat -> Agent Team -> Checkpoint Workflow -> explicit send/capture guards -> parser/intervention flow -> artifacts -> Workflow History, plus `npm.cmd run build` and `npm.cmd run test:unit`.
+- Blockers found: full live-agent dogfood could not be completed from this Codex shell-only session because the GUI app and AI CLIs were not launched here.
+- Fixed issues: Chat hero and empty-state copy no longer describe workflow routing as future work or claim Chat cannot send to terminals. Chat/Agents switching now keeps terminal panes mounted so xterm content is not destroyed by navigation.
+- Deferred issues: run a full desktop dogfood workflow with a live CLI agent, collect screenshots/video proof, and execute clean-machine installer QA.
 
 ## Closed Alpha Readiness Checklist
 

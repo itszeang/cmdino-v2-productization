@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { HealthSnapshot, HealthStatus } from "../domain/health";
 
@@ -32,14 +31,18 @@ function healthAggregateDot(snapshot: HealthSnapshot): ReactNode {
 }
 
 interface AppSidebarProps {
+  onOpenChat:                () => void;
+  onOpenAgents:              () => void;
   onAddTerminal:             () => void;
   onLoadDemo:                () => void;
   onOpenWorkflow:            () => void;
+  onOpenContextLibrary:      () => void;
+  onOpenWorkflowHistory:     () => void;
   onOpenHealth:              () => void;
   onNew:                     () => void;
   onSave:                    () => void;
-  onLoad:                    (name: string) => void;
   onRefreshList:             () => void;
+  onOpenWorkspaceBrowser:    () => void;
   savedWorkspaces:           string[];
   onOpenSettings:            () => void;
   onOpenHistory:             () => void;
@@ -50,14 +53,16 @@ interface AppSidebarProps {
   canGenerateBuildKit:       boolean;
   onOpenOutputLibrary:       () => void;
   outputFileCount:           number;
-  onDeleteWorkspace:         (name: string) => void;
   terminalCount:             number;
   maxTerminals:              number;
   maxReached:                boolean;
   healthSnapshot:            HealthSnapshot;
+  activeSurface?:            "chat" | "agents";
+  openInterventionCount?:    number;
 }
 
 type SidebarIconName =
+  | "chat"
   | "demo"
   | "workflow"
   | "health"
@@ -88,6 +93,13 @@ function SidebarIcon({ name }: { name: SidebarIconName }) {
       aria-hidden="true"
       focusable="false"
     >
+      {name === "chat" && (
+        <>
+          <path d="M5 5h14v10H8l-3 3V5z" {...common} />
+          <path d="M8 9h8" {...common} />
+          <path d="M8 12h5" {...common} />
+        </>
+      )}
       {name === "demo" && (
         <>
           <circle cx="12" cy="12" r="9" {...common} />
@@ -199,14 +211,18 @@ function SidebarRow({
 }
 
 export function AppSidebar({
+  onOpenChat,
+  onOpenAgents,
   onAddTerminal,
   onLoadDemo,
   onOpenWorkflow,
+  onOpenContextLibrary,
+  onOpenWorkflowHistory,
   onOpenHealth,
   onNew,
   onSave,
-  onLoad,
   onRefreshList,
+  onOpenWorkspaceBrowser,
   savedWorkspaces,
   onOpenSettings,
   onOpenHistory,
@@ -217,14 +233,13 @@ export function AppSidebar({
   canGenerateBuildKit,
   onOpenOutputLibrary,
   outputFileCount,
-  onDeleteWorkspace,
   terminalCount,
   maxTerminals,
   maxReached,
   healthSnapshot,
+  activeSurface,
+  openInterventionCount = 0,
 }: AppSidebarProps) {
-  const [selectedWorkspace, setSelectedWorkspace] = useState("");
-
   return (
     <aside className="app-sidebar">
       <div className="sidebar-brand">
@@ -249,8 +264,50 @@ export function AppSidebar({
         {/* ── Start ── */}
         <div className="sidebar-section">
           <div className="sidebar-label">Start</div>
+          <SidebarRow
+            icon="chat"
+            onClick={onOpenChat}
+            title="Open CMDino Chat task shell"
+            data-active={String(activeSurface === "chat")}
+            trailing={openInterventionCount > 0 ? (
+              <span className="sidebar-alert-badge">{openInterventionCount}</span>
+            ) : undefined}
+          >
+            Chat
+          </SidebarRow>
+          <SidebarRow
+            icon="health"
+            onClick={onOpenChat}
+            title={openInterventionCount > 0 ? "Open Chat to review active interventions" : "No active interventions"}
+            disabled={openInterventionCount === 0}
+          >
+            Interventions
+            {openInterventionCount > 0 && (
+              <span className="sidebar-alert-badge">{openInterventionCount}</span>
+            )}
+          </SidebarRow>
+          <SidebarRow
+            icon="start"
+            onClick={onOpenAgents}
+            title="Open the agent terminal workspace"
+            data-active={String(activeSurface === "agents")}
+          >
+            Agent Workspace
+          </SidebarRow>
           <SidebarRow icon="demo" onClick={onLoadDemo} title="Load the CMDino demo workflow">
             Try Demo Setup
+          </SidebarRow>
+        </div>
+
+        {/* ── Context ── */}
+        <div className="sidebar-section">
+          <div className="sidebar-label">Context</div>
+          <SidebarRow
+            icon="library"
+            onClick={onOpenContextLibrary}
+            title="Open persistent project and agent context files"
+          >
+            Context Library
           </SidebarRow>
         </div>
 
@@ -259,6 +316,9 @@ export function AppSidebar({
           <div className="sidebar-label">Work</div>
           <SidebarRow icon="workflow" onClick={onOpenWorkflow} title="View your agent map and workflow connections">
             Agent Map
+          </SidebarRow>
+          <SidebarRow icon="history" onClick={onOpenWorkflowHistory} title="Inspect and resume local workflow runs">
+            Workflow History
           </SidebarRow>
           <SidebarRow icon="history" onClick={onOpenHistory} title="View session activity log">
             Activity
@@ -339,44 +399,19 @@ export function AppSidebar({
             Save Workspace
           </SidebarRow>
 
-          <div className="sidebar-select-wrapper" title="Open a saved workspace">
-            <SidebarIcon name="load" />
-            <span className="sidebar-select-label">Open Workspace</span>
-            <span className="sidebar-select-arrow">v</span>
-            <select
-              className="sidebar-select-native"
-              value={selectedWorkspace}
-              onChange={(e) => setSelectedWorkspace(e.target.value)}
-              onFocus={onRefreshList}
-            >
-              <option value="" disabled>
-                {savedWorkspaces.length === 0 ? "No saved workspaces yet." : "Select workspace…"}
-              </option>
-              {savedWorkspaces.map((name) => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ display: "flex", gap: 4, padding: "2px 8px 4px" }}>
-            <button
-              className="cmd-pill-btn"
-              style={{ flex: 1, fontSize: 10, padding: "4px 6px" }}
-              disabled={!selectedWorkspace}
-              title={selectedWorkspace ? `Open "${selectedWorkspace}"` : "Select a workspace first"}
-              onClick={() => { if (selectedWorkspace) onLoad(selectedWorkspace); }}
-            >
-              Open
-            </button>
-            <button
-              className="cmd-pill-btn cmd-pill-btn--danger"
-              style={{ fontSize: 10, padding: "4px 8px" }}
-              disabled={!selectedWorkspace}
-              title={selectedWorkspace ? `Delete "${selectedWorkspace}"` : "Select a workspace first"}
-              onClick={() => { if (selectedWorkspace) { onDeleteWorkspace(selectedWorkspace); setSelectedWorkspace(""); } }}
-            >
-              Delete
-            </button>
-          </div>
+          <SidebarRow
+            icon="load"
+            onClick={() => {
+              onRefreshList();
+              onOpenWorkspaceBrowser();
+            }}
+            title={savedWorkspaces.length === 0 ? "Browse saved workspaces" : `Browse ${savedWorkspaces.length} saved workspace${savedWorkspaces.length !== 1 ? "s" : ""}`}
+          >
+            Open Workspace
+            {savedWorkspaces.length > 0 && (
+              <span className="sidebar-alert-badge">{savedWorkspaces.length}</span>
+            )}
+          </SidebarRow>
 
           <SidebarRow icon="settings" onClick={onOpenSettings} title="Visual and agent settings">
             Settings
