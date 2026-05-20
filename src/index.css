@@ -6980,3 +6980,843 @@ input[type="range"]::-webkit-slider-thumb:hover {
 /* Project context pill — small hover improvement */
 .project-context-pill:hover { border-color: var(--border-strong); }
 .template-card:hover .template-card-chevron { opacity: 0.80; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CMDino V3 Real UI Pass — Terminal Cockpit + Mission Control
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* A. Mission Control — Composer card upgrade */
+
+/* Make the whole mission control surface feel like a command center */
+.main-task-chat {
+  background: var(--app-bg);
+}
+
+/* Status strip — taller, denser */
+.mc-status-strip {
+  height: 42px;
+  padding: 0 18px;
+  gap: 0;
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 0 var(--glass-border);
+}
+
+.mc-status-chip {
+  padding: 5px 10px;
+  border-radius: 6px;
+  gap: 6px;
+}
+
+.mc-status-label {
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  font-weight: 700;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+
+.mc-status-value {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Composer zone — more prominent command area */
+.mc-composer-zone {
+  padding: 14px 18px 18px;
+  background: var(--app-bg);
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+/* Chat composer — elevated command card */
+.chat-composer {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--panel-highlight);
+  padding: 14px 14px 10px;
+  gap: 10px;
+}
+
+/* Command textarea — more prominent */
+.chat-composer textarea {
+  min-height: 80px;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--terminal-bg);
+  color: #e8e8e8;
+  border-color: transparent;
+  resize: none;
+}
+.chat-composer textarea:focus {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.04);
+}
+.chat-composer textarea::placeholder {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.chat-composer textarea:disabled {
+  color: var(--text-faint);
+  background: var(--surface-0);
+  opacity: 0.55;
+}
+
+/* Stage Task / primary submit — amber when active */
+.mc-composer-zone .chat-submit-btn:not(:disabled) {
+  background: var(--agent-claude);
+  color: #0e0e0e;
+  font-weight: 650;
+  font-size: 12px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  box-shadow: 0 1px 5px rgba(245,158,11,0.30);
+}
+.mc-composer-zone .chat-submit-btn:hover:not(:disabled) {
+  opacity: 0.88;
+  box-shadow: 0 2px 10px rgba(245,158,11,0.28);
+}
+.mc-composer-zone .chat-submit-btn:active:not(:disabled) {
+  opacity: 0.78;
+  box-shadow: none;
+}
+.mc-composer-zone .chat-submit-btn:disabled {
+  background: var(--button-bg);
+  color: var(--text-faint);
+  box-shadow: none;
+}
+
+/* Ghost buttons in composer */
+.mc-composer-zone .chat-ghost-btn {
+  font-size: 11px;
+  padding: 7px 10px;
+  border-radius: 7px;
+}
+
+/* Composer footer hint */
+.mc-composer-hint {
+  font-size: 10px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+
+/* B. Mission Control — Checkpoint column */
+
+.mc-checkpoint-col {
+  background: var(--surface-0);
+  border-left: 1px solid var(--border-subtle);
+  box-shadow: inset 1px 0 0 var(--glass-border);
+  width: 400px;
+}
+
+.mc-checkpoint-header {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(245,158,11,0.14);
+  background: linear-gradient(
+    180deg,
+    rgba(245,158,11,0.06) 0%,
+    rgba(255,255,255,0.012) 32px,
+    transparent 100%
+  );
+}
+
+.mc-checkpoint-kicker {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--agent-claude);
+  opacity: 0.75;
+}
+
+.mc-checkpoint-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.mc-checkpoint-status-badge {
+  font-size: 9px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--status-warning);
+  background: var(--status-warning-dim);
+  border: 1px solid rgba(251,191,36,0.22);
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.mc-checkpoint-body {
+  padding: 12px 14px;
+  gap: 10px;
+}
+
+/* Target select — more prominent */
+.mc-target-select {
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 8px 10px;
+  background: var(--surface-1);
+  border-color: var(--border-subtle);
+  color: var(--text-main);
+}
+.mc-target-select:focus {
+  border-color: var(--agent-claude);
+  box-shadow: 0 0 0 2px rgba(245,158,11,0.10);
+  outline: none;
+}
+
+/* Step prompt card */
+.chat-step-prompt {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 11px;
+  gap: 9px;
+  background-image: linear-gradient(180deg, var(--panel-highlight) 0%, transparent 36px);
+}
+
+/* Result parser card */
+.chat-result-parser {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 11px;
+  gap: 8px;
+}
+
+/* Send Prompt CTA — large amber */
+.chat-step-prompt .chat-submit-btn:not(:disabled) {
+  background: var(--agent-claude);
+  color: #0e0e0e;
+  font-weight: 650;
+  font-size: 12px;
+  padding: 7px 16px;
+  border-radius: 7px;
+  box-shadow: 0 1px 5px rgba(245,158,11,0.28);
+}
+.chat-step-prompt .chat-submit-btn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+/* Continue button — white primary */
+.mc-result-actions .chat-submit-btn:not(:disabled) {
+  background: var(--accent);
+  color: var(--app-bg);
+  font-weight: 650;
+  padding: 7px 16px;
+  border-radius: 7px;
+}
+
+/* Workflow timeline step */
+.workflow-timeline {
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.workflow-timeline-step {
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 10px;
+  padding: 3px 0;
+}
+
+.workflow-timeline-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 3px;
+  border-radius: 50%;
+}
+
+.workflow-timeline-step[data-state="done"] .workflow-timeline-body {
+  opacity: 0.65;
+}
+
+/* Gate screens */
+.mc-gate-headline {
+  font-size: 20px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.mc-gate-headline--ready {
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.mc-gate-kicker {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+/* Chat messages */
+.chat-message {
+  border-radius: 10px;
+  padding: 10px 12px;
+  border-color: var(--border-subtle);
+}
+
+.chat-message--user {
+  align-self: flex-end;
+  background: rgba(255,255,255,0.04);
+  border-color: var(--border-strong);
+  max-width: 80%;
+}
+
+/* Intervention card */
+.chat-intervention-card {
+  border-radius: 10px;
+  padding: 13px 14px;
+}
+
+/* Intervention banner */
+.mc-intervention-banner {
+  border-bottom-color: rgba(251,146,60,0.22);
+  background: rgba(251,146,60,0.06);
+}
+
+/* C. Agent Cockpit — Terminal panes */
+
+/* Agent pane root — cockpit card */
+.agent-pane {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  height: 100%;
+  position: relative;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  box-shadow: var(--shadow-xs);
+}
+
+.agent-pane[data-active="true"][data-view="grid"] {
+  box-shadow: 0 0 0 1px var(--border-strong), var(--shadow-sm);
+}
+
+/* Kind accent top stripe — always 2px visible */
+.agent-pane::before {
+  height: 2px;
+  opacity: 0.55;
+  border-radius: 12px 12px 0 0;
+}
+.agent-pane[data-active="true"]::before { opacity: 1; }
+
+/* Topbar — cockpit header */
+.agent-pane-topbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--border-subtle);
+  min-height: 40px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+/* Identity — more prominent */
+.agent-pane-identity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 140px;
+  flex-shrink: 0;
+}
+
+.agent-pane-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.agent-pane-title {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -0.1px;
+}
+
+.agent-pane-kind-badge {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-faint);
+  letter-spacing: 0.2px;
+}
+
+/* Action strip buttons */
+.agent-strip-btn {
+  font-size: 10px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  height: 26px;
+  border-color: var(--border-subtle);
+  line-height: 1;
+}
+
+/* Icon buttons */
+.agent-icon-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* CWD pill */
+.agent-cwd-pill {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Dormant launch card — polished */
+.agent-pane-dormant {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  background: var(--terminal-bg);
+}
+
+.agent-pane-dormant-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 260px;
+  width: 100%;
+  box-shadow: var(--shadow-md);
+  background-image: linear-gradient(180deg, var(--panel-highlight) 0%, transparent 44px);
+}
+
+.agent-pane-dormant-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-pane-dormant-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-dormant);
+  flex-shrink: 0;
+}
+
+.agent-pane-dormant-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.2;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-pane-dormant-meta {
+  font-size: 10px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+}
+
+.agent-pane-dormant-cwd {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-family: "Cascadia Code", "Consolas", monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4px 8px;
+  background: var(--surface-0);
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  line-height: 1.4;
+}
+
+.agent-pane-dormant-actions {
+  display: flex;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.agent-pane-dormant-start-btn {
+  flex: 1;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  background: var(--accent);
+  color: var(--app-bg);
+  border: 1px solid transparent;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transition: opacity 0.12s, box-shadow 0.12s;
+  font-family: inherit;
+}
+.agent-pane-dormant-start-btn:hover:not(:disabled) { opacity: 0.88; box-shadow: var(--shadow-sm); }
+.agent-pane-dormant-start-btn:disabled { opacity: 0.40; cursor: not-allowed; }
+
+.agent-pane-dormant-settings-btn {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.10s, color 0.10s, border-color 0.10s;
+  flex-shrink: 0;
+}
+.agent-pane-dormant-settings-btn:hover { background: var(--button-bg); color: var(--text-main); border-color: var(--border-strong); }
+
+/* Habitat strip */
+.agent-pane-habitat {
+  flex-shrink: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.15) 100%);
+  border-top: 1px solid rgba(255,255,255,0.02);
+}
+
+/* Terminal area */
+.agent-pane-body {
+  background: var(--terminal-bg);
+}
+
+/* D. Agent Dock — squad dock */
+
+.agent-dock {
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 12px;
+  min-height: 48px;
+  gap: 3px;
+  align-items: stretch;
+  box-shadow: 0 1px 0 var(--glass-border);
+}
+
+.agent-dock-item {
+  padding: 7px 11px 7px 9px;
+  border-radius: 7px 7px 0 0;
+  gap: 8px;
+  min-width: 120px;
+  transition: background 0.10s, border-color 0.10s;
+}
+
+.agent-dock-item[data-active="true"] {
+  background: var(--surface-1);
+  border-color: var(--border-subtle);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.18);
+}
+
+/* Avatar */
+.agent-dock-avatar {
+  width: 30px;
+  height: 30px;
+}
+
+/* Label */
+.agent-dock-label {
+  font-size: 11px;
+  font-weight: 550;
+  max-width: 96px;
+}
+.agent-dock-item[data-active="true"] .agent-dock-label {
+  font-weight: 650;
+}
+
+/* Lifecycle text */
+.agent-dock-lc {
+  font-size: 9px;
+  letter-spacing: 0.2px;
+}
+
+/* Attention dot */
+.agent-dock-attn {
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--surface-0);
+}
+
+/* E. Sidebar improvements */
+
+.app-sidebar {
+  width: 188px;
+  background: var(--surface-0);
+  border-right: 1px solid var(--border-subtle);
+  box-shadow: 1px 0 0 var(--glass-border);
+}
+
+.sidebar-brand {
+  background: linear-gradient(180deg, rgba(245,158,11,0.05) 0%, transparent 100%);
+  border-bottom-color: var(--border-subtle);
+  padding: 12px 14px 11px;
+}
+
+.sidebar-brand-mark {
+  font-size: 12px;
+  color: var(--agent-claude);
+  opacity: 1;
+  font-weight: 700;
+}
+
+.sidebar-brand-title {
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: -0.2px;
+}
+
+.sidebar-brand-subtitle {
+  font-size: 8px;
+  letter-spacing: 0.6px;
+  background: rgba(245,158,11,0.10);
+  color: rgba(245,158,11,0.70);
+  border: 1px solid rgba(245,158,11,0.18);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.sidebar-cta {
+  background: var(--agent-claude);
+  color: #0e0e0e;
+  height: 30px;
+  font-size: 11px;
+  font-weight: 650;
+  border-radius: 7px;
+  box-shadow: 0 1px 4px rgba(245,158,11,0.24);
+}
+.sidebar-cta:hover:not(:disabled) {
+  opacity: 0.88;
+  box-shadow: 0 2px 8px rgba(245,158,11,0.22);
+}
+.sidebar-cta:disabled {
+  background: var(--button-bg);
+  color: var(--text-faint);
+  box-shadow: none;
+}
+
+.sidebar-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  padding: 0 8px;
+  margin-bottom: 4px;
+}
+
+.sidebar-row {
+  height: 31px;
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: 7px;
+  padding: 0 8px;
+  gap: 8px;
+}
+
+.sidebar-row[data-active="true"] {
+  background: rgba(245,158,11,0.07);
+  border-color: rgba(245,158,11,0.18);
+  border-left-color: var(--agent-claude);
+  color: var(--text-main);
+}
+.sidebar-row[data-active="true"]:hover:not(:disabled) {
+  background: rgba(245,158,11,0.10);
+}
+
+.sidebar-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.65;
+  flex: 0 0 14px;
+}
+.sidebar-row:hover:not(:disabled) .sidebar-icon { opacity: 0.85; }
+.sidebar-row[data-active="true"] .sidebar-icon { opacity: 1; color: var(--agent-claude); }
+
+.sidebar-count {
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 5px 10px;
+  min-height: 30px;
+}
+
+/* F. Header improvements */
+
+.workspace-header {
+  height: 52px;
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 0 var(--glass-border);
+}
+
+.header-shell {
+  padding: 0 18px;
+  gap: 12px;
+}
+
+.header-kicker {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.header-name-display {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-main);
+}
+
+.project-context-pill {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 5px 10px;
+  gap: 8px;
+}
+
+.project-context-name {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.project-context-path {
+  font-size: 9px;
+  color: var(--text-faint);
+}
+
+.project-context-btn {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  height: 22px;
+}
+
+.header-view-toggle {
+  border-radius: 8px;
+  background: var(--surface-1);
+  border-color: var(--border-subtle);
+  overflow: hidden;
+}
+
+.header-view-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 11px;
+}
+
+.header-view-btn[data-active="true"] {
+  background: var(--button-bg);
+  color: var(--text-main);
+}
+
+/* G. Terminal grid layout improvements */
+
+.terminal-grid[data-view="grid"] .terminal-layout {
+  gap: 12px;
+  padding: 12px;
+}
+
+/* H. Secondary surfaces — shared improvements */
+
+/* All drawers/modals get stronger headers */
+.cmdino-drawer {
+  background: var(--surface-1);
+  box-shadow: -16px 0 48px rgba(0,0,0,0.38);
+}
+
+.cmdino-panel-header {
+  padding: 15px 18px 13px;
+  background: linear-gradient(180deg, var(--panel-highlight) 0%, transparent 100%);
+}
+
+.cmdino-panel-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Health panel improvements */
+.health-card {
+  padding: 13px 20px;
+}
+
+.health-card-name {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+/* Settings panel */
+.settings-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+
+.settings-row-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Confirm dialog */
+.confirm-dialog {
+  border-radius: 14px;
+  padding: 22px 22px 18px;
+}
+
+.confirm-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Empty states */
+.cmdino-empty-panel-title {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.cmdino-empty-panel-desc {
+  font-size: 11px;
+  max-width: 280px;
+}
+
+/* Handoff modal improvements */
+.handoff-modal {
+  border-radius: 14px;
+}
+
+.handoff-header-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Workflow history */
+.wfhist-drawer {
+  width: 740px;
+}

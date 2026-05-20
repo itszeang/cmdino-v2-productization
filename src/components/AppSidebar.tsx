@@ -263,31 +263,25 @@ export function AppSidebar({
 
       <div className="sidebar-sections">
 
-        {/* ── Start ── */}
+        {/* ── Command ── */}
         <div className="sidebar-section">
-          <div className="sidebar-label">Start</div>
+          <div className="sidebar-label">Command</div>
           <SidebarRow
             icon="chat"
             onClick={onOpenChat}
-            title="Open CMDino Chat task shell"
+            title="Mission Control"
             data-active={String(activeSurface === "chat")}
             trailing={openInterventionCount > 0 ? (
               <span className="sidebar-alert-badge">{openInterventionCount}</span>
             ) : undefined}
           >
-            Chat
+            Mission Control
           </SidebarRow>
-          <SidebarRow
-            icon="health"
-            onClick={onOpenChat}
-            title={openInterventionCount > 0 ? "Open Chat to review active interventions" : "No active interventions"}
-            disabled={openInterventionCount === 0}
-          >
-            Interventions
-            {openInterventionCount > 0 && (
-              <span className="sidebar-alert-badge">{openInterventionCount}</span>
-            )}
-          </SidebarRow>
+        </div>
+
+        {/* ── Agents ── */}
+        <div className="sidebar-section">
+          <div className="sidebar-label">Agents</div>
           <SidebarRow
             icon="start"
             onClick={onOpenAgents}
@@ -296,8 +290,21 @@ export function AppSidebar({
           >
             Agent Workspace
           </SidebarRow>
-          <SidebarRow icon="demo" onClick={onLoadDemo} title="Load the CMDino demo workflow">
-            Try Demo Setup
+          <SidebarRow
+            icon="start"
+            onClick={onStartAll}
+            disabled={terminalCount === 0}
+            title={terminalCount === 0 ? "No agents to start" : "Start all dormant agents"}
+          >
+            Start Agents
+          </SidebarRow>
+          <SidebarRow
+            icon="health"
+            onClick={onOpenHealth}
+            title="Check provider availability and CLI setup"
+            trailing={healthAggregateDot(healthSnapshot)}
+          >
+            Setup Check
           </SidebarRow>
         </div>
 
@@ -311,40 +318,11 @@ export function AppSidebar({
           >
             Context Library
           </SidebarRow>
-        </div>
-
-        {/* ── Work ── */}
-        <div className="sidebar-section">
-          <div className="sidebar-label">Work</div>
-          <SidebarRow icon="workflow" onClick={onOpenWorkflow} title="View your agent map and workflow connections">
-            Agent Map
-          </SidebarRow>
-          <SidebarRow icon="history" onClick={onOpenWorkflowHistory} title="Inspect and resume local workflow runs">
-            Workflow History
-          </SidebarRow>
-          <SidebarRow icon="history" onClick={onOpenHistory} title="View session activity log">
-            Activity
-          </SidebarRow>
-          <SidebarRow
-            icon="start"
-            onClick={onStartAll}
-            disabled={terminalCount === 0}
-            title={terminalCount === 0 ? "No agents to start" : "Start all dormant agents"}
-          >
-            Start Agents
-          </SidebarRow>
-        </div>
-
-        {/* ── Outputs ── */}
-        <div className="sidebar-section sidebar-section--secondary">
-          <div className="sidebar-label">Outputs</div>
           <SidebarRow
             icon="library"
             onClick={onOpenOutputLibrary}
             title={outputFileCount > 0 ? `Browse ${outputFileCount} generated file${outputFileCount !== 1 ? "s" : ""}` : "Browse generated output files"}
-          >
-            Output Shelf
-            {outputFileCount > 0 && (
+            trailing={outputFileCount > 0 ? (
               <span style={{
                 marginLeft: "auto",
                 fontSize: 9, fontWeight: 700,
@@ -355,52 +333,47 @@ export function AppSidebar({
               }}>
                 {outputFileCount}
               </span>
-            )}
-          </SidebarRow>
-          <SidebarRow
-            icon="share"
-            onClick={onGenerateBuildUpdateKit}
-            disabled={!canGenerateBuildKit}
-            title={canGenerateBuildKit ? "Generate a shareable progress update in the outputs folder" : "Add an agent or run a session first"}
+            ) : undefined}
           >
-            Share Progress
-          </SidebarRow>
-          <SidebarRow
-            icon="memory"
-            onClick={onGenerateMemoryBriefs}
-            disabled={!canGenerateMemoryBrief}
-            title={canGenerateMemoryBrief ? "Save a project continuity brief for tomorrow or another agent" : "Start work, run a workflow, or generate an output first"}
-          >
-            Save Memory Brief
-          </SidebarRow>
-          <SidebarRow
-            icon="transcript"
-            onClick={onExportTranscripts}
-            disabled={terminalCount === 0}
-            title={terminalCount === 0 ? "No agents to export logs for" : "Export terminal output to markdown files"}
-          >
-            Export Logs
+            Output Shelf
           </SidebarRow>
         </div>
 
-        {/* ── Fix & Manage ── */}
-        <div className="sidebar-section sidebar-section--secondary sidebar-section--divider">
-          <div className="sidebar-label">Fix & Manage</div>
+        {/* ── Runs ── */}
+        <div className="sidebar-section">
+          <div className="sidebar-label">Runs</div>
           <SidebarRow
-            icon="health"
-            onClick={onOpenHealth}
-            title="Check provider availability and CLI setup"
-            trailing={healthAggregateDot(healthSnapshot)}
+            icon="workflow"
+            onClick={onOpenWorkflow}
+            title="View your agent map and workflow connections"
           >
-            Setup Check
+            Agent Map
           </SidebarRow>
+          <SidebarRow
+            icon="history"
+            onClick={onOpenWorkflowHistory}
+            title="Inspect and resume local workflow runs"
+          >
+            Workflow History
+          </SidebarRow>
+          <SidebarRow
+            icon="history"
+            onClick={onOpenHistory}
+            title="View session activity log"
+          >
+            Activity Log
+          </SidebarRow>
+        </div>
+
+        {/* ── Manage ── */}
+        <div className="sidebar-section sidebar-section--secondary sidebar-section--divider">
+          <div className="sidebar-label">Manage</div>
           <SidebarRow icon="new" onClick={onNew} title="Clear workspace and start fresh">
             New Workspace
           </SidebarRow>
           <SidebarRow icon="save" onClick={onSave} title="Save current workspace to disk">
             Save Workspace
           </SidebarRow>
-
           <SidebarRow
             icon="load"
             onClick={() => {
@@ -408,13 +381,39 @@ export function AppSidebar({
               onOpenWorkspaceBrowser();
             }}
             title={savedWorkspaces.length === 0 ? "Browse saved workspaces" : `Browse ${savedWorkspaces.length} saved workspace${savedWorkspaces.length !== 1 ? "s" : ""}`}
+            trailing={savedWorkspaces.length > 0 ? (
+              <span className="sidebar-alert-badge">{savedWorkspaces.length}</span>
+            ) : undefined}
           >
             Open Workspace
-            {savedWorkspaces.length > 0 && (
-              <span className="sidebar-alert-badge">{savedWorkspaces.length}</span>
-            )}
           </SidebarRow>
-
+          <SidebarRow icon="demo" onClick={onLoadDemo} title="Load the CMDino demo workflow">
+            Try Demo
+          </SidebarRow>
+          <SidebarRow
+            icon="share"
+            onClick={onGenerateBuildUpdateKit}
+            disabled={!canGenerateBuildKit}
+            title={canGenerateBuildKit ? "Generate shareable progress update" : "Run a session first"}
+          >
+            Share Progress
+          </SidebarRow>
+          <SidebarRow
+            icon="memory"
+            onClick={onGenerateMemoryBriefs}
+            disabled={!canGenerateMemoryBrief}
+            title={canGenerateMemoryBrief ? "Save project continuity brief" : "Run a workflow first"}
+          >
+            Memory Brief
+          </SidebarRow>
+          <SidebarRow
+            icon="transcript"
+            onClick={onExportTranscripts}
+            disabled={terminalCount === 0}
+            title={terminalCount === 0 ? "No agents to export" : "Export terminal output"}
+          >
+            Export Logs
+          </SidebarRow>
           <SidebarRow icon="settings" onClick={onOpenSettings} title="Visual and agent settings">
             Settings
           </SidebarRow>
