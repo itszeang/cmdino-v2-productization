@@ -16,6 +16,8 @@ import type { BuiltStepPrompt } from "../orchestration/stepPromptBuilder";
 import { AgentTeamSelector } from "./AgentTeamSelector";
 import { WorkflowRunTimeline, type WorkflowTimelineBinding } from "./WorkflowRunTimeline";
 import { getAgentCwdHealth } from "../domain/agentCwd";
+import type { AgentInteraction } from "../domain/agentInteraction";
+import { InteractionCard } from "./InteractionCard";
 
 interface MainTaskChatProps {
   projectName?: string;
@@ -64,6 +66,10 @@ interface MainTaskChatProps {
   onOpenContextLibrary?: () => void;
   onOpenSetupCheck?: () => void;
   onInterventionAction?: (intervention: Intervention, actionKind: InterventionActionKind) => void;
+  pendingAgentInteractions?: AgentInteraction[];
+  onOpenAgentTerminal?: (agentId: string) => void;
+  onSendInteractionResponse?: (interactionId: string, agentId: string, text: string) => Promise<void>;
+  onDismissInteraction?: (interactionId: string) => void;
 }
 
 function formatTime(ts: number): string {
@@ -274,6 +280,10 @@ export function MainTaskChat({
   onOpenContextLibrary,
   onOpenSetupCheck,
   onInterventionAction,
+  pendingAgentInteractions = [],
+  onOpenAgentTerminal,
+  onSendInteractionResponse,
+  onDismissInteraction,
 }: MainTaskChatProps) {
   const [taskText, setTaskText] = useState("");
   const [resultText, setResultText] = useState("");
@@ -1192,6 +1202,38 @@ export function MainTaskChat({
                     onOpenAgents={onOpenAgents}
                     onOpenSetupCheck={onOpenSetupCheck}
                     onInterventionAction={onInterventionAction}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Agent interaction cards */}
+          {!projectRequired && pendingAgentInteractions.length > 0 && (
+            <div className="mc-interaction-section">
+              <div className="mc-interaction-section-header">
+                <span className="mc-interaction-section-pulse" />
+                <span className="mc-interaction-section-title">
+                  {pendingAgentInteractions.length === 1
+                    ? "1 agent waiting for input"
+                    : `${pendingAgentInteractions.length} agents waiting for input`}
+                </span>
+                <span className="mc-interaction-section-hint">
+                  This agent is waiting in its terminal.
+                </span>
+              </div>
+              <div className="mc-interaction-cards">
+                {pendingAgentInteractions.map((interaction) => (
+                  <InteractionCard
+                    key={interaction.interactionId}
+                    interaction={interaction}
+                    onOpenTerminal={
+                      onOpenAgentTerminal
+                        ? () => { onOpenAgentTerminal(interaction.agentId); }
+                        : undefined
+                    }
+                    onSendResponse={onSendInteractionResponse ?? (async () => {})}
+                    onDismiss={onDismissInteraction ?? (() => {})}
                   />
                 ))}
               </div>

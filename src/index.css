@@ -7820,3 +7820,292 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .wfhist-drawer {
   width: 740px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Agent Interaction Router V1
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Mission Control interaction section ─────────────────────────────────── */
+
+.mc-interaction-section {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(245,158,11,0.04);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.mc-interaction-section-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.mc-interaction-section-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--workflow-cta);
+  flex-shrink: 0;
+  animation: pulse-glow 1.6s ease-in-out infinite;
+}
+
+.mc-interaction-section-title {
+  color: var(--agent-claude);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.mc-interaction-section-hint {
+  color: var(--text-faint);
+  font-size: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.mc-interaction-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Interaction Card ─────────────────────────────────────────────────────── */
+
+.interaction-card {
+  background: var(--surface-1);
+  border: 1px solid rgba(245,158,11,0.22);
+  border-radius: 10px;
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  background-image: linear-gradient(180deg, rgba(245,158,11,0.04) 0%, transparent 40px);
+}
+
+.interaction-card--responded {
+  border-color: rgba(52,211,153,0.22);
+  background-image: none;
+  opacity: 0.75;
+}
+
+/* Card header */
+.interaction-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.interaction-card-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--agent-claude);
+  flex-shrink: 0;
+  margin-top: 3px;
+  animation: pulse-glow 1.6s ease-in-out infinite;
+}
+
+.interaction-card--responded .interaction-card-pulse-dot {
+  background: var(--status-running);
+  animation: none;
+}
+
+.interaction-card-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.interaction-card-title {
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.interaction-card-type {
+  color: var(--agent-claude);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.interaction-card-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.1s, background 0.1s;
+}
+.interaction-card-dismiss:hover { color: var(--danger); background: var(--button-bg); }
+
+/* Prompt excerpt */
+.interaction-card-excerpt {
+  background: var(--terminal-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: #d4d4d4;
+  font-family: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+  font-size: 10px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+/* Actions row */
+.interaction-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.interaction-card-action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid;
+  transition: background 0.10s, color 0.10s, border-color 0.10s, opacity 0.10s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.interaction-card-action-btn:disabled { opacity: 0.40; cursor: not-allowed; }
+
+.interaction-card-action-btn--primary {
+  background: var(--agent-claude);
+  color: #0e0e0e;
+  border-color: transparent;
+  font-weight: 650;
+  box-shadow: 0 1px 4px rgba(245,158,11,0.24);
+}
+.interaction-card-action-btn--primary:hover:not(:disabled) { opacity: 0.88; }
+
+.interaction-card-action-btn--secondary {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+}
+.interaction-card-action-btn--secondary:hover:not(:disabled) {
+  background: var(--button-bg);
+  color: var(--text-main);
+  border-color: var(--border-strong);
+}
+
+/* Custom response */
+.interaction-card-custom {
+  width: 100%;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.interaction-card-custom-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--terminal-bg);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 6px 9px;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.10s;
+}
+.interaction-card-custom-input:focus { border-color: var(--agent-claude); }
+
+.interaction-card-custom-send {
+  flex-shrink: 0;
+  padding: 6px 11px;
+  background: var(--agent-claude);
+  color: #0e0e0e;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 650;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.10s;
+}
+.interaction-card-custom-send:hover:not(:disabled) { opacity: 0.88; }
+.interaction-card-custom-send:disabled { opacity: 0.40; cursor: not-allowed; }
+
+/* Notice / feedback text */
+.interaction-card-notice {
+  font-size: 10px;
+  color: var(--success);
+  line-height: 1.4;
+}
+.interaction-card-notice:contains("Failed") { color: var(--danger); }
+
+/* Responded state */
+.interaction-card-responded {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.interaction-card-responded-text {
+  color: var(--status-running);
+  font-size: 11px;
+}
+
+/* ── Agent Dock interaction badge ────────────────────────────────────────── */
+
+.agent-dock-interaction-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--agent-claude);
+  color: #0e0e0e;
+  font-size: 8px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--surface-0);
+  z-index: 2;
+  animation: pulse-glow 1.8s ease-in-out infinite;
+  line-height: 1;
+}
+
+/* Dock item: position relative needed for badge */
+.agent-dock-item {
+  position: relative;
+}
+
+/* Subtle amber tint on dock item with pending interaction */
+.agent-dock-item[data-interaction="pending"] {
+  background: rgba(245,158,11,0.04);
+}
+.agent-dock-item[data-interaction="pending"]:hover {
+  background: rgba(245,158,11,0.08);
+}

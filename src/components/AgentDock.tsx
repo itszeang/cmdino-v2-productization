@@ -107,8 +107,9 @@ interface Props {
   sessionEntries:     SessionLogEvent[];
   healthSnapshot:     HealthSnapshot;
   readinessErrors:    Record<string, ReadinessFailure | null>;
-  animationSpeed?:    number;
-  onSelectAgent:      (id: string) => void;
+  animationSpeed?:              number;
+  onSelectAgent:                (id: string) => void;
+  pendingInteractionsByAgentId?: Record<string, number>;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -125,6 +126,7 @@ export function AgentDock({
   readinessErrors,
   animationSpeed = 1,
   onSelectAgent,
+  pendingInteractionsByAgentId = {},
 }: Props) {
   const [tooltip, setTooltip] = useState<TooltipPos | null>(null);
 
@@ -144,6 +146,8 @@ export function AgentDock({
           const cwdHealth = getAgentCwdHealth({ agentCwd: agent.cwd, selectedProjectRoot });
           const lcColor  = LC_COLOR[lc] ?? "var(--text-faint)";
 
+          const pendingInteractionCount = pendingInteractionsByAgentId[agent.id] ?? 0;
+
           return (
             <button
               key={agent.id}
@@ -152,6 +156,7 @@ export function AgentDock({
               data-lifecycle={lc}
               data-attn={attn ?? ""}
               data-kind={agent.agentKind ?? "custom"}
+              data-interaction={pendingInteractionCount > 0 ? "pending" : ""}
               onClick={() => onSelectAgent(agent.id)}
               onMouseEnter={(e) => {
                 const r = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
@@ -182,6 +187,16 @@ export function AgentDock({
                   />
                 )}
               </div>
+
+              {/* Interaction badge */}
+              {pendingInteractionCount > 0 && (
+                <span
+                  className="agent-dock-interaction-badge"
+                  title={`${pendingInteractionCount} pending input`}
+                >
+                  !
+                </span>
+              )}
 
               {/* Label + lifecycle */}
               <div className="agent-dock-info">

@@ -12,6 +12,7 @@ import type { GeneratedOutputFile } from "../domain/attachments";
 import type { CmdinoContextManifest } from "../domain/contextLibrary";
 import type { WorkflowResultCapture } from "../domain/workflowResultCapture";
 import type { CSSProperties } from "react";
+import type { InteractionDetectedPayload } from "../domain/agentInteraction";
 
 // Minimum readable pane width used for browser-measured grid wrapping.
 const GRID_PANE_MIN_WIDTH = 540;
@@ -47,6 +48,8 @@ interface Props {
   onRegisterPaneRef?:           (agentId: string, el: HTMLElement | null) => void;
   onOpenHealth?:                () => void;
   onContextManifestChange?:     (manifest: CmdinoContextManifest) => void;
+  onInteractionDetected?:       (payload: InteractionDetectedPayload) => void;
+  pendingInteractionsByAgentId?: Record<string, number>;
 }
 
 export function TerminalGrid({
@@ -65,6 +68,8 @@ export function TerminalGrid({
   onRegisterPaneRef,
   onOpenHealth,
   onContextManifestChange,
+  onInteractionDetected,
+  pendingInteractionsByAgentId = {},
 }: Props) {
   // Grid mode needs dynamic column/row counts — set as inline style only in grid mode.
   // Focus mode: no inline style on layout div (CSS class handles everything).
@@ -88,6 +93,7 @@ export function TerminalGrid({
         readinessErrors={readinessErrors}
         animationSpeed={settings?.animationSpeed}
         onSelectAgent={onDockSelectAgent}
+        pendingInteractionsByAgentId={pendingInteractionsByAgentId}
       />
 
       {/*
@@ -144,6 +150,7 @@ export function TerminalGrid({
                   onRegisterPaneRef={onRegisterPaneRef}
                   onOpenHealth={onOpenHealth}
                   onContextManifestChange={onContextManifestChange}
+                  onInteractionDetected={onInteractionDetected}
                 />
               </div>
             );

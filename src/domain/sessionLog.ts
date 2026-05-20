@@ -16,7 +16,8 @@ export type SessionLogEventType =
   | "attachment_added"
   | "attachment_removed"
   | "workspace_saved"
-  | "workspace_loaded";
+  | "workspace_loaded"
+  | "interaction_response_sent";
 
 export interface SessionLogEvent {
   id:              string;

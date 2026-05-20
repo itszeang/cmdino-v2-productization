@@ -30,6 +30,7 @@ import { useWorkflowOrchestrator } from "./orchestration/useWorkflowOrchestrator
 import { terminalBridge }      from "./terminal/terminalBridge";
 import { HealthPanel }         from "./components/HealthPanel";
 import { useAttachmentDrop }   from "./hooks/useAttachmentDrop";
+import { useAgentInteractions } from "./hooks/useAgentInteractions";
 import { workspaceBridge }     from "./workspace/workspaceBridge";
 import { pickProjectFolder }   from "./workspace/projectWorkspaceBridge";
 import { validateWorkspaceFile, sanitizeWorkspaceFilename } from "./domain/workspace";
@@ -174,6 +175,13 @@ export default function App() {
     restoreRun,
   } = useWorkflowOrchestrator();
 
+  const {
+    pendingInteractions:     pendingAgentInteractions,
+    addInteraction:          addAgentInteraction,
+    markResponded:           markInteractionResponded,
+    dismissInteraction:      dismissAgentInteraction,
+  } = useAgentInteractions();
+
   const [showModal,           setShowModal]           = useState(false);
   const [showWorkflow,        setShowWorkflow]        = useState(false);
   const [showWorkflowHistory, setShowWorkflowHistory] = useState(false);
@@ -228,6 +236,41 @@ export default function App() {
       workflowResultCaptureRef.current.delete(agentId);
     }
   }, []);
+
+  // ── Agent Interaction Router ────────────────────────────────────────────────
+
+  const handleInteractionDetected = useCallback((payload: Parameters<typeof addAgentInteraction>[0]) => {
+    addAgentInteraction(payload);
+  }, [addAgentInteraction]);
+
+  const handleSendInteractionResponse = useCallback(async (
+    interactionId: string,
+    agentId: string,
+    responseText: string,
+  ) => {
+    const agent = agents.find((a) => a.id === agentId);
+    if (!agent || !runningAgentIds.has(agentId)) return;
+    await terminalBridge.submitLine(
+      agentId,
+      responseText,
+      getTerminalSubmitStrategy(agent.agentKind),
+    );
+    markInteractionResponded(interactionId);
+    appendEvent({
+      id:            crypto.randomUUID(),
+      ts:            Date.now(),
+      workspaceId:   workspaceName,
+      agentConfigId: agent.configId,
+      agentLabel:    agent.label,
+      type:          "interaction_response_sent",
+      payload:       { response: responseText.slice(0, 120) },
+    });
+  }, [agents, runningAgentIds, markInteractionResponded, appendEvent, workspaceName]);
+
+  const handleOpenAgentTerminal = useCallback((agentId: string) => {
+    setActiveSurface("agents");
+    setActiveTerminalId(agentId);
+  }, [setActiveSurface]);
 
   useEffect(() => {
     if (!currentRun) return;
@@ -1400,6 +1443,10 @@ export default function App() {
                   onOpenContextLibrary={() => setShowContextLibrary(true)}
                   onOpenSetupCheck={() => setShowHealth(true)}
                   onInterventionAction={handleInterventionAction}
+                  pendingAgentInteractions={pendingAgentInteractions}
+                  onOpenAgentTerminal={handleOpenAgentTerminal}
+                  onSendInteractionResponse={handleSendInteractionResponse}
+                  onDismissInteraction={dismissAgentInteraction}
                 />
               </div>
               <div
@@ -1457,6 +1504,13 @@ export default function App() {
                     onRegisterPaneRef={handleRegisterPaneRef}
                     onOpenHealth={() => setShowHealth(true)}
                     onContextManifestChange={setContextManifest}
+                    onInteractionDetected={handleInteractionDetected}
+                    pendingInteractionsByAgentId={
+                      pendingAgentInteractions.reduce<Record<string, number>>((acc, i) => {
+                        acc[i.agentId] = (acc[i.agentId] ?? 0) + 1;
+                        return acc;
+                      }, {})
+                    }
                   />
                 )}
               </div>

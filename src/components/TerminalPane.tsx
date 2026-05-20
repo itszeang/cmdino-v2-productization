@@ -22,6 +22,8 @@ import {
   useTerminalProcess,
   type TerminalLifecycleState,
 } from "../terminal/useTerminalProcess";
+import { detectInteractionInOutput } from "../domain/interactionDetector";
+import type { InteractionDetectedPayload } from "../domain/agentInteraction";
 
 // ── Colour maps ───────────────────────────────────────────────────────────────
 
@@ -114,6 +116,7 @@ interface Props {
   onRegisterPaneRef?:             (agentId: string, el: HTMLElement | null) => void;
   onOpenHealth?:                  () => void;
   onContextManifestChange?:       (manifest: CmdinoContextManifest) => void;
+  onInteractionDetected?:         (payload: InteractionDetectedPayload) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -133,6 +136,7 @@ export function TerminalPane({
   onRegisterPaneRef,
   onOpenHealth,
   onContextManifestChange,
+  onInteractionDetected,
 }: Props) {
   const containerRef      = useRef<HTMLDivElement>(null);
   const paneRootRef       = useRef<HTMLDivElement>(null);
@@ -244,6 +248,46 @@ export function TerminalPane({
     return () => { onRegisterPaneRef(agent.id, null); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent.id, onRegisterPaneRef]);
+
+  // ── Agent Interaction Router — poll terminal output for pending prompts ───────
+  const onInteractionDetectedRef = useRef(onInteractionDetected);
+  useEffect(() => { onInteractionDetectedRef.current = onInteractionDetected; });
+
+  const lastDetectedExcerptRef = useRef<string>("");
+
+  useEffect(() => {
+    if (lifecycle !== "running") {
+      lastDetectedExcerptRef.current = "";
+      return;
+    }
+
+    const id = setInterval(() => {
+      const cb = onInteractionDetectedRef.current;
+      if (!cb) return;
+
+      const block = captureLastOutputBlock();
+      if (!block.trim()) return;
+
+      const detected = detectInteractionInOutput(block);
+      if (!detected) return;
+
+      const key = detected.excerpt.slice(0, 120);
+      if (key === lastDetectedExcerptRef.current) return;
+      lastDetectedExcerptRef.current = key;
+
+      cb({
+        agentId:         agent.id,
+        agentLabel:      agent.label,
+        interactionType: detected.type,
+        promptExcerpt:   detected.excerpt,
+        suggestedActions: detected.suggestedActions,
+      });
+    }, 2500);
+
+    return () => clearInterval(id);
+  // captureLastOutputBlock is stable (useCallback in useTerminalProcess)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lifecycle, agent.id, agent.label, captureLastOutputBlock]);
 
   // ── Egg → hatch → dino spawn sequence ─────────────────────────────────────
   const lifecycleRef = useRef<TerminalLifecycleState>(lifecycle);
