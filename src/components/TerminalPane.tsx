@@ -36,7 +36,6 @@ const STATE_COLORS: Record<string, string> = {
   idle_center:      "#737373",
 };
 
-
 const VIEW_MODE_DINO_SCALE: Record<TerminalViewMode, number> = {
   focus: 1.25,
   grid: 0.85,
@@ -44,7 +43,7 @@ const VIEW_MODE_DINO_SCALE: Record<TerminalViewMode, number> = {
 
 function dotColor(s: string) { return STATE_COLORS[s] ?? "#737373"; }
 
-// ── Shared button primitives ──────────────────────────────────────────────────
+// ── Shared button primitives (class-based) ────────────────────────────────────
 
 function HdrBtn({
   title, onClick, onMouseDown, children, danger = false,
@@ -55,21 +54,13 @@ function HdrBtn({
 }) {
   return (
     <button
-      title={title} onClick={onClick} onMouseDown={onMouseDown}
-      style={{ background: "transparent", border: "none", color: "var(--text-faint)", fontSize: 12,
-        lineHeight: 1, cursor: "pointer", padding: "4px 6px", borderRadius: 999,
-        fontFamily: "inherit", transition: "background 0.12s, color 0.12s", flexShrink: 0 }}
-      onMouseEnter={(e) => {
-        const b = e.currentTarget as HTMLButtonElement;
-        b.style.background = "var(--button-bg)";
-        b.style.color = danger ? "var(--danger)" : "var(--text-main)";
-      }}
-      onMouseLeave={(e) => {
-        const b = e.currentTarget as HTMLButtonElement;
-        b.style.background = "transparent";
-        b.style.color = "var(--text-faint)";
-      }}
-    >{children}</button>
+      title={title}
+      onClick={onClick}
+      onMouseDown={onMouseDown}
+      className={`agent-icon-btn${danger ? " agent-icon-btn--danger" : ""}`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -79,34 +70,15 @@ function StripBtn({
   onClick: () => void; disabled?: boolean; accent?: boolean;
   title?: string; children: React.ReactNode;
 }) {
-  const base  = accent ? "var(--accent)" : "var(--text-muted)";
-  const bdBase = accent ? "var(--border-strong)" : "var(--border-subtle)";
   return (
     <button
-      onClick={onClick} disabled={disabled} title={title}
-      style={{
-        background: accent && !disabled ? "var(--button-bg)" : "transparent",
-        border: `1px solid ${disabled ? "transparent" : bdBase}`,
-        color: disabled ? "var(--text-faint)" : base,
-        fontSize: 10, padding: "4px 9px", borderRadius: 999,
-        fontFamily: "inherit", fontWeight: 600, letterSpacing: 0,
-        cursor: disabled ? "not-allowed" : "pointer",
-        flexShrink: 0, whiteSpace: "nowrap", transition: "background 0.1s, color 0.1s, border-color 0.1s",
-      }}
-      onMouseEnter={(e) => {
-        if (disabled) return;
-        const b = e.currentTarget as HTMLButtonElement;
-        b.style.background = "var(--button-hover)";
-        b.style.color = "var(--text-main)";
-        b.style.borderColor = "var(--border-strong)";
-      }}
-      onMouseLeave={(e) => {
-        const b = e.currentTarget as HTMLButtonElement;
-        b.style.background = accent && !disabled ? "var(--button-bg)" : "transparent";
-        b.style.color = disabled ? "var(--text-faint)" : base;
-        b.style.borderColor = disabled ? "var(--border-subtle)" : bdBase;
-      }}
-    >{children}</button>
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`agent-strip-btn${accent ? " agent-strip-btn--accent" : ""}`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -222,7 +194,6 @@ export function TerminalPane({
   useEffect(() => {
     if (!lastRuntimeError) return;
     if (lastRuntimeError.occurredAt === lastEmittedErrorAtRef.current) return;
-    // Only log high/medium confidence errors
     if (lastRuntimeError.confidence === "low") return;
     lastEmittedErrorAtRef.current = lastRuntimeError.occurredAt;
     onEvent?.({
@@ -250,14 +221,10 @@ export function TerminalPane({
   useEffect(() => {
     if (!onRegisterTranscriptGetter) return;
     onRegisterTranscriptGetter(agent.id, getSessionLogs);
-    return () => {
-      onRegisterTranscriptGetter(agent.id, null);
-    };
+    return () => { onRegisterTranscriptGetter(agent.id, null); };
   }, [agent.id, getSessionLogs, onRegisterTranscriptGetter]);
 
   const captureWorkflowResult = useCallback(() => {
-    // Sprint 7 result capture reuses the terminal process' xterm helpers:
-    // selected text first, then the clean output block since the last user input.
     const selectedText = captureSelectedText().trimEnd();
     if (selectedText.trim()) return { text: selectedText, source: "selected_text" as const };
     return { text: captureLastOutputBlock().trimEnd(), source: "latest_output" as const };
@@ -266,9 +233,7 @@ export function TerminalPane({
   useEffect(() => {
     if (!onRegisterWorkflowResultCapture) return;
     onRegisterWorkflowResultCapture(agent.id, captureWorkflowResult);
-    return () => {
-      onRegisterWorkflowResultCapture(agent.id, null);
-    };
+    return () => { onRegisterWorkflowResultCapture(agent.id, null); };
   }, [agent.id, captureWorkflowResult, onRegisterWorkflowResultCapture]);
 
   // Register pane root element for drag-drop hit-testing
@@ -281,8 +246,6 @@ export function TerminalPane({
   }, [agent.id, onRegisterPaneRef]);
 
   // ── Egg → hatch → dino spawn sequence ─────────────────────────────────────
-  // Tracks which visual phase we're in so DinoLane shows egg assets before
-  // the PTY is live, then briefly plays the hatch animation on first spawn.
   const lifecycleRef = useRef<TerminalLifecycleState>(lifecycle);
   const [dinoVisualPhase, setDinoVisualPhase] = useState<DinoVisualPhase>("egg_idle");
 
@@ -293,30 +256,23 @@ export function TerminalPane({
       setDinoVisualPhase("egg_idle");
       return;
     }
-
     if (lifecycle === "spawning") {
       setDinoVisualPhase((phase) => phase === "dino" ? "dino" : "egg_hatching");
       return;
     }
-
     if (lifecycle === "running") {
       setDinoVisualPhase((phase) => phase === "egg_idle" ? "egg_hatching" : phase);
       return;
     }
-
     if (lifecycle === "error" || lifecycle === "exited" || lifecycle === "killed") {
       setDinoVisualPhase("dino");
     }
   }, [lifecycle]);
 
   const handleEggHatchComplete = useCallback(() => {
-    if (lifecycleRef.current === "running") {
-      setDinoVisualPhase("dino");
-    }
+    if (lifecycleRef.current === "running") setDinoVisualPhase("dino");
   }, []);
 
-  // Derived dino state passed to DinoLane — overrides runtime dinoState
-  // while dormant/spawning so the egg asset is shown instead of the dino.
   // ── UI state ───────────────────────────────────────────────────────────────
 
   const [showLogs,          setShowLogs]          = useState(false);
@@ -325,7 +281,6 @@ export function TerminalPane({
   const [restarting,        setRestarting]        = useState(false);
   const [showAttPanel,      setShowAttPanel]      = useState(false);
 
-  // Forward state
   const [selectedForwardTargetId, setSelectedForwardTargetId] = useState<string | null>(null);
   const [fwdError,   setFwdError]   = useState("");
   const [forwarding, setForwarding] = useState(false);
@@ -339,10 +294,8 @@ export function TerminalPane({
   const runningTargets = allAgents.filter((a) => a.id !== agent.id && runningAgentIds.has(a.id));
   const cwdHealth      = getAgentCwdHealth({ agentCwd: agent.cwd, selectedProjectRoot });
 
-  // Defensive: attachments may be undefined on agents created before schema migration
   const atts = agent.attachments ?? [];
 
-  // Forward target derivation: route > handoff > selected > first
   const otherTerminals = allAgents.filter((a) => a.id !== agent.id);
   const outgoingRoute   = workflowLinks
     .filter((l) => l.kind === "route" && l.sourceConfigId === agent.configId)
@@ -361,7 +314,7 @@ export function TerminalPane({
     null;
   const targetIsRunning = effectiveFwdTarget != null && runningAgentIds.has(effectiveFwdTarget.id);
 
-  // ── Attachment panel actions ───────────────────────────────────────────────
+  // ── Actions ────────────────────────────────────────────────────────────────
 
   async function handleSendContextTextOnce(targetAgentId: string, content: string) {
     const target = allAgents.find((item) => item.id === targetAgentId);
@@ -421,8 +374,6 @@ export function TerminalPane({
     }
   }
 
-  // ── Lifecycle header actions ───────────────────────────────────────────────
-
   async function handleRemove() {
     if (isAlive && !window.confirm(`Kill "${agent.label}"?`)) return;
     await kill();
@@ -455,20 +406,17 @@ export function TerminalPane({
   }
 
   async function handleRestart() {
-    // Guard against double-click and re-entry during restart / readiness check
     if (restarting || readinessChecking) return;
     if (isAlive && !window.confirm(`Restart "${agent.label}"?`)) return;
     isRestartingRef.current = true;
     setRestarting(true);
     try {
-      // Validate before killing the current session.
       const ok = await runReadinessAndStart();
       if (ok) {
         await restart();
       } else {
         isRestartingRef.current = false;
       }
-      // If !ok: error is shown; current running PTY stays alive.
     } finally {
       setRestarting(false);
     }
@@ -477,19 +425,39 @@ export function TerminalPane({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div ref={paneRootRef} style={{
-      display: "flex", flexDirection: "column",
-      background: "var(--surface-1)",
-      border: `1px solid ${isActive && viewMode === "grid" ? "var(--border-strong)" : "var(--border-subtle)"}`,
-      borderRadius: 12, overflow: "hidden", height: "100%",
-      boxShadow: isActive && viewMode === "grid" ? "0 0 0 1px var(--border-strong)" : "none",
-      position: "relative",
-    }}>
+    <div
+      ref={paneRootRef}
+      className="agent-pane"
+      data-active={String(isActive)}
+      data-view={viewMode}
+      data-lifecycle={lifecycle}
+      data-kind={agent.agentKind ?? "custom"}
+      data-cwd-health={cwdHealth.status}
+    >
+      {/* ── Topbar ──────────────────────────────────────────────────────── */}
+      <div className="agent-pane-topbar">
 
-      {/* ── Single chrome row: orchestration + pane controls ── */}
-      <div className="pane-orch">
+        {/* Identity: dot + label + kind */}
+        <div className="agent-pane-identity">
+          <div
+            className={pulse ? "agent-pane-status-dot status-dot-pulse" : "agent-pane-status-dot"}
+            style={{
+              background: color,
+              boxShadow: dinoState !== "terminal_dead" && dinoState !== "idle_center"
+                ? `0 0 0 2px ${color}28` : "none",
+            }}
+          />
+          <div className="agent-pane-id-stack">
+            <span className="agent-pane-title" title={agent.label}>{agent.label}</span>
+            <span className="agent-pane-kind-badge">
+              {agent.agentKind ?? "custom"} · {lifecycle}
+            </span>
+          </div>
+        </div>
 
-        {/* Left: context + handoff */}
+        <span className="pane-strip-sep" />
+
+        {/* Actions: Add Context + Review & Send */}
         <div className="pane-orch-group">
           <StripBtn
             onClick={() => { showAttPanel ? setShowAttPanel(false) : openAttPanel(); }}
@@ -498,99 +466,72 @@ export function TerminalPane({
           >
             {atts.length > 0 ? `Add Context (${atts.length})` : "Add Context"}
           </StripBtn>
-          <div className="pane-strip-sep" />
+          <span className="pane-strip-sep" />
           <StripBtn
             onClick={handleOpenHandoff}
             disabled={!isAlive}
             title={isAlive ? "Review and send output to another agent" : "Start terminal first"}
-          >Review & Send</StripBtn>
+          >
+            Review & Send
+          </StripBtn>
         </div>
 
-        {/* Middle/right: forward flow */}
-        <div className="pane-orch-group pane-orch-group--end">
-          <span style={{ color: "var(--text-faint)", fontSize: 10, flexShrink: 0, lineHeight: 1 }}>→</span>
+        {/* Flowbar: flow → target + Send Marked */}
+        <div className="agent-pane-flowbar">
+          <span className="agent-flow-arrow">→</span>
           {linkedTarget ? (
-            <span style={{
-              fontSize: 10, color: "var(--text-muted)", flexShrink: 0,
-              maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}
+            <span
+              className="agent-flow-target-label"
               title={preferredLink?.kind === "route" ? "Preferred route" : "Observed handoff"}
             >
               {preferredLink?.kind === "route" ? "→ " : "↪ "}{linkedTarget.label}
             </span>
           ) : otherTerminals.length > 0 ? (
             <select
+              className="agent-flow-select"
               value={effectiveFwdTarget?.id ?? ""}
               onChange={(e) => { setSelectedForwardTargetId(e.target.value); setFwdError(""); }}
-              style={{
-                background: "transparent", border: "1px solid var(--border-subtle)",
-                color: "var(--text-muted)", fontSize: 9, padding: "3px 6px",
-                borderRadius: 999, fontFamily: "inherit", maxWidth: 90, flexShrink: 1, minWidth: 0,
-              }}
             >
-              {otherTerminals.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+              {otherTerminals.map((a) => (
+                <option key={a.id} value={a.id}>{a.label}</option>
+              ))}
             </select>
           ) : (
-            <span style={{ fontSize: 9, color: "var(--text-faint)", flexShrink: 0 }}>—</span>
+            <span className="agent-flow-target-none">—</span>
           )}
           <StripBtn
             onClick={() => { void handleForwardToNext(); }}
             disabled={!isAlive || !effectiveFwdTarget || !targetIsRunning || forwarding || otherTerminals.length === 0}
             title={
-              !isAlive                                            ? "Start this terminal first" :
-              otherTerminals.length === 0 || !effectiveFwdTarget  ? "No targets"               :
-              !targetIsRunning                                    ? "Start target first"        :
-              forwarding                                          ? "Forwarding…"              :
+              !isAlive                                             ? "Start this terminal first" :
+              otherTerminals.length === 0 || !effectiveFwdTarget  ? "No targets"                :
+              !targetIsRunning                                     ? "Start target first"        :
+              forwarding                                           ? "Forwarding…"               :
               `Send marked handoff to ${effectiveFwdTarget.label}`
             }
           >
             {forwarding ? "…" : "Send Marked"}
           </StripBtn>
           {fwdError && (
-            <span style={{ color: "var(--danger)", fontSize: 9, whiteSpace: "nowrap", flexShrink: 0 }}>
-              {fwdError}
-            </span>
+            <span className="agent-flow-error" title={fwdError}>{fwdError}</span>
           )}
         </div>
 
-        {/* Far right: status dot + pane controls */}
-        <div className="pane-orch-group" style={{ paddingLeft: 6, borderLeft: "1px solid var(--border-subtle)", gap: 1, flexShrink: 0 }}>
+        {/* Controls: cwd pill + dot + icon buttons */}
+        <div className="agent-pane-controls">
           <span
+            className="agent-cwd-pill"
+            data-health={cwdHealth.status}
             title={cwdHealth.warning ?? agent.cwd ?? cwdHealth.label}
-            style={{
-              maxWidth: 112,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              color:
-                cwdHealth.status === "project"
-                  ? "var(--success)"
-                  : cwdHealth.status === "different"
-                  ? "var(--warning)"
-                  : "var(--text-faint)",
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: 0,
-              padding: "2px 6px",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: 999,
-              flexShrink: 1,
-            }}
           >
             {cwdHealth.label}
           </span>
-          <div
-            className={pulse ? "status-dot-pulse" : undefined}
-            style={{
-              width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0, marginRight: 2,
-              boxShadow: dinoState !== "terminal_dead" && dinoState !== "idle_center"
-                ? `0 0 0 2px ${color}1f` : "none",
-              transition: "background 0.25s, box-shadow 0.25s",
-            }}
-          />
           <HdrBtn title="Copy visible output" onClick={() => { void copyVisible(); }}>⎘</HdrBtn>
-          <HdrBtn title="View session logs" onClick={() => setShowLogs(true)}
-            onMouseDown={(e) => e.preventDefault()}>≡</HdrBtn>
+          <HdrBtn
+            title="View session logs"
+            onClick={() => setShowLogs(true)}
+            onMouseDown={(e) => e.preventDefault()}
+          >≡</HdrBtn>
           <HdrBtn
             title={readinessChecking ? "Checking…" : restarting ? "Starting…" : "Restart terminal"}
             onClick={() => { if (!readinessChecking && !restarting) void handleRestart(); }}
@@ -622,10 +563,9 @@ export function TerminalPane({
           </HdrBtn>
           <HdrBtn title="Close terminal" onClick={() => { void handleRemove(); }} danger>✕</HdrBtn>
         </div>
-
       </div>
 
-      {/* ── Attachment panel (collapsible) ── */}
+      {/* ── Context library panel (collapsible) ─────────────────────────── */}
       {showAttPanel && (
         <ContextLibraryModal
           agent={agent}
@@ -639,31 +579,27 @@ export function TerminalPane({
         />
       )}
 
-      <div style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        minHeight: 0,
-        background: "var(--terminal-bg)",
-      }}>
-        {/* Readiness error — shown as compact strip for running terminals */}
+      {/* ── Pane body ────────────────────────────────────────────────────── */}
+      <div className="agent-pane-body">
+
+        {/* Readiness error strip (running + readiness error) */}
         {readinessError && isRunning && (
-          <div className="readiness-error readiness-error--strip">
-            <div className="readiness-error-body">
-              <span className="readiness-error-title">Restart blocked</span>
-              <span className="readiness-error-msg">{readinessError.message}</span>
+          <div className="agent-pane-warning-strip agent-pane-warning-strip--error">
+            <div className="agent-pane-warning-body">
+              <span className="agent-pane-warning-title">Restart blocked</span>
+              <span className="agent-pane-warning-msg">{readinessError.message}</span>
             </div>
-            <div className="readiness-error-actions">
-              <button className="readiness-error-btn" onClick={() => onEditAgent(agent.id)}>Settings</button>
+            <div className="agent-pane-warning-actions">
+              <button className="agent-pane-warning-btn" onClick={() => onEditAgent(agent.id)}>Settings</button>
               <button
-                className="readiness-error-btn"
+                className="agent-pane-warning-btn"
                 onClick={() => { void handleRestart(); }}
                 disabled={readinessChecking}
               >
                 {readinessChecking ? "…" : "Retry"}
               </button>
               <button
-                className="readiness-error-dismiss"
+                className="agent-pane-warning-dismiss"
                 onClick={() => onReadinessError(agent.id, null)}
                 title="Dismiss"
               >×</button>
@@ -671,22 +607,27 @@ export function TerminalPane({
           </div>
         )}
 
-        {/* Runtime error — compact strip above xterm when process is running */}
+        {/* CWD warning strip */}
         {cwdHealth.status !== "project" && (
-          <div className="readiness-error readiness-error--strip">
-            <div className="readiness-error-body">
-              <span className="readiness-error-title">{cwdHealth.label}</span>
-              <span className="readiness-error-msg">
-                {cwdHealth.warning}
-                {cwdHealth.status === "different" ? " Stop and recreate or restart the agent with the selected project folder as cwd." : ""}
-              </span>
+          <div className={`agent-pane-warning-strip${
+            cwdHealth.status === "different" ? "" : " agent-pane-warning-strip--neutral"
+          }`}>
+            <div className="agent-pane-warning-body">
+              <span className="agent-pane-warning-title">{cwdHealth.label}</span>
+              {cwdHealth.warning && (
+                <span className="agent-pane-warning-msg">
+                  {cwdHealth.warning}
+                  {cwdHealth.status === "different" ? " Stop and recreate or restart with the project folder as cwd." : ""}
+                </span>
+              )}
             </div>
-            <div className="readiness-error-actions">
-              <button className="readiness-error-btn" onClick={() => onEditAgent(agent.id)}>Settings</button>
+            <div className="agent-pane-warning-actions">
+              <button className="agent-pane-warning-btn" onClick={() => onEditAgent(agent.id)}>Settings</button>
             </div>
           </div>
         )}
 
+        {/* Runtime error strip (while running) */}
         {lastRuntimeError && isRunning && lastRuntimeError.confidence !== "low" && (
           <RuntimeErrorCard
             error={lastRuntimeError}
@@ -698,15 +639,11 @@ export function TerminalPane({
           />
         )}
 
+        {/* Terminal / dormant / error states */}
         {isRunning ? (
-          <div ref={containerRef} style={{ flex: 1, overflow: "hidden", minHeight: 0 }} />
+          <div ref={containerRef} className="agent-pane-terminal" />
         ) : readinessError ? (
-          /* Dormant + readiness error: show error panel in place of normal dormant view */
-          <div style={{
-            flex: 1, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            gap: 0, minHeight: 0, padding: "0 16px",
-          }}>
+          <div className="agent-pane-error-center">
             <div className="readiness-error readiness-error--panel">
               <span className="readiness-error-title">Agent not ready</span>
               <span className="readiness-error-msg">{readinessError.message}</span>
@@ -725,12 +662,7 @@ export function TerminalPane({
             </div>
           </div>
         ) : lastRuntimeError && lastRuntimeError.confidence !== "low" ? (
-          /* Non-running pane with runtime error: centered panel */
-          <div style={{
-            flex: 1, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            gap: 0, minHeight: 0, padding: "0 16px",
-          }}>
+          <div className="agent-pane-error-center">
             <RuntimeErrorCard
               error={lastRuntimeError}
               variant="panel"
@@ -741,49 +673,55 @@ export function TerminalPane({
             />
           </div>
         ) : (
-          <div style={{
-            flex: 1, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            gap: 6, minHeight: 0,
-          }}>
-            <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 650, letterSpacing: 0 }}>
-              {agent.label}
-            </span>
-            <span style={{ color: "var(--text-faint)", fontSize: 11, letterSpacing: 0 }}>Dormant</span>
-            <span style={{ color: "var(--text-faint)", fontSize: 10, letterSpacing: 0, opacity: 0.6, marginBottom: 4 }}>
-              Start when ready
-            </span>
-            <button
-              onClick={() => { void handleStart(); }}
-              disabled={readinessChecking}
-              style={{
-                padding: "9px 24px",
-                background: readinessChecking ? "var(--button-bg)" : "var(--accent)",
-                border: "1px solid transparent", borderRadius: 999,
-                color: readinessChecking ? "var(--text-muted)" : "var(--app-bg)",
-                fontSize: 12, fontFamily: "inherit",
-                fontWeight: 650, letterSpacing: 0,
-                cursor: readinessChecking ? "default" : "pointer", transition: "opacity 0.15s",
-              }}
-              onMouseEnter={(e) => { if (!readinessChecking) (e.currentTarget as HTMLButtonElement).style.opacity = "0.88"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
-            >
-              {readinessChecking ? "Checking…" : "Start"}
-            </button>
+          /* Dormant launch card */
+          <div className="agent-pane-dormant">
+            <div className="agent-pane-dormant-card">
+              <div className="agent-pane-dormant-header">
+                <div className="agent-pane-dormant-dot" />
+                <span className="agent-pane-dormant-title">{agent.label}</span>
+                <span className="agent-pane-dormant-meta">{agent.agentKind ?? "custom"}</span>
+              </div>
+              {agent.cwd && (
+                <span
+                  className="agent-pane-dormant-cwd"
+                  title={cwdHealth.warning ?? agent.cwd}
+                >
+                  {agent.cwd}
+                </span>
+              )}
+              <div className="agent-pane-dormant-actions">
+                <button
+                  className="agent-pane-dormant-start-btn"
+                  onClick={() => { void handleStart(); }}
+                  disabled={readinessChecking}
+                >
+                  {readinessChecking ? "Checking…" : "Start"}
+                </button>
+                <button
+                  className="agent-pane-dormant-settings-btn"
+                  onClick={() => onEditAgent(agent.id)}
+                >
+                  Settings
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
-        <DinoLane
-          dinoId={agent.dinoId}
-          state={dinoState}
-          animationSpeed={settings?.animationSpeed ?? 1}
-          dinoScale={dinoScale}
-          visualPhase={dinoVisualPhase}
-          onEggHatchComplete={handleEggHatchComplete}
-        />
+        {/* DinoLane — agent habitat strip */}
+        <div className="agent-pane-habitat">
+          <DinoLane
+            dinoId={agent.dinoId}
+            state={dinoState}
+            animationSpeed={settings?.animationSpeed ?? 1}
+            dinoScale={dinoScale}
+            visualPhase={dinoVisualPhase}
+            onEggHatchComplete={handleEggHatchComplete}
+          />
+        </div>
       </div>
 
-      {/* ── Logs overlay ── */}
+      {/* ── Logs overlay ─────────────────────────────────────────────────── */}
       {showLogs && (
         <LogsPanel
           label={agent.label}
@@ -793,7 +731,7 @@ export function TerminalPane({
         />
       )}
 
-      {/* ── Handoff modal ── */}
+      {/* ── Handoff modal ─────────────────────────────────────────────────── */}
       {handoffCapture !== null && (
         <HandoffModal
           sourceAgentId={agent.id}

@@ -23,56 +23,23 @@ export function ConfirmDialog({
 }: Props) {
   return (
     <>
-      <div
-        onClick={onCancel}
-        style={{
-          position: "fixed", inset: 0,
-          background: "rgba(0,0,0,0.5)",
-          zIndex: 300,
-        }}
-      />
-      <div style={{
-        position: "fixed",
-        top: "50%", left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: 360,
-        background: "var(--surface-1)",
-        border: "1px solid var(--border-subtle)",
-        borderRadius: 10,
-        padding: "20px 20px 16px",
-        display: "flex", flexDirection: "column", gap: 12,
-        zIndex: 301,
-        boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-      }}>
-        <div style={{
-          fontWeight: 700, fontSize: 13,
-          color: destructive ? "var(--danger, #f87171)" : "var(--text-main)",
-        }}>
+      <div className="confirm-overlay" onClick={onCancel} />
+      <div className="confirm-dialog soft-enter">
+        <div className={`confirm-title${destructive ? " confirm-title--destructive" : ""}`}>
           {title}
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-          {body}
-        </div>
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button
-            className="cmd-pill-btn"
-            style={{ fontSize: 11, padding: "5px 12px" }}
-            onClick={onCancel}
-          >
+        <div className="confirm-body">{body}</div>
+        <div className="confirm-actions">
+          <button className="cmdino-action-btn cmdino-action-btn--ghost" onClick={onCancel}>
             {cancelLabel}
           </button>
           {secondaryLabel && onSecondary && (
-            <button
-              className="cmd-pill-btn cmd-pill-btn--danger"
-              style={{ fontSize: 11, padding: "5px 12px" }}
-              onClick={onSecondary}
-            >
+            <button className="cmdino-action-btn cmdino-action-btn--danger" onClick={onSecondary}>
               {secondaryLabel}
             </button>
           )}
           <button
-            className={`cmd-pill-btn${destructive ? " cmd-pill-btn--danger" : ""}`}
-            style={{ fontSize: 11, padding: "5px 12px" }}
+            className={`cmdino-action-btn${destructive ? " cmdino-action-btn--danger" : " cmdino-action-btn--primary"}`}
             onClick={onConfirm}
           >
             {confirmLabel}

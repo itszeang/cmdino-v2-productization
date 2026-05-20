@@ -294,6 +294,7 @@ export function MainTaskChat({
   const [copyStatus, setCopyStatus] = useState("");
   const [showAgentDetails, setShowAgentDetails] = useState(false);
   const resultTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
   const currentStep = currentRun?.currentStepId
     ? currentRun.steps.find((step) => step.id === currentRun.currentStepId) ?? null
     : null;
@@ -366,6 +367,7 @@ export function MainTaskChat({
         };
       })
     : [];
+
   const canSendPrompt = Boolean(
     currentStepPrompt &&
     selectedTarget &&
@@ -386,13 +388,15 @@ export function MainTaskChat({
   const activeTeam = currentRun?.agentTeamId
     ? agentTeams.find((team) => team.id === currentRun.agentTeamId) ?? selectedTeam
     : selectedTeam;
-  const teamStepLabels = activeTeam?.steps.map((step) => step.label).join(" -> ");
+  const teamStepLabels = activeTeam?.steps.map((step) => step.label).join(" → ");
   const teamLocked = Boolean(currentRun && currentRun.status !== "completed" && currentRun.status !== "cancelled");
   const runningAgentCount = workflowAgentTargets.filter((a) => a.isRunning).length;
   const totalAgentCount = workflowAgentTargets.length;
   const noRunningAgents = runningAgentCount === 0;
   const projectRequired = !projectPath;
   const teamRequired = !selectedAgentTeamId;
+  const agentsNotReady = noRunningAgents || Boolean(selectedTeam && !selectedTeamDeployed);
+
   useEffect(() => {
     setSelectedTargetAgentId("");
     setSendNotice("");
@@ -437,17 +441,11 @@ export function MainTaskChat({
       await navigator.clipboard.writeText(text);
       setCopyStatus(okMessage);
       setCopyNotice(okMessage);
-      setTimeout(() => {
-        setCopyStatus("");
-        setCopyNotice("");
-      }, 1600);
+      setTimeout(() => { setCopyStatus(""); setCopyNotice(""); }, 1600);
     } catch {
       setCopyStatus(failMessage);
       setCopyNotice(failMessage);
-      setTimeout(() => {
-        setCopyStatus("");
-        setCopyNotice("");
-      }, 2200);
+      setTimeout(() => { setCopyStatus(""); setCopyNotice(""); }, 2200);
     }
   }
 
@@ -512,15 +510,8 @@ export function MainTaskChat({
 
   async function sendPromptToAgent() {
     if (!currentStepPrompt || !onSendWorkflowPromptToAgent) return;
-    if (!selectedTarget) {
-      setSendNotice("Choose a target agent before sending.");
-      return;
-    }
-    if (!selectedTarget.isRunning) {
-      setSendNotice("Start this agent before sending the workflow prompt.");
-      return;
-    }
-
+    if (!selectedTarget) { setSendNotice("Choose a target agent before sending."); return; }
+    if (!selectedTarget.isRunning) { setSendNotice("Start this agent before sending the workflow prompt."); return; }
     setSendingPrompt(true);
     setSendNotice("");
     const result = await onSendWorkflowPromptToAgent({
@@ -531,187 +522,659 @@ export function MainTaskChat({
     setSendingPrompt(false);
   }
 
-  return (
-    <div className="main-task-chat">
-      <div className="chat-shell">
-        <div className="chat-hero">
-          <div className="chat-hero-copy">
-            <span className="chat-kicker">CMDino Chat</span>
-            <h1 className="chat-title">Stage a checkpoint workflow.</h1>
-            <p className="chat-subtitle">
-              Set up agents in Agent Workspace, then describe your task here. CMDino prepares checkpoint prompts — you send them explicitly, capture results, and continue at your own pace.
-            </p>
+  // ── Readiness list component (reused across gate screens) ──────────────────
+  function ReadinessList({ showTeam = true }: { showTeam?: boolean }) {
+    return (
+      <div className="mc-readiness-list">
+        <div className={`mc-readiness-item ${projectRequired ? "mc-readiness-item--warn" : "mc-readiness-item--ok"}`}>
+          <span className="mc-readiness-dot" />
+          <div className="mc-readiness-info">
+            <span className="mc-readiness-label">Project</span>
+            <span className="mc-readiness-value">{projectName ?? "Not selected"}</span>
           </div>
-          <div className="chat-context-grid">
-            <div className="chat-context-item">
-              <span className="chat-context-key">Project</span>
-              <span className="chat-context-value">{projectName ?? "No project selected"}</span>
-              <span className="chat-context-path">{projectPath ?? "Open a project folder to set agent working directory."}</span>
+        </div>
+        {showTeam && (
+          <div className={`mc-readiness-item ${teamRequired ? "mc-readiness-item--warn" : "mc-readiness-item--ok"}`}>
+            <span className="mc-readiness-dot" />
+            <div className="mc-readiness-info">
+              <span className="mc-readiness-label">Team</span>
+              <span className="mc-readiness-value">{selectedTeam?.name ?? "Not selected"}</span>
             </div>
-            <div className="chat-context-item">
-              <span className="chat-context-key">Running agents</span>
-              <span className="chat-context-value">
-                {runningAgentCount} of {totalAgentCount} active
+          </div>
+        )}
+        <div className={`mc-readiness-item ${noRunningAgents ? "mc-readiness-item--warn" : "mc-readiness-item--ok"}`}>
+          <span className="mc-readiness-dot" />
+          <div className="mc-readiness-info">
+            <span className="mc-readiness-label">Agents</span>
+            <span className="mc-readiness-value">
+              {totalAgentCount === 0 ? "None deployed" : `${runningAgentCount}/${totalAgentCount} running`}
+            </span>
+          </div>
+        </div>
+        {teamStepLabels && (
+          <div className="mc-readiness-item mc-readiness-item--neutral">
+            <span className="mc-readiness-dot" />
+            <div className="mc-readiness-info">
+              <span className="mc-readiness-label">Flow</span>
+              <span className="mc-readiness-value" style={{ fontSize: "10px", whiteSpace: "normal", lineHeight: "1.4" }}>
+                {teamStepLabels}
               </span>
-              <span className="chat-context-path">
-                Chat sends checkpoint prompts after Agent Workspace setup.
-              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Gate: project missing ──────────────────────────────────────────────────
+  function ProjectGate() {
+    return (
+      <div className="mc-gate mc-gate--project">
+        <div className="mc-gate-inner">
+          <div className="mc-gate-icon-area">
+            <span className="mc-gate-icon">📁</span>
+          </div>
+          <div className="mc-gate-copy">
+            <h2 className="mc-gate-headline">Open a project folder</h2>
+            <p className="mc-gate-desc">
+              CMDino needs a project directory to set agent working directories, save context, and stage workflow prompts. Context Library is available without a project.
+            </p>
+            <div className="mc-gate-actions">
+              <button className="chat-submit-btn mc-gate-primary-btn" onClick={onOpenProject} disabled={!onOpenProject}>
+                Select Project Folder
+              </button>
+              <button className="chat-ghost-btn" onClick={onOpenAgents} disabled={!onOpenAgents}>
+                Agent Workspace
+              </button>
+              <button className="chat-ghost-btn" onClick={onOpenContextLibrary} disabled={!onOpenContextLibrary}>
+                Context Library
+              </button>
+              <button className="chat-ghost-btn" onClick={onOpenSetupCheck} disabled={!onOpenSetupCheck}>
+                Setup Check
+              </button>
+            </div>
+          </div>
+          <ReadinessList />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Gate: team missing ─────────────────────────────────────────────────────
+  function TeamGate() {
+    return (
+      <div className="mc-gate mc-gate--team">
+        <div className="mc-gate-inner">
+          <div className="mc-gate-icon-area">
+            <span className="mc-gate-icon">🤝</span>
+          </div>
+          <div className="mc-gate-copy">
+            <h2 className="mc-gate-headline">Choose an Agent Team</h2>
+            <p className="mc-gate-desc">
+              A team defines the workflow steps and which agent roles participate. Select one to plan your checkpoint sequence.
+            </p>
+            {agentTeams.length > 0 && onSelectAgentTeam && (
+              <AgentTeamSelector
+                teams={agentTeams}
+                selectedTeamId={selectedAgentTeamId}
+                onSelectTeam={onSelectAgentTeam}
+                disabled={teamLocked}
+              />
+            )}
+            <div className="mc-gate-actions">
+              <button className="chat-submit-btn mc-gate-primary-btn" onClick={onOpenAgents} disabled={!onOpenAgents}>
+                Open Agent Workspace
+              </button>
+              <button className="chat-ghost-btn" onClick={onOpenSetupCheck} disabled={!onOpenSetupCheck}>
+                Setup Check
+              </button>
+            </div>
+          </div>
+          <ReadinessList />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Gate: agents not deployed / not running ────────────────────────────────
+  function AgentsGate() {
+    const needsDeploy = totalAgentCount === 0;
+    return (
+      <div className="mc-gate mc-gate--agents">
+        <div className="mc-gate-inner">
+          <div className="mc-gate-icon-area">
+            <span className="mc-gate-icon">⚡</span>
+          </div>
+          <div className="mc-gate-copy">
+            <h2 className="mc-gate-headline">
+              {needsDeploy ? "Deploy your Agent Team" : "Start your agents"}
+            </h2>
+            <p className="mc-gate-desc">
+              {needsDeploy
+                ? "Your team plan is ready. Deploy it in Agent Workspace to create running Claude, Codex, or Ollama instances."
+                : `${totalAgentCount} agent${totalAgentCount !== 1 ? "s" : ""} deployed but not running. Start them in Agent Workspace, then return here.`}
+            </p>
+            <div className="mc-flow-steps">
+              {[
+                "Open Agent Workspace",
+                needsDeploy ? `Deploy ${selectedTeam?.name ?? "this team"}` : "Start the agents",
+                "Return here and describe your task",
+                "Approve and send each checkpoint prompt",
+                "Capture the result, then continue",
+              ].map((step, i) => (
+                <div className="mc-flow-step" key={i}>
+                  <span className="mc-flow-step-num">{i + 1}</span>
+                  <span className="mc-flow-step-label">{step}</span>
+                </div>
+              ))}
+            </div>
+            {agentTeams.length > 0 && onSelectAgentTeam && (
+              <AgentTeamSelector
+                teams={agentTeams}
+                selectedTeamId={selectedAgentTeamId}
+                onSelectTeam={onSelectAgentTeam}
+                disabled={teamLocked}
+              />
+            )}
+            <div className="mc-gate-actions">
+              {selectedTeam && (
+                <button className="chat-submit-btn mc-gate-primary-btn" onClick={onDeploySelectedTeam} disabled={!onDeploySelectedTeam}>
+                  Deploy {selectedTeam.name}
+                </button>
+              )}
+              <button className="chat-submit-btn mc-gate-primary-btn" onClick={onOpenAgents} disabled={!onOpenAgents}>
+                Open Agent Workspace
+              </button>
+              <button className="chat-ghost-btn" onClick={onOpenContextLibrary} disabled={!onOpenContextLibrary}>
+                Context Library
+              </button>
+            </div>
+          </div>
+          <ReadinessList />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Gate: ready — compose ──────────────────────────────────────────────────
+  function ReadyGate() {
+    return (
+      <div className="mc-gate mc-gate--ready">
+        <div className="mc-gate-inner mc-gate-inner--ready">
+          <div className="mc-gate-copy mc-gate-copy--ready">
+            <span className="mc-gate-kicker">Mission Control Ready</span>
+            <h2 className="mc-gate-headline mc-gate-headline--ready">What are we building?</h2>
+            <p className="mc-gate-desc">
+              Describe your task below. CMDino stages checkpoint prompts for each workflow step — you send them to running agents, capture results, and continue at your own pace.
+            </p>
+            <div className="mc-readiness-row">
+              <div className="mc-readiness-item mc-readiness-item--ok mc-readiness-item--inline">
+                <span className="mc-readiness-dot" />
+                <span>{projectName}</span>
+              </div>
+              <div className="mc-readiness-item mc-readiness-item--ok mc-readiness-item--inline">
+                <span className="mc-readiness-dot" />
+                <span>{selectedTeam?.name ?? agentTeamName}</span>
+              </div>
+              <div className="mc-readiness-item mc-readiness-item--ok mc-readiness-item--inline">
+                <span className="mc-readiness-dot" />
+                <span>{runningAgentCount} agent{runningAgentCount !== 1 ? "s" : ""} running</span>
+              </div>
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        <div className="chat-main">
-          <div className="chat-message-list">
-            {projectRequired ? (
-              <div className="chat-empty-state">
-                <div className="chat-empty-primary">
-                  <span className="chat-empty-title">Open a local project folder</span>
-                  <p>
-                    CMDino Chat needs a selected project before it can stage workflow prompts or save persistent project context.
-                  </p>
-                  <p>
-                    Context Library is still available. Saving persistent context is blocked until a project folder is selected.
-                  </p>
-                  <div className="chat-setup-status">
-                    <span className="chat-setup-badge chat-setup-badge--warn">
-                      Project: No project selected
-                    </span>
-                    <span className="chat-setup-badge">
-                      {totalAgentCount === 0
-                        ? "No agents deployed"
-                        : `${runningAgentCount} of ${totalAgentCount} agent${totalAgentCount !== 1 ? "s" : ""} running`}
-                    </span>
+  // ── Which content to show in scroll region ─────────────────────────────────
+  function ScrollContent() {
+    if (projectRequired) return <ProjectGate />;
+
+    if (messages.length === 0 && !currentRun) {
+      if (teamRequired)     return <TeamGate />;
+      if (agentsNotReady)   return <AgentsGate />;
+      return <ReadyGate />;
+    }
+
+    return (
+      <div className="chat-message-list">
+        {messages.map((message) => (
+          <ChatMessageCard
+            key={message.id}
+            message={message}
+            onOpenAgents={onOpenAgents}
+            onOpenSetupCheck={onOpenSetupCheck}
+            interventions={interventions}
+            onInterventionAction={onInterventionAction}
+          />
+        ))}
+        {!currentRun && agentsNotReady && (
+          <div className="mc-inline-guidance">
+            <span className="mc-inline-guidance-title">
+              {selectedTeam && !selectedTeamDeployed
+                ? `${selectedTeam.name} is not deployed`
+                : "No agents running"}
+            </span>
+            <p className="mc-inline-guidance-body">
+              {totalAgentCount === 0
+                ? "Deploy your team in Agent Workspace, start the agents, then describe your task."
+                : `${totalAgentCount} agent${totalAgentCount !== 1 ? "s" : ""} deployed but none running. Start them in Agent Workspace.`}
+            </p>
+            <div className="mc-gate-actions">
+              {selectedTeam && (
+                <button className="chat-submit-btn" onClick={onDeploySelectedTeam} disabled={!onDeploySelectedTeam}>
+                  Deploy {selectedTeam.name}
+                </button>
+              )}
+              <button className="chat-submit-btn" onClick={onOpenAgents} disabled={!onOpenAgents}>
+                Open Agent Workspace
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Checkpoint column content ──────────────────────────────────────────────
+  function CheckpointPanel() {
+    if (!currentRun) return null;
+    return (
+      <>
+        <div className="mc-checkpoint-header">
+          <div className="mc-checkpoint-title-group">
+            <span className="mc-checkpoint-kicker">Active Workflow</span>
+            <div className="mc-checkpoint-title">
+              {currentStep ? currentStep.label : "Workflow Complete"}
+            </div>
+          </div>
+          <span className="mc-checkpoint-status-badge">
+            {currentRun.status.replace(/_/g, " ")}
+          </span>
+        </div>
+
+        <div className="mc-checkpoint-body">
+          <WorkflowRunTimeline
+            run={currentRun}
+            agentTeamName={agentTeamName}
+            bindings={workflowStepBindings}
+            onCopySummary={(step) => {
+              if (step.summary) void copyText(step.summary, "Summary copied");
+            }}
+          />
+          {copyStatus && <span className="chat-copy-notice">{copyStatus}</span>}
+
+          {/* Send prompt to agent */}
+          {currentStep && currentStepPrompt && (
+            <div className="chat-step-prompt">
+              {previousSteps.length > 0 && (
+                <details className="chat-previous-context">
+                  <summary>Context from previous steps</summary>
+                  <div className="chat-previous-context-list">
+                    {previousSteps.map((step) => (
+                      <div key={step.stepId} className="chat-previous-context-item">
+                        <strong>{step.label}</strong>
+                        <span>Summary: {step.summary}</span>
+                        {step.handoff && <span>Handoff: {step.handoff}</span>}
+                      </div>
+                    ))}
                   </div>
-                  <div className="chat-setup-actions">
-                    <button className="chat-submit-btn" onClick={onOpenProject} disabled={!onOpenProject}>
-                      Select Project Folder
-                    </button>
-                    <button className="chat-ghost-btn" onClick={onOpenAgents} disabled={!onOpenAgents}>
-                      Open Agent Workspace
-                    </button>
-                    <button className="chat-ghost-btn" onClick={onOpenContextLibrary} disabled={!onOpenContextLibrary}>
-                      Open Context Library
-                    </button>
-                  </div>
-                </div>
-                <div className="chat-empty-secondary">
-                  <span className="chat-context-key">Setup order</span>
-                  <strong>Project first</strong>
-                  <span>Select a local folder so agents and context use the same workspace cwd.</span>
-                  <div className="chat-empty-secondary-actions">
-                    <button className="chat-mini-btn" onClick={onOpenContextLibrary} disabled={!onOpenContextLibrary}>Context</button>
-                    <button className="chat-mini-btn" onClick={onOpenSetupCheck} disabled={!onOpenSetupCheck}>Setup Check</button>
-                  </div>
+                </details>
+              )}
+
+              <div className="mc-target-block">
+                <div className="mc-target-label">Target Agent</div>
+                {workflowAgentTargets.length === 0 ? (
+                  <span className="chat-target-help">No agents deployed. Open Agent Workspace first.</span>
+                ) : (
+                  <select
+                    className="mc-target-select"
+                    id="workflow-target-agent"
+                    value={selectedTargetAgentId}
+                    onChange={(e) => { setSelectedTargetAgentId(e.target.value); setSendNotice(""); }}
+                  >
+                    <option value="">Select an agent…</option>
+                    {workflowAgentTargets.map((agent) => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.label}{agent.isSuggested ? " ★" : ""} — {agent.isRunning ? "running" : agent.lifecycle ?? "dormant"}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {selectedTargetIsSuggested && (
+                  <span className="chat-target-help">Suggested for this checkpoint role.</span>
+                )}
+                {selectedTarget && !selectedTarget.isRunning && (
+                  <span className="chat-send-warning">Start this agent before sending the prompt.</span>
+                )}
+                {selectedTeam && !selectedTeamDeployed && (
+                  <span className="chat-send-warning">{selectedTeam.name} is not deployed in Agent Workspace.</span>
+                )}
+                {selectedTargetCwdHealth?.status === "different" && (
+                  <span className="chat-send-warning">{selectedTargetCwdHealth.warning}</span>
+                )}
+              </div>
+
+              <div className="mc-prompt-info-row">
+                <span className="mc-prompt-role-label">Prompt for {currentStep.agentRole}</span>
+                <div className="chat-step-actions">
+                  <button className="chat-ghost-btn" onClick={() => setPromptExpanded((v) => !v)}>
+                    {promptExpanded ? "Hide Prompt" : "Preview Prompt"}
+                  </button>
+                  <button className="chat-ghost-btn" onClick={() => { void copyPrompt(); }}>
+                    Copy
+                  </button>
+                  <button
+                    className="chat-submit-btn"
+                    onClick={() => { void sendPromptToAgent(); }}
+                    disabled={!canSendPrompt}
+                    title={
+                      promptCannotBeSent ? "Not ready for this checkpoint state"
+                      : !selectedTarget ? "Select a target agent"
+                      : selectedTarget.isRunning ? `Send to ${selectedTarget.label}`
+                      : "Start this agent first"
+                    }
+                  >
+                    {sendingPrompt ? "Sending…" : "Send Prompt"}
+                  </button>
+                  {onOpenAgents && (
+                    <button className="chat-ghost-btn" onClick={onOpenAgents}>Workspace</button>
+                  )}
                 </div>
               </div>
-            ) : messages.length === 0 ? (
-              <div className="chat-empty-state">
-                <div className="chat-empty-primary">
-                  <span className="chat-empty-title">
-                    {selectedTeam ? "Deploy the selected Agent Workspace team" : "Choose or deploy an Agent Workspace template"}
-                  </span>
-                  <p>
-                    Chat uses one shared workspace team. Selecting a team plans workflow steps, but it does not create or start running agents.
-                  </p>
-                  <p>
-                    Deploy the selected team in Agent Workspace, start the agents, then return here to stage a checkpoint workflow.
-                  </p>
-                  <div className="chat-setup-status">
-                    <button
-                      type="button"
-                      className={noRunningAgents ? "chat-setup-badge chat-setup-badge--warn chat-setup-badge--button" : "chat-setup-badge chat-setup-badge--ok chat-setup-badge--button"}
-                      onClick={() => setShowAgentDetails((value) => !value)}
-                    >
-                      {runningAgentCount} running agent{runningAgentCount !== 1 ? "s" : ""}
-                      {totalAgentCount > 0 ? ` of ${totalAgentCount}` : ""}
-                    </button>
-                    <span className="chat-setup-badge">
-                      Project: {projectPath ?? "No project path selected"}
+              {copyNotice && <span className="chat-copy-notice">{copyNotice}</span>}
+              {sendNotice && (
+                <span className={sendNotice.startsWith("Sent ") ? "chat-copy-notice" : "chat-send-warning"}>
+                  {sendNotice}
+                </span>
+              )}
+              {promptExpanded && (
+                <pre className="chat-prompt-preview">{currentStepPrompt.body}</pre>
+              )}
+            </div>
+          )}
+
+          {/* Capture result */}
+          {currentStep && (
+            <div className="chat-result-parser">
+              <div className="mc-result-header">
+                <span className="mc-result-label">Result — {currentStep.label}</span>
+                <div className="chat-step-actions">
+                  <button
+                    className="chat-ghost-btn"
+                    onClick={captureResultFromAgent}
+                    disabled={!canCaptureResult}
+                    title={
+                      currentStep.agentId
+                        ? sentTarget?.isRunning ? `Capture from ${sentTarget.label}` : "Start the target agent first"
+                        : "Send the prompt to an agent first"
+                    }
+                  >
+                    Capture
+                  </button>
+                  <button className="chat-ghost-btn" onClick={focusManualPaste}>Paste</button>
+                </div>
+              </div>
+              {!currentStep.agentId && (
+                <span className="chat-send-warning">Send the prompt to an agent first, then capture.</span>
+              )}
+              {currentStep.agentId && sentTarget && !sentTarget.isRunning && (
+                <span className="chat-send-warning">Start {sentTarget.label} before capturing.</span>
+              )}
+              {captureNotice && (
+                <span className={captureNotice.startsWith("Captured ") ? "chat-copy-notice" : "chat-send-warning"}>
+                  {captureNotice}
+                </span>
+              )}
+              {captureMeta && <span className="chat-capture-meta">{captureMeta}</span>}
+              {(rawCapturedOutput || cleanedCapturedOutput) && (
+                <details className="chat-previous-context">
+                  <summary>Review captured output</summary>
+                  <div className="chat-previous-context-list">
+                    {cleanedCapturedOutput && (
+                      <div className="chat-previous-context-item">
+                        <strong>Cleaned</strong>
+                        <span>{cleanedCapturedOutput}</span>
+                      </div>
+                    )}
+                    {rawCapturedOutput && rawCapturedOutput !== cleanedCapturedOutput && (
+                      <div className="chat-previous-context-item">
+                        <strong>Raw transcript</strong>
+                        <span>{rawCapturedOutput}</span>
+                      </div>
+                    )}
+                  </div>
+                </details>
+              )}
+              <textarea
+                ref={resultTextareaRef}
+                value={resultText}
+                onChange={(e) => setResultText(e.target.value)}
+                placeholder="Paste output containing CMDINO_RESULT_START … CMDINO_RESULT_END"
+              />
+              {canContinue && (
+                <div className="chat-continuation-review">
+                  <div>
+                    <strong>{currentStep.label} completed.</strong>
+                    <span>
+                      {nextStep
+                        ? `Next: ${nextStep.label}. The next prompt includes completed summaries and handoff text.`
+                        : "Final checkpoint. Continue generates the workflow summary."}
                     </span>
                   </div>
-                  {showAgentDetails && (
-                    <div className="chat-agent-popover">
-                      <div className="chat-agent-popover-title">Running agents</div>
-                      {workflowAgentTargets.length === 0 ? (
-                        <span className="chat-agent-popover-empty">No agents are deployed yet.</span>
-                      ) : (
-                        workflowAgentTargets.map((agent) => {
-                          const cwdHealth = getAgentCwdHealth({
-                            agentCwd: agent.cwd,
-                            selectedProjectRoot: projectPath,
-                          });
-                          return (
-                            <div className="chat-agent-row" key={agent.id}>
-                              <div>
-                                <strong>{agent.label}</strong>
-                                <span>{agent.isRunning ? "running" : agent.lifecycle ?? "dormant"}</span>
-                              </div>
-                              <code>{agent.cwd ?? "No cwd configured"}</code>
-                              <em>{cwdHealth.label}</em>
-                              {cwdHealth.warning && <em>{cwdHealth.warning}</em>}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                  {agentTeams.length > 0 && onSelectAgentTeam && (
-                    <AgentTeamSelector
-                      teams={agentTeams}
-                      selectedTeamId={selectedAgentTeamId}
-                      onSelectTeam={onSelectAgentTeam}
-                      disabled={teamLocked}
-                    />
-                  )}
-                  <div className="chat-setup-actions">
-                    {selectedTeam && (
-                      <button className="chat-submit-btn" onClick={onDeploySelectedTeam} disabled={!onDeploySelectedTeam}>
-                        Deploy this team in Agent Workspace
+                  {currentHandoff && (
+                    <details className="chat-handoff-review">
+                      <summary>Review handoff</summary>
+                      <pre>{currentHandoff}</pre>
+                      <button className="chat-mini-btn" onClick={() => { void copyText(currentHandoff, "Handoff copied"); }}>
+                        Copy Handoff
                       </button>
-                    )}
-                    <button className="chat-ghost-btn" onClick={onOpenContextLibrary} disabled={!onOpenContextLibrary}>
-                      Open Context Library
-                    </button>
-                    <button className="chat-ghost-btn" onClick={onOpenProject} disabled={!onOpenProject}>
-                      {projectPath ? "Switch Project Folder" : "Select Project Folder"}
-                    </button>
-                    <button className="chat-submit-btn" onClick={onOpenAgents} disabled={!onOpenAgents}>
-                      Open Agent Workspace
-                    </button>
-                  </div>
+                    </details>
+                  )}
                 </div>
-                <div className="chat-empty-secondary">
-                  <span className="chat-context-key">Workspace team</span>
-                  <strong>{selectedTeam?.name ?? "No team selected"}</strong>
-                  <span>{teamStepLabels ?? "Choose a shared team before staging a workflow."}</span>
-                  <div className="chat-empty-secondary-actions">
-                    {selectedTeam && (
-                      <button className="chat-mini-btn" onClick={onDeploySelectedTeam} disabled={!onDeploySelectedTeam}>Deploy Team</button>
-                    )}
-                    <button className="chat-mini-btn" onClick={onOpenSetupCheck} disabled={!onOpenSetupCheck}>Setup Check</button>
-                  </div>
-                </div>
+              )}
+              <div className="mc-result-actions">
+                <button
+                  className="chat-ghost-btn"
+                  onClick={parseManualResult}
+                  disabled={!onParseResult || !resultText.trim()}
+                >
+                  Parse
+                </button>
+                <button
+                  className="chat-submit-btn"
+                  onClick={onContinueWorkflow}
+                  disabled={!canContinue || !onContinueWorkflow}
+                  title={canContinue
+                    ? nextStep ? `Prepare ${nextStep.label}` : "Finish workflow"
+                    : "Complete this checkpoint first"}
+                >
+                  {nextStep ? `Continue → ${nextStep.label}` : "Finish Workflow"}
+                </button>
+                {onCancelWorkflow && (
+                  <button className="chat-ghost-btn" onClick={onCancelWorkflow}>Cancel</button>
+                )}
               </div>
-            ) : (
-              messages.map((message) => (
-                <ChatMessageCard
-                  key={message.id}
-                  message={message}
-                  onOpenAgents={onOpenAgents}
-                  onOpenSetupCheck={onOpenSetupCheck}
-                  interventions={interventions}
-                  onInterventionAction={onInterventionAction}
-                />
-              ))
-            )}
+              {parseResult && (
+                <div className={parseResult.ok ? "chat-parse-ok" : "chat-parse-error"}>
+                  {parseResult.ok
+                    ? `✓ ${parseResult.result.status} — ${parseResult.result.summary}`
+                    : (
+                      <>
+                        <strong>{parseFailureTitle(parseResult)}</strong>
+                        <span>{parseFailureDetail(parseResult)}</span>
+                        {parseResult.reason === "missing_block" && (
+                          <div className="chat-parse-recovery-actions">
+                            <button
+                              className="chat-mini-btn"
+                              onClick={() => { void sendCorrectionInstruction(); }}
+                              disabled={!currentStep.agentId || !onSendWorkflowResultCorrectionToAgent || sendingCorrection}
+                            >
+                              {sendingCorrection ? "Sending…" : "Ask agent to finish"}
+                            </button>
+                            <button className="chat-mini-btn" onClick={() => { void copyCorrectionInstruction(); }}>
+                              Copy recovery prompt
+                            </button>
+                          </div>
+                        )}
+                        {correctionNotice && <span>{correctionNotice}</span>}
+                      </>
+                    )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Workflow complete: final output */}
+          {!currentStep && currentRun.finalOutput && (
+            <div className="chat-final-panel">
+              <div className="mc-result-actions">
+                <strong>Workflow Complete</strong>
+                <button className="chat-ghost-btn" onClick={() => { void copyText(currentRun.finalOutput ?? "", "Final output copied"); }}>
+                  Copy Output
+                </button>
+                <button className="chat-ghost-btn" onClick={() => { void copyText(buildWorkflowStepArtifactsMarkdown(currentRun), "Step artifacts copied"); }}>
+                  Copy Artifacts
+                </button>
+                <button
+                  className="chat-submit-btn"
+                  onClick={() => { void saveArtifact("final", onSaveWorkflowFinalOutput); }}
+                  disabled={!onSaveWorkflowFinalOutput || savingArtifact !== null}
+                >
+                  {savingArtifact === "final" ? "Saving…" : "Save Output"}
+                </button>
+                <button className="chat-ghost-btn" onClick={() => { void saveArtifact("steps", onSaveWorkflowStepArtifacts); }} disabled={!onSaveWorkflowStepArtifacts || savingArtifact !== null}>
+                  {savingArtifact === "steps" ? "Saving…" : "Save Artifacts"}
+                </button>
+                <button className="chat-ghost-btn" onClick={() => { void saveArtifact("build-public-kit", onGenerateBuildPublicKit); }} disabled={!onGenerateBuildPublicKit || savingArtifact !== null}>
+                  {savingArtifact === "build-public-kit" ? "Generating…" : "Build-in-Public Kit"}
+                </button>
+                <button className="chat-ghost-btn" onClick={() => { void saveArtifact("memory-briefs", onGenerateMemoryBriefs); }} disabled={!onGenerateMemoryBriefs || savingArtifact !== null}>
+                  {savingArtifact === "memory-briefs" ? "Generating…" : "Memory Brief"}
+                </button>
+              </div>
+              {artifactNotice && (
+                <span className={artifactNotice.includes("saved") ? "chat-copy-notice" : "chat-send-warning"}>
+                  {artifactNotice}
+                </span>
+              )}
+              <pre className="chat-final-output">{currentRun.finalOutput}</pre>
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <div className="main-task-chat">
+
+      {/* ── Status strip ────────────────────────────────────────────────── */}
+      <div className="mc-status-strip">
+        <div className="mc-status-items">
+          <button
+            className={`mc-status-chip mc-status-chip--btn ${projectRequired ? "mc-status-chip--warn" : "mc-status-chip--ok"}`}
+            onClick={onOpenProject}
+            title={projectRequired ? "Select a project folder" : projectPath}
+          >
+            <span className="mc-status-dot" />
+            <span className="mc-status-label">Project</span>
+            <span className="mc-status-value">{projectName ?? "None"}</span>
+          </button>
+
+          <span className="mc-status-sep" />
+
+          <div className={`mc-status-chip ${teamRequired ? "mc-status-chip--warn" : teamLocked ? "mc-status-chip--locked" : "mc-status-chip--ok"}`}>
+            <span className="mc-status-dot" />
+            <span className="mc-status-label">Team</span>
+            <span className="mc-status-value">{selectedTeam?.name ?? agentTeamName ?? "None"}</span>
           </div>
 
+          <span className="mc-status-sep" />
+
+          <button
+            className={`mc-status-chip mc-status-chip--btn ${noRunningAgents ? "mc-status-chip--warn" : "mc-status-chip--ok"}`}
+            onClick={() => setShowAgentDetails((v) => !v)}
+            title="Show agent status"
+          >
+            <span className="mc-status-dot" />
+            <span className="mc-status-label">Agents</span>
+            <span className="mc-status-value">
+              {totalAgentCount === 0 ? "None deployed" : `${runningAgentCount}/${totalAgentCount} running`}
+            </span>
+          </button>
+        </div>
+
+        <div className="mc-status-strip-end">
+          {currentRun && (
+            <span className="mc-run-badge">{currentRun.status.replace(/_/g, " ")}</span>
+          )}
+          {onOpenSetupCheck && (
+            <button className="mc-setup-btn" onClick={onOpenSetupCheck}>Setup Check</button>
+          )}
+          {onClear && !projectRequired && messages.length > 0 && (
+            <button className="mc-ghost-chip" onClick={onClear}>Clear</button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Agent popover ────────────────────────────────────────────────── */}
+      {showAgentDetails && (
+        <div className="mc-agent-popover">
+          <div className="mc-agent-popover-header">
+            <span className="mc-agent-popover-title">Deployed Agents</span>
+            <button className="mc-ghost-chip" onClick={() => setShowAgentDetails(false)}>✕</button>
+          </div>
+          {workflowAgentTargets.length === 0 ? (
+            <div className="mc-agent-popover-empty">
+              No agents deployed yet. Open Agent Workspace to set up agents.
+            </div>
+          ) : (
+            <div className="mc-agent-list">
+              {workflowAgentTargets.map((agent) => {
+                const cwdHealth = getAgentCwdHealth({ agentCwd: agent.cwd, selectedProjectRoot: projectPath });
+                return (
+                  <div className="mc-agent-row" key={agent.id}>
+                    <div className="mc-agent-row-status">
+                      <span className={`mc-agent-dot ${agent.isRunning ? "mc-agent-dot--running" : "mc-agent-dot--stopped"}`} />
+                      <span className="mc-agent-row-label">{agent.label}</span>
+                      <span className="mc-agent-row-lc">{agent.isRunning ? "running" : agent.lifecycle ?? "dormant"}</span>
+                    </div>
+                    <code className="mc-agent-row-cwd">{agent.cwd ?? "No cwd"}</code>
+                    {cwdHealth.warning && <span className="mc-agent-row-warn">{cwdHealth.warning}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="mc-agent-popover-actions">
+            {onOpenAgents && (
+              <button className="chat-ghost-btn" onClick={() => { onOpenAgents(); setShowAgentDetails(false); }}>
+                Open Agent Workspace
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Body ────────────────────────────────────────────────────────── */}
+      <div className={`mc-body${currentRun ? " mc-body--split" : ""}`}>
+
+        {/* Left column: messages + composer */}
+        <div className="mc-main-col">
+
+          {/* Active intervention banner */}
           {!projectRequired && openInterventions.length > 0 && (
-            <div className="chat-active-interventions">
-              <div className="chat-active-interventions-title">
-                Active Interventions ({openInterventions.length})
+            <div className="mc-intervention-banner">
+              <div className="mc-intervention-banner-header">
+                <span className="mc-intervention-banner-icon">⚠</span>
+                <span className="mc-intervention-banner-title">
+                  {openInterventions.length} Active Intervention{openInterventions.length !== 1 ? "s" : ""}
+                </span>
               </div>
-              <div className="chat-active-interventions-list">
+              <div className="mc-intervention-banner-list">
                 {openInterventions.map((intervention) => (
                   <InterventionChatCard
                     key={intervention.id}
@@ -735,472 +1198,84 @@ export function MainTaskChat({
             </div>
           )}
 
-          {!projectRequired && (noRunningAgents || Boolean(selectedTeam && !selectedTeamDeployed)) && !currentRun && messages.length > 0 && (
-            <div className="chat-setup-guidance">
-              <div className="chat-setup-heading">
-                {selectedTeam ? `${selectedTeam.name} is not deployed` : "Choose or deploy an Agent Workspace template"}
-              </div>
-              <p className="chat-setup-copy">
-                CMDino Chat sends checkpoint prompts to running local agents. The selected team is only a plan until Agent Workspace agents are deployed and started.
-              </p>
-              <ol className="chat-setup-steps">
-                <li>Open Agent Workspace — add the agents you want to run</li>
-                <li>Start the agents</li>
-                <li>Return to Chat and describe your task</li>
-                <li>Send the generated checkpoint prompt to a running agent</li>
-                <li>Capture the result and continue to the next checkpoint</li>
-              </ol>
-              <div className="chat-setup-status">
-                <span className="chat-setup-badge chat-setup-badge--warn">
-                  {totalAgentCount === 0
-                    ? "No agents deployed"
-                    : `${runningAgentCount} of ${totalAgentCount} agent${totalAgentCount !== 1 ? "s" : ""} running`}
-                </span>
-                {projectPath && (
-                  <span className="chat-setup-badge">Project: {projectPath}</span>
-                )}
-              </div>
-              <div className="chat-setup-actions">
-                {selectedTeam && (
-                  <button className="chat-submit-btn" onClick={onDeploySelectedTeam} disabled={!onDeploySelectedTeam}>
-                    Deploy this team in Agent Workspace
-                  </button>
-                )}
-                <button className="chat-ghost-btn" onClick={onOpenContextLibrary} disabled={!onOpenContextLibrary}>
-                  Open Context Library
-                </button>
-                <button className="chat-submit-btn" onClick={onOpenAgents} disabled={!onOpenAgents}>
-                  Open Agent Workspace
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Scrollable content */}
+          <div className="mc-scroll-region">
+            <ScrollContent />
+          </div>
 
-          {!projectRequired && !noRunningAgents && (!selectedTeam || selectedTeamDeployed) && !currentRun && messages.length > 0 && (
-            <div className="chat-agent-readiness">
-              <button
-                type="button"
-                className="chat-setup-badge chat-setup-badge--ok chat-setup-badge--button"
-                onClick={() => setShowAgentDetails((value) => !value)}
-              >
-                {runningAgentCount} of {totalAgentCount} agent{totalAgentCount !== 1 ? "s" : ""} running
-              </button>
-              {projectPath && (
-                <span className="chat-setup-badge">Project: {projectPath}</span>
-              )}
-              {showAgentDetails && (
-                <div className="chat-agent-popover">
-                  <div className="chat-agent-popover-title">Running agents</div>
-                  {workflowAgentTargets.map((agent) => {
-                    const cwdHealth = getAgentCwdHealth({
-                      agentCwd: agent.cwd,
-                      selectedProjectRoot: projectPath,
-                    });
-                    return (
-                      <div className="chat-agent-row" key={agent.id}>
-                        <div>
-                          <strong>{agent.label}</strong>
-                          <span>{agent.isRunning ? "running" : agent.lifecycle ?? "dormant"}</span>
-                        </div>
-                        <code>{agent.cwd ?? "No cwd configured"}</code>
-                        <em>{cwdHealth.label}</em>
-                        {cwdHealth.warning && <em>{cwdHealth.warning}</em>}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {!projectRequired && agentTeams.length > 0 && !currentRun && messages.length > 0 && onSelectAgentTeam && (
-            <AgentTeamSelector
-              teams={agentTeams}
-              selectedTeamId={selectedAgentTeamId}
-              onSelectTeam={onSelectAgentTeam}
-              disabled={teamLocked}
-            />
-          )}
-
-          {!projectRequired && currentRun && (
-            <div className="chat-checkpoint-panel">
-              <div className="chat-checkpoint-header">
-                <div>
-                  <span className="chat-checkpoint-kicker">Checkpoint Mode</span>
-                  <div className="chat-checkpoint-title">
-                    {currentStep ? `Current Step: ${currentStep.label}` : "Workflow complete"}
-                  </div>
-                </div>
-                <span className="chat-checkpoint-status">{currentRun.status.replace(/_/g, " ")}</span>
-              </div>
-              <WorkflowRunTimeline
-                run={currentRun}
-                agentTeamName={agentTeamName}
-                bindings={workflowStepBindings}
-                onCopySummary={(step) => {
-                  if (step.summary) void copyText(step.summary, "Summary copied");
-                }}
+          {/* Composer zone */}
+          <div className="mc-composer-zone">
+            {!projectRequired && agentTeams.length > 0 && !currentRun && onSelectAgentTeam && messages.length > 0 && (
+              <AgentTeamSelector
+                teams={agentTeams}
+                selectedTeamId={selectedAgentTeamId}
+                onSelectTeam={onSelectAgentTeam}
+                disabled={teamLocked}
               />
-              {copyStatus && <span className="chat-copy-notice">{copyStatus}</span>}
-
-              {currentStep && currentStepPrompt && (
-                <div className="chat-step-prompt">
-                  {previousSteps.length > 0 && (
-                    <details className="chat-previous-context">
-                      <summary>Previous steps included in this prompt</summary>
-                      <div className="chat-previous-context-list">
-                        {previousSteps.map((step) => (
-                          <div key={step.stepId} className="chat-previous-context-item">
-                            <strong>{step.label}</strong>
-                            <span>Summary: {step.summary}</span>
-                            {step.handoff && <span>Handoff: {step.handoff}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  )}
-                  <div className="chat-target-row">
-                    <label htmlFor="workflow-target-agent">Target Agent</label>
-                    {workflowAgentTargets.length === 0 ? (
-                      <span className="chat-target-help">No agents deployed yet. Open Agent Workspace to add/start an agent.</span>
-                    ) : (
-                      <select
-                        id="workflow-target-agent"
-                        value={selectedTargetAgentId}
-                        onChange={(e) => {
-                          setSelectedTargetAgentId(e.target.value);
-                          setSendNotice("");
-                        }}
-                      >
-                        <option value="">Select an agent...</option>
-                        {workflowAgentTargets.map((agent) => (
-                          <option key={agent.id} value={agent.id}>
-                            {agent.label}{agent.isSuggested ? " - suggested" : ""} ({agent.isRunning ? "running" : agent.lifecycle ?? "dormant"})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                  <div className="chat-step-prompt-row">
-                    <span>Prompt ready for {currentStep.agentRole}.</span>
-                    <div className="chat-step-actions">
-                      <button className="chat-ghost-btn" onClick={() => setPromptExpanded((value) => !value)}>
-                        {promptExpanded ? "Hide Prompt" : "Preview Prompt"}
-                      </button>
-                      <button className="chat-ghost-btn" onClick={() => { void copyPrompt(); }}>
-                        Copy Prompt
-                      </button>
-                      <button
-                        className="chat-submit-btn"
-                        onClick={() => { void sendPromptToAgent(); }}
-                        disabled={!canSendPrompt}
-                        title={
-                          promptCannotBeSent
-                            ? "Prompt is not ready to send for this checkpoint state"
-                            : selectedTeam && !selectedTeamDeployed
-                            ? "Deploy the selected Agent Workspace team before sending"
-                            : !selectedTarget
-                            ? "Select a target agent"
-                            : selectedTarget.isRunning
-                              ? `Send prompt to ${selectedTarget.label}`
-                              : "Start this agent before sending"
-                        }
-                      >
-                        {sendingPrompt ? "Sending..." : "Send Prompt to Agent"}
-                      </button>
-                      {onOpenAgents && (
-                        <button className="chat-ghost-btn" onClick={onOpenAgents}>Open Agent Workspace</button>
-                      )}
-                    </div>
-                  </div>
-                  {copyNotice && <span className="chat-copy-notice">{copyNotice}</span>}
-                  {selectedTarget && !selectedTarget.isRunning && (
-                    <span className="chat-send-warning">Start this agent before sending the workflow prompt.</span>
-                  )}
-                  {selectedTeam && !selectedTeamDeployed && (
-                    <span className="chat-send-warning">
-                      {selectedTeam.name} is selected but not deployed in Agent Workspace. Deploy this team before sending workflow prompts.
-                    </span>
-                  )}
-                  {selectedTargetCwdHealth?.status === "different" && (
-                    <span className="chat-send-warning">{selectedTargetCwdHealth.warning}</span>
-                  )}
-                  {selectedTargetIsSuggested && (
-                    <span className="chat-target-help">Suggested from this team's preferred provider and checkpoint role. You can choose a different running agent.</span>
-                  )}
-                  {sendNotice && (
-                    <span className={sendNotice.startsWith("Sent ") ? "chat-copy-notice" : "chat-send-warning"}>
-                      {sendNotice}
-                    </span>
-                  )}
-                  {promptExpanded && (
-                    <pre className="chat-prompt-preview">{currentStepPrompt.body}</pre>
-                  )}
-                </div>
-              )}
-
-              {currentStep && (
-                <div className="chat-result-parser">
-                  <div className="chat-result-header">
-                    <div>
-                      <label>Result for Current Step</label>
-                      <span>
-                        Capture reads selected terminal text when available, otherwise the latest clean output block. Review before parsing.
-                      </span>
-                    </div>
-                    <div className="chat-result-actions">
-                      <button
-                        className="chat-ghost-btn"
-                        onClick={captureResultFromAgent}
-                        disabled={!canCaptureResult}
-                        title={
-                          currentStep.agentId
-                            ? sentTarget?.isRunning
-                              ? `Capture output from ${sentTarget.label}`
-                              : "Start the target agent before capturing"
-                            : "Send the prompt to an agent first"
-                        }
-                      >
-                        Capture Result From Agent
-                      </button>
-                      <button className="chat-ghost-btn" onClick={focusManualPaste}>
-                        Paste Manually
-                      </button>
-                    </div>
-                  </div>
-                  {!currentStep.agentId && (
-                    <span className="chat-send-warning">
-                      No target agent selected for this step. Paste the result manually or send the prompt to an agent first.
-                    </span>
-                  )}
-                  {currentStep.agentId && sentTarget && !sentTarget.isRunning && (
-                    <span className="chat-send-warning">
-                      Start {sentTarget.label} before capturing, or paste the result manually.
-                    </span>
-                  )}
-                  {captureNotice && (
-                    <span className={captureNotice.startsWith("Captured ") ? "chat-copy-notice" : "chat-send-warning"}>
-                      {captureNotice}
-                    </span>
-                  )}
-                  {captureMeta && (
-                    <span className="chat-capture-meta">{captureMeta}</span>
-                  )}
-                  {(rawCapturedOutput || cleanedCapturedOutput) && (
-                    <details className="chat-previous-context">
-                      <summary>Review captured transcript</summary>
-                      <div className="chat-previous-context-list">
-                        {cleanedCapturedOutput && (
-                          <div className="chat-previous-context-item">
-                            <strong>Cleaned capture</strong>
-                            <span>{cleanedCapturedOutput}</span>
-                          </div>
-                        )}
-                        {rawCapturedOutput && rawCapturedOutput !== cleanedCapturedOutput && (
-                          <div className="chat-previous-context-item">
-                            <strong>Raw transcript</strong>
-                            <span>{rawCapturedOutput}</span>
-                          </div>
-                        )}
-                      </div>
-                    </details>
-                  )}
-                  <textarea
-                    ref={resultTextareaRef}
-                    value={resultText}
-                    onChange={(e) => setResultText(e.target.value)}
-                    placeholder={"Paste output containing CMDINO_RESULT_START ... CMDINO_RESULT_END"}
-                  />
-                  {canContinue && (
-                    <div className="chat-continuation-review">
-                      <div>
-                        <strong>{currentStep.label} completed.</strong>
-                        <span>
-                          {nextStep
-                            ? `Next: ${nextStep.label}. The next prompt will include completed summaries and handoff text.`
-                            : "This is the final checkpoint. Continue will generate the workflow summary."}
-                        </span>
-                      </div>
-                      {currentHandoff && (
-                        <details className="chat-handoff-review">
-                          <summary>Review handoff</summary>
-                          <pre>{currentHandoff}</pre>
-                          <button
-                            className="chat-mini-btn"
-                            onClick={() => { void copyText(currentHandoff, "Handoff copied"); }}
-                          >
-                            Copy Handoff
-                          </button>
-                        </details>
-                      )}
-                    </div>
-                  )}
-                  <div className="chat-result-actions">
-                    <button
-                      className="chat-ghost-btn"
-                      onClick={parseManualResult}
-                      disabled={!onParseResult || !resultText.trim()}
-                    >
-                      Parse Result
-                    </button>
-                    <button
-                      className="chat-submit-btn"
-                      onClick={onContinueWorkflow}
-                      disabled={!canContinue || !onContinueWorkflow}
-                      title={canContinue
-                        ? nextStep
-                          ? `Prepare ${nextStep.label}. No prompt will be sent automatically.`
-                          : "Finish workflow and show the final summary."
-                        : "Complete this checkpoint first"}
-                    >
-                      {nextStep ? `Continue to ${nextStep.label}` : "Finish Workflow"}
-                    </button>
-                    {onCancelWorkflow && (
-                      <button className="chat-ghost-btn" onClick={onCancelWorkflow}>Cancel Run</button>
-                    )}
-                  </div>
-                  {parseResult && (
-                    <div className={parseResult.ok ? "chat-parse-ok" : "chat-parse-error"}>
-                      {parseResult.ok
-                        ? `Parsed: ${parseResult.result.status} - ${parseResult.result.summary}`
-                        : (
-                          <>
-                            <strong>{parseFailureTitle(parseResult)}</strong>
-                            <span>{parseFailureDetail(parseResult)}</span>
-                            {parseResult.reason === "missing_block" && (
-                              <div className="chat-parse-recovery-actions">
-                                <button
-                                  className="chat-mini-btn"
-                                  onClick={() => { void sendCorrectionInstruction(); }}
-                                  disabled={!currentStep.agentId || !onSendWorkflowResultCorrectionToAgent || sendingCorrection}
-                                >
-                                  {sendingCorrection ? "Sending..." : "Ask agent to finish"}
-                                </button>
-                                <button className="chat-mini-btn" onClick={() => { void copyCorrectionInstruction(); }}>
-                                  Copy recovery prompt
-                                </button>
-                              </div>
-                            )}
-                            {correctionNotice && <span>{correctionNotice}</span>}
-                          </>
-                        )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {!currentStep && currentRun.finalOutput && (
-                <div className="chat-final-panel">
-                  <div className="chat-result-actions">
-                    <strong>Workflow Complete</strong>
-                    <button
-                      className="chat-ghost-btn"
-                      onClick={() => { void copyText(currentRun.finalOutput ?? "", "Final output copied"); }}
-                    >
-                      Copy Final Output
-                    </button>
-                    <button
-                      className="chat-ghost-btn"
-                      onClick={() => { void copyText(buildWorkflowStepArtifactsMarkdown(currentRun), "Step artifacts copied"); }}
-                    >
-                      Copy Step Artifacts
-                    </button>
-                    <button
-                      className="chat-submit-btn"
-                      onClick={() => { void saveArtifact("final", onSaveWorkflowFinalOutput); }}
-                      disabled={!onSaveWorkflowFinalOutput || savingArtifact !== null}
-                    >
-                      {savingArtifact === "final" ? "Saving..." : "Save Final Output"}
-                    </button>
-                    <button
-                      className="chat-ghost-btn"
-                      onClick={() => { void saveArtifact("steps", onSaveWorkflowStepArtifacts); }}
-                      disabled={!onSaveWorkflowStepArtifacts || savingArtifact !== null}
-                    >
-                      {savingArtifact === "steps" ? "Saving..." : "Save Step Artifacts"}
-                    </button>
-                    <button
-                      className="chat-ghost-btn"
-                      onClick={() => { void saveArtifact("build-public-kit", onGenerateBuildPublicKit); }}
-                      disabled={!onGenerateBuildPublicKit || savingArtifact !== null}
-                    >
-                      {savingArtifact === "build-public-kit" ? "Generating..." : "Generate Build-in-Public Kit"}
-                    </button>
-                    <button
-                      className="chat-ghost-btn"
-                      onClick={() => { void saveArtifact("memory-briefs", onGenerateMemoryBriefs); }}
-                      disabled={!onGenerateMemoryBriefs || savingArtifact !== null}
-                    >
-                      {savingArtifact === "memory-briefs" ? "Generating..." : "Generate Memory Brief"}
-                    </button>
-                  </div>
-                  {artifactNotice && (
-                    <span className={artifactNotice.includes("saved") ? "chat-copy-notice" : "chat-send-warning"}>
-                      {artifactNotice}
-                    </span>
-                  )}
-                  <pre className="chat-final-output">{currentRun.finalOutput}</pre>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="chat-composer">
-            <textarea
-              value={taskText}
-              onChange={(e) => setTaskText(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              disabled={projectRequired || teamRequired}
-              placeholder={projectRequired
-                ? "Select a local project folder before staging a task."
-                : teamRequired
-                  ? "Choose an Agent Workspace team before staging a workflow."
-                : "Describe what you want to build, fix, refactor, or review..."}
-            />
-            <div className="chat-composer-footer">
-              <span>
-                {projectRequired
-                  ? "Task composer requires a selected local project folder."
-                  : teamRequired
-                    ? "Choose a shared Agent Workspace team before staging a workflow."
-                  : "CMDino runs local CLI agents in your project workspace. You stay in control when intervention is needed."}
-              </span>
-              <div className="chat-composer-actions">
-                {onOpenProject && (
-                  <button className="chat-ghost-btn" onClick={onOpenProject}>
-                    {projectRequired ? "Select Project" : "Project"}
-                  </button>
-                )}
-                {projectRequired && onOpenContextLibrary && (
-                  <button className="chat-ghost-btn" onClick={onOpenContextLibrary}>Context Library</button>
-                )}
-                {onOpenAgents && (
-                  <button className="chat-ghost-btn" onClick={onOpenAgents}>Agents</button>
-                )}
-                {onClear && !projectRequired && messages.length > 0 && (
-                  <button className="chat-ghost-btn" onClick={onClear}>Clear</button>
-                )}
-                <button
-                  className="chat-submit-btn"
-                  onClick={submit}
-                  disabled={projectRequired || teamRequired || !taskText.trim()}
-                  title={projectRequired
-                    ? "Select a local project folder before staging a task"
+            )}
+            <div className="chat-composer">
+              <textarea
+                value={taskText}
+                onChange={(e) => setTaskText(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                    e.preventDefault();
+                    submit();
+                  }
+                }}
+                disabled={projectRequired || teamRequired}
+                placeholder={
+                  projectRequired
+                    ? "Select a project folder before staging a task."
                     : teamRequired
-                      ? "Choose an Agent Workspace team before staging a workflow"
-                      : undefined}
-                >
-                  Stage Task
-                </button>
+                      ? "Choose an Agent Workspace team before staging a workflow."
+                      : "Describe what you want to build, fix, refactor, or review… (Ctrl+Enter to submit)"
+                }
+              />
+              <div className="chat-composer-footer">
+                <span className="mc-composer-hint">
+                  {projectRequired
+                    ? "Requires a project folder."
+                    : teamRequired
+                      ? "Requires an Agent Workspace team."
+                      : "CMDino runs local CLI agents. You stay in control at every checkpoint."}
+                </span>
+                <div className="chat-composer-actions">
+                  {onOpenProject && (
+                    <button className="chat-ghost-btn" onClick={onOpenProject}>
+                      {projectRequired ? "Select Project" : "Project"}
+                    </button>
+                  )}
+                  {projectRequired && onOpenContextLibrary && (
+                    <button className="chat-ghost-btn" onClick={onOpenContextLibrary}>Context</button>
+                  )}
+                  {onOpenAgents && (
+                    <button className="chat-ghost-btn" onClick={onOpenAgents}>Agents</button>
+                  )}
+                  <button
+                    className="chat-submit-btn"
+                    onClick={submit}
+                    disabled={projectRequired || teamRequired || !taskText.trim()}
+                    title={
+                      projectRequired ? "Select a local project folder before staging a task"
+                      : teamRequired ? "Choose an Agent Workspace team before staging a workflow"
+                      : undefined
+                    }
+                  >
+                    Stage Task
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Right column: checkpoint panel (split view) */}
+        {currentRun && (
+          <div className="mc-checkpoint-col">
+            <CheckpointPanel />
+          </div>
+        )}
       </div>
     </div>
   );

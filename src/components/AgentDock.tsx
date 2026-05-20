@@ -149,6 +149,9 @@ export function AgentDock({
               key={agent.id}
               className="agent-dock-item"
               data-active={String(isActive)}
+              data-lifecycle={lc}
+              data-attn={attn ?? ""}
+              data-kind={agent.agentKind ?? "custom"}
               onClick={() => onSelectAgent(agent.id)}
               onMouseEnter={(e) => {
                 const r = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
@@ -172,8 +175,9 @@ export function AgentDock({
                 {attn && (
                   <div
                     className="agent-dock-attn"
+                    data-attn={attn}
                     style={{
-                      background: attn === "error" ? "var(--danger)" : "var(--warning)",
+                      background: attn === "error" ? "var(--status-error)" : "var(--status-warning)",
                     }}
                   />
                 )}
@@ -182,7 +186,11 @@ export function AgentDock({
               {/* Label + lifecycle */}
               <div className="agent-dock-info">
                 <span className="agent-dock-label">{agent.label}</span>
-                <span className="agent-dock-lc" style={{ color: cwdHealth.status === "different" ? "var(--warning)" : lcColor }}>
+                <span
+                  className="agent-dock-lc"
+                  data-lc={cwdHealth.status === "different" ? "warn" : lc}
+                  style={{ color: cwdHealth.status === "different" ? "var(--status-warning)" : lcColor }}
+                >
                   {cwdHealth.status === "different" ? "cwd warning" : lc}
                 </span>
               </div>
@@ -218,7 +226,7 @@ export function AgentDock({
             </div>
             <div className="agent-dock-tooltip-row">
               <span className="agent-dock-tooltip-key">cwd</span>
-              <span style={{ color: cwdHealth.status === "different" ? "var(--warning)" : "var(--text-main)" }}>
+              <span style={{ color: cwdHealth.status === "different" ? "var(--status-warning)" : "var(--text-main)" }}>
                 {cwdHealth.label}
               </span>
             </div>
@@ -236,16 +244,12 @@ export function AgentDock({
               </div>
             )}
             {attn && (
-              <div
-                className="agent-dock-tooltip-issue"
-                style={{
-                  background: attn === "error" ? "rgba(252,165,165,0.1)" : "rgba(251,191,36,0.1)",
-                  color: attn === "error" ? "var(--danger)" : "var(--warning)",
-                }}
-              >
+              <div className={`agent-dock-tooltip-issue agent-dock-tooltip-issue--${attn}`}>
                 {rdFail?.message
                   ?? (cwdHealth.status === "different" ? cwdHealth.warning
-                  : lc === "error" ? "Process error" : attn === "error" ? "Runtime error" : "Provider or readiness issue")}
+                  : lc === "error" ? "Process error"
+                  : attn === "error" ? "Runtime error"
+                  : "Provider or readiness issue")}
               </div>
             )}
           </div>

@@ -206,54 +206,26 @@ export function OutputLibraryDrawer({
   return (
     <>
       {/* Overlay */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed", inset: 0,
-          background: "rgba(0,0,0,0.35)",
-          zIndex: 200,
-        }}
-      />
+      <div className="output-overlay" onClick={onClose} />
 
       {/* Drawer */}
-      <div style={{
-        position: "fixed", top: 0, right: 0, bottom: 0,
-        width: 520,
-        background: "var(--surface-1)",
-        borderLeft: "1px solid var(--border-subtle)",
-        display: "flex", flexDirection: "column",
-        zIndex: 201,
-        boxShadow: "-12px 0 32px rgba(0,0,0,0.28)",
-      }}>
+      <div className="output-drawer">
 
         {/* Header */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8,
-          padding: "14px 16px 12px",
-          borderBottom: "1px solid var(--border-subtle)",
-          flexShrink: 0,
-        }}>
+        <div className="output-header">
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, letterSpacing: 0.2, color: "var(--text-main)" }}>
-              Output Shelf
-            </div>
-            <div style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 1 }}>
-              Workflow results, memory briefs, build notes, and terminal logs.
-            </div>
+            <div className="cmdino-panel-title" style={{ flex: "unset" }}>Output Shelf</div>
+            <div className="cmdino-panel-subtitle">Workflow results, memory briefs, build notes, and terminal logs.</div>
           </div>
           <button
-            className="cmd-pill-btn"
-            style={{ fontSize: 11, padding: "3px 9px" }}
+            className="cmdino-action-btn cmdino-action-btn--ghost"
+            style={{ fontSize: 10, padding: "4px 9px" }}
             onClick={onRefresh}
             title="Refresh output files"
           >
             Refresh
           </button>
-          <button
-            className="cmd-icon-btn"
-            onClick={onClose}
-            title="Close"
-          >×</button>
+          <button className="cmdino-close-btn" onClick={onClose} title="Close">✕</button>
         </div>
 
         {/* Body: two columns */}
@@ -538,12 +510,7 @@ export function OutputLibraryDrawer({
 
         {/* Footer */}
         {outputFiles.length > 0 && (
-          <div style={{
-            padding: "8px 16px",
-            borderTop: "1px solid var(--border-subtle)",
-            fontSize: 10, color: "var(--text-faint)",
-            flexShrink: 0,
-          }}>
+          <div className="output-footer">
             {outputFiles.length} artifact{outputFiles.length !== 1 ? "s" : ""} on shelf · local only, not synced
           </div>
         )}

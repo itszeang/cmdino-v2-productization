@@ -29,14 +29,10 @@ interface SliderRowProps {
 function SliderRow({ label, value, min, max, step, format, onChange }: SliderRowProps) {
   const display = format ? format(value) : value.toFixed(2);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5, padding: "10px 16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 650, letterSpacing: 0 }}>
-          {label}
-        </span>
-        <span style={{ color: "var(--text-main)", fontSize: 11, fontFamily: "monospace", minWidth: 36, textAlign: "right" }}>
-          {display}
-        </span>
+    <div className="settings-slider-row">
+      <div className="settings-slider-head">
+        <span className="settings-slider-label">{label}</span>
+        <span className="settings-slider-val">{display}</span>
       </div>
       <input
         type="range"
@@ -45,9 +41,9 @@ function SliderRow({ label, value, min, max, step, format, onChange }: SliderRow
         onChange={(e) => onChange(Number(e.target.value))}
         style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer", height: 2 }}
       />
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <span style={{ color: "var(--text-faint)", fontSize: 8 }}>{min.toFixed(2)}</span>
-        <span style={{ color: "var(--text-faint)", fontSize: 8 }}>{max.toFixed(2)}</span>
+      <div className="settings-slider-range">
+        <span>{min.toFixed(2)}</span>
+        <span>{max.toFixed(2)}</span>
       </div>
     </div>
   );
@@ -61,41 +57,18 @@ function ThemeToggle({
   onChange: (value: AppSettings["themeMode"]) => void;
 }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px" }}>
-      <span style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 650, letterSpacing: 0 }}>
-        THEME
-      </span>
-      <div style={{
-        display: "flex",
-        padding: 2,
-        background: "var(--surface-0)",
-        border: "1px solid var(--border-subtle)",
-        borderRadius: 999,
-      }}>
-        {(["dark", "light"] as const).map((mode) => {
-          const active = value === mode;
-          return (
-            <button
-              key={mode}
-              onClick={() => onChange(mode)}
-              style={{
-                minWidth: 54,
-                padding: "4px 8px",
-                background: active ? "var(--accent-soft)" : "transparent",
-                border: `1px solid ${active ? "var(--border-strong)" : "transparent"}`,
-                borderRadius: 999,
-                color: active ? "var(--text-main)" : "var(--text-muted)",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: 0.8,
-              }}
-            >
-              {mode.toUpperCase()}
-            </button>
-          );
-        })}
+    <div className="settings-row">
+      <span className="settings-row-label">THEME</span>
+      <div className="settings-theme-toggle">
+        {(["dark", "light"] as const).map((mode) => (
+          <button
+            key={mode}
+            onClick={() => onChange(mode)}
+            className={`settings-theme-btn${value === mode ? " settings-theme-btn--active" : ""}`}
+          >
+            {mode.toUpperCase()}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -131,22 +104,20 @@ export function SettingsPanel({ settings, onUpdate, onReset, onClose, onShowOnbo
         </div>
 
         {/* System Health */}
-        <div style={{ borderBottom: "1px solid var(--border-subtle)", padding: "10px 16px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="settings-section">
+          <div className="settings-row">
             <div>
-              <span style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 650 }}>System Health</span>
+              <span className="settings-row-label">System Health</span>
               <span style={{ color: healthColor, fontSize: 10, marginLeft: 8 }}>{healthLabel}</span>
             </div>
-            <button className="cmd-pill-btn" style={{ fontSize: 10 }} onClick={onOpenHealth}>
+            <button className="cmdino-action-btn cmdino-action-btn--ghost" style={{ fontSize: 10, padding: "4px 10px" }} onClick={onOpenHealth}>
               Open
             </button>
           </div>
         </div>
 
-        <div style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-          <div style={{ padding: "12px 16px 2px" }}>
-            <span style={{ color: "var(--text-faint)", fontSize: 11, letterSpacing: 0 }}>Visual</span>
-          </div>
+        <div className="settings-section">
+          <div className="settings-section-title">Visual</div>
           <ThemeToggle
             value={settings.themeMode}
             onChange={(themeMode) => onUpdate({ themeMode })}
@@ -174,13 +145,11 @@ export function SettingsPanel({ settings, onUpdate, onReset, onClose, onShowOnbo
           />
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px" }}>
-          <span style={{ color: "var(--text-faint)", fontSize: 9 }}>
-            Saved locally on this machine
-          </span>
+        <div className="settings-footer-row">
+          <span className="settings-footer-hint">Saved locally on this machine</span>
           <button
-            className="cmd-pill-btn cmd-pill-btn--danger"
-            style={{ borderColor: "transparent" }}
+            className="cmdino-action-btn cmdino-action-btn--danger"
+            style={{ fontSize: 10, padding: "4px 10px" }}
             onClick={() => {
               if (window.confirm("Reset all visual settings to defaults?")) onReset();
             }}
@@ -189,8 +158,8 @@ export function SettingsPanel({ settings, onUpdate, onReset, onClose, onShowOnbo
           </button>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 16px 10px" }}>
-          <span style={{ color: "var(--text-faint)", fontSize: 8, letterSpacing: 0, lineHeight: 1.4, flex: 1, minWidth: 0, paddingRight: 8 }}>
+        <div className="settings-footer-row" style={{ paddingTop: 4 }}>
+          <span className="settings-footer-hint" style={{ fontSize: 8 }}>
             CMDino Alpha - Local-first desktop build
             {settings.animationSpeed === DEFAULT_SETTINGS.animationSpeed
              && settings.dinoScale === DEFAULT_SETTINGS.dinoScale
@@ -199,8 +168,8 @@ export function SettingsPanel({ settings, onUpdate, onReset, onClose, onShowOnbo
               ? "" : " - custom visual settings"}
           </span>
           <button
-            className="cmd-pill-btn"
-            style={{ borderColor: "transparent" }}
+            className="cmdino-action-btn cmdino-action-btn--ghost"
+            style={{ fontSize: 10, padding: "4px 10px" }}
             onClick={onShowOnboarding}
             title="Show onboarding on next launch"
           >

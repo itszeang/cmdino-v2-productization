@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { WORKSPACE_TEMPLATES } from "../config/workspaceTemplates";
 import { AGENT_PRESETS } from "../config/agentPresets";
 import type { CmdinoWorkspaceFile } from "../domain/workspace";
@@ -17,12 +16,10 @@ const ACCENT_BY_KIND: Record<string, string> = Object.fromEntries(
 function KindPill({ kind }: { kind: AgentKind }) {
   const color = ACCENT_BY_KIND[kind] ?? "#737373";
   return (
-    <span style={{
-      fontSize: 9, fontWeight: 700, letterSpacing: 0.3,
-      padding: "2px 7px", borderRadius: 999,
-      border: `1px solid ${color}`, color,
-      flexShrink: 0, whiteSpace: "nowrap",
-    }}>
+    <span
+      className="template-kind-pill"
+      style={{ border: `1px solid ${color}`, color }}
+    >
       {kind}
     </span>
   );
@@ -35,74 +32,31 @@ function TemplateCard({
   template: typeof WORKSPACE_TEMPLATES[number];
   onSelect: (workspace: CmdinoWorkspaceFile) => void;
 }) {
-  const [hovered, setHovered] = useState(false);
-
   return (
     <div
+      className="template-card"
       onClick={() => onSelect(template.workspace)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display:          "flex",
-        alignItems:       "center",
-        gap:              16,
-        padding:          "15px 20px",
-        borderBottom:     "1px solid var(--border-subtle)",
-        borderLeft:       `2px solid ${hovered ? "var(--border-strong)" : "transparent"}`,
-        background:       hovered ? "var(--surface-2)" : "transparent",
-        cursor:           "pointer",
-        transition:       "background 0.1s, border-left-color 0.1s",
-        userSelect:       "none",
-      }}
     >
-      {/* Left: name + tagline */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          color:      "var(--text-main)",
-          fontWeight: 650,
-          fontSize:   13,
-          lineHeight: 1.3,
-        }}>
-          {template.name}
-        </div>
-        <div style={{
-          color:     "var(--text-muted)",
-          fontSize:  11,
-          marginTop: 4,
-          lineHeight: 1.4,
-        }}>
-          {template.tagline}
-        </div>
-        {/* Agent kind pills */}
-        <div style={{
-          display:   "flex",
-          gap:       4,
-          marginTop: 9,
-          flexWrap:  "wrap",
-          alignItems: "center",
-        }}>
+      <div className="template-card-copy">
+        <div className="template-card-name">{template.name}</div>
+        <div className="template-card-tagline">{template.tagline}</div>
+        <div className="template-card-pills">
           {template.agentKinds.map((kind, i) => (
             <KindPill key={i} kind={kind} />
           ))}
-          <span style={{
-            fontSize: 10, color: "var(--text-faint)", marginLeft: 4,
-          }}>
-            {template.agentKinds.length} agents
-          </span>
+          <span className="template-card-count">{template.agentKinds.length} agents</span>
         </div>
       </div>
-
-      {/* Right: chevron */}
       <svg
         viewBox="0 0 8 12"
         width="8"
         height="12"
         fill="none"
-        stroke={hovered ? "var(--text-muted)" : "var(--text-faint)"}
+        stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ flexShrink: 0, transition: "stroke 0.1s" }}
+        className="template-card-chevron"
       >
         <path d="M1.5 1.5 6.5 6 1.5 10.5" />
       </svg>
@@ -138,7 +92,7 @@ export function TemplatePickerModal({ onSelect, onClose }: Props) {
         </div>
 
         {/* Template list */}
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <div className="template-list-body">
           {WORKSPACE_TEMPLATES.map((template) => (
             <TemplateCard
               key={template.id}
@@ -150,8 +104,7 @@ export function TemplatePickerModal({ onSelect, onClose }: Props) {
 
         {/* Footer */}
         <div className="cmd-modal-footer" style={{ justifyContent: "center" }}>
-          <button className="cmd-pill-btn cmd-pill-btn--ghost" style={{ fontSize: 12, padding: "7px 14px" }}
-            onClick={onClose}>
+          <button className="cmdino-action-btn cmdino-action-btn--ghost" onClick={onClose}>
             Cancel
           </button>
         </div>

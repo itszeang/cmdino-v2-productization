@@ -122,7 +122,7 @@ interface Props {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function HistoryDrawer({ entries, onClear, onClose }: Props) {
-  const [filter,   setFilter]   = useState<FilterTab>("all");
+  const [filter, setFilter] = useState<FilterTab>("all");
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -131,7 +131,6 @@ export function HistoryDrawer({ entries, onClear, onClose }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Auto-scroll to bottom when new entries arrive
   useEffect(() => {
     const el = bodyRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -149,118 +148,56 @@ export function HistoryDrawer({ entries, onClear, onClose }: Props) {
   }
 
   const tabs: { id: FilterTab; label: string }[] = [
-    { id: "all",      label: "All" },
-    { id: "commands", label: "Terminals" },
-    { id: "handoffs", label: "Handoffs" },
-    { id: "errors",   label: "Errors" },
-    { id: "workspace",label: "Workspace" },
+    { id: "all",       label: "All" },
+    { id: "commands",  label: "Terminals" },
+    { id: "handoffs",  label: "Handoffs" },
+    { id: "errors",    label: "Errors" },
+    { id: "workspace", label: "Workspace" },
   ];
 
   return (
     <>
-      {/* Overlay — click to close */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed", inset: 0,
-          background: "rgba(0,0,0,0.35)",
-          zIndex: 200,
-        }}
-      />
+      {/* Overlay */}
+      <div className="hist-overlay" onClick={onClose} />
 
-      {/* Drawer panel */}
-      <div style={{
-        position: "fixed", top: 0, right: 0, bottom: 0,
-        width: 400,
-        background: "var(--surface-1)",
-        borderLeft: "1px solid var(--border-subtle)",
-        display: "flex", flexDirection: "column",
-        zIndex: 201,
-        boxShadow: "-12px 0 32px rgba(0,0,0,0.28)",
-      }}>
+      {/* Drawer */}
+      <div className="hist-drawer">
 
         {/* Header */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8,
-          padding: "14px 16px 12px",
-          borderBottom: "1px solid var(--border-subtle)",
-          flexShrink: 0,
-        }}>
-          <span style={{
-            flex: 1,
-            fontWeight: 700, fontSize: 13, letterSpacing: 0.2,
-            color: "var(--text-main)",
-          }}>
-            History
-          </span>
+        <div className="hist-header">
+          <span className="cmdino-panel-title">History</span>
           {entries.length > 0 && (
             <button
-              className="cmd-pill-btn cmd-pill-btn--danger"
-              style={{ fontSize: 11, padding: "3px 9px" }}
+              className="cmdino-action-btn cmdino-action-btn--danger"
+              style={{ fontSize: 10, padding: "3px 9px" }}
               onClick={handleClear}
               title="Clear history"
             >
               Clear
             </button>
           )}
-          <button
-            className="cmd-icon-btn"
-            onClick={onClose}
-            title="Close"
-          >×</button>
+          <button className="cmdino-close-btn" onClick={onClose} title="Close">✕</button>
         </div>
 
         {/* Filter tabs */}
-        <div style={{
-          display: "flex", gap: 4, padding: "10px 14px 8px",
-          borderBottom: "1px solid var(--border-subtle)",
-          flexShrink: 0, overflowX: "auto",
-        }}>
-          {tabs.map((tab) => {
-            const active = filter === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setFilter(tab.id)}
-                style={{
-                  background: active ? "var(--button-bg)" : "transparent",
-                  border: `1px solid ${active ? "var(--border-strong)" : "transparent"}`,
-                  color: active ? "var(--text-main)" : "var(--text-faint)",
-                  fontSize: 11, fontWeight: active ? 600 : 400,
-                  padding: "4px 10px", borderRadius: 999,
-                  cursor: "pointer", whiteSpace: "nowrap",
-                  fontFamily: "inherit", transition: "all 0.12s",
-                  flexShrink: 0,
-                }}
-                onMouseEnter={(e) => {
-                  if (!active) (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!active) (e.currentTarget as HTMLButtonElement).style.color = "var(--text-faint)";
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+        <div className="hist-filter-row">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={`hist-filter-tab${filter === tab.id ? " hist-filter-tab--active" : ""}`}
+              onClick={() => setFilter(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Timeline body */}
-        <div
-          ref={bodyRef}
-          style={{
-            flex: 1, overflowY: "auto",
-            padding: "8px 0 16px",
-          }}
-        >
+        <div ref={bodyRef} className="hist-body">
           {filtered.length === 0 ? (
-            <div style={{
-              display: "flex", flexDirection: "column", alignItems: "center",
-              justifyContent: "center", height: "100%", gap: 8,
-              color: "var(--text-faint)", padding: "32px 24px", textAlign: "center",
-            }}>
-              <span style={{ fontSize: 28, lineHeight: 1 }}>◎</span>
-              <span style={{ fontSize: 12 }}>
+            <div className="hist-empty">
+              <span className="hist-empty-icon">◎</span>
+              <span className="hist-empty-msg">
                 {entries.length === 0
                   ? "No events yet. Start a terminal or run a command."
                   : "No events match this filter."}
@@ -270,91 +207,38 @@ export function HistoryDrawer({ entries, onClear, onClose }: Props) {
             groups.map(({ label, events }) => (
               <div key={label}>
                 {/* Date separator */}
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "8px 16px 4px",
-                }}>
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
-                    color: "var(--text-faint)", textTransform: "uppercase",
-                    whiteSpace: "nowrap",
-                  }}>
-                    {label}
-                  </span>
-                  <div style={{ flex: 1, height: 1, background: "var(--border-subtle)" }} />
+                <div className="hist-date-sep">
+                  <span className="hist-date-label">{label}</span>
+                  <div className="hist-date-line" />
                 </div>
 
                 {/* Events */}
                 {events.map((ev) => {
                   const color = badgeColor(ev.type);
                   return (
-                    <div
-                      key={ev.id}
-                      style={{
-                        display: "flex", alignItems: "flex-start", gap: 10,
-                        padding: "7px 16px",
-                        borderLeft: `2px solid transparent`,
-                        transition: "background 0.1s",
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLDivElement).style.background = "var(--surface-2, rgba(255,255,255,0.03))";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLDivElement).style.background = "transparent";
-                      }}
-                    >
-                      {/* Color dot */}
-                      <div style={{
-                        width: 6, height: 6, borderRadius: "50%",
-                        background: color, flexShrink: 0, marginTop: 5,
-                      }} />
-
-                      {/* Content */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          display: "flex", alignItems: "center", gap: 6,
-                          marginBottom: 2, flexWrap: "wrap",
-                        }}>
-                          {/* Badge */}
-                          <span style={{
-                            fontSize: 9, fontWeight: 700, letterSpacing: 0.6,
-                            color, background: `${color}18`,
-                            border: `1px solid ${color}40`,
-                            padding: "1px 6px", borderRadius: 999,
-                            whiteSpace: "nowrap",
-                          }}>
+                    <div key={ev.id} className="hist-event-row">
+                      <div
+                        className="hist-event-dot"
+                        style={{ background: color }}
+                      />
+                      <div className="hist-event-content">
+                        <div className="hist-event-top">
+                          <span
+                            className="hist-event-badge"
+                            style={{
+                              color,
+                              background: `${color}18`,
+                              border: `1px solid ${color}40`,
+                            }}
+                          >
                             {badgeLabel(ev.type)}
                           </span>
-
-                          {/* Agent label */}
                           {ev.agentLabel && (
-                            <span style={{
-                              fontSize: 11, color: "var(--text-muted)",
-                              fontWeight: 500,
-                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                              maxWidth: 160,
-                            }}>
-                              {ev.agentLabel}
-                            </span>
+                            <span className="hist-event-agent">{ev.agentLabel}</span>
                           )}
-
-                          {/* Timestamp */}
-                          <span style={{
-                            fontSize: 10, color: "var(--text-faint)",
-                            marginLeft: "auto", whiteSpace: "nowrap", flexShrink: 0,
-                          }}>
-                            {formatTime(ev.ts)}
-                          </span>
+                          <span className="hist-event-time">{formatTime(ev.ts)}</span>
                         </div>
-
-                        {/* Message */}
-                        <div style={{
-                          fontSize: 12, color: "var(--text-muted)",
-                          lineHeight: 1.4,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>
-                          {eventMessage(ev)}
-                        </div>
+                        <div className="hist-event-msg">{eventMessage(ev)}</div>
                       </div>
                     </div>
                   );
@@ -364,14 +248,9 @@ export function HistoryDrawer({ entries, onClear, onClose }: Props) {
           )}
         </div>
 
-        {/* Footer count */}
+        {/* Footer */}
         {entries.length > 0 && (
-          <div style={{
-            padding: "8px 16px",
-            borderTop: "1px solid var(--border-subtle)",
-            fontSize: 10, color: "var(--text-faint)",
-            flexShrink: 0,
-          }}>
+          <div className="hist-footer">
             {entries.length} event{entries.length !== 1 ? "s" : ""} recorded
           </div>
         )}

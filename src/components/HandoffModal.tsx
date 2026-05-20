@@ -15,10 +15,19 @@ interface Props {
   onSent?:        (targetAgentId: string) => void;
 }
 
-export function HandoffModal({ sourceAgentId, sourceLabel, outputText, selectedText = "", runningTargets, preferredTargetId, onClose, onSent }: Props) {
+export function HandoffModal({
+  sourceAgentId,
+  sourceLabel,
+  outputText,
+  selectedText = "",
+  runningTargets,
+  preferredTargetId,
+  onClose,
+  onSent,
+}: Props) {
   const extracted = extractReviewSendText({ outputText, selectedText });
   const [targetId,  setTargetId]  = useState(
-    preferredTargetId && runningTargets.some((target) => target.id === preferredTargetId)
+    preferredTargetId && runningTargets.some((t) => t.id === preferredTargetId)
       ? preferredTargetId
       : runningTargets[0]?.id ?? "",
   );
@@ -42,67 +51,39 @@ export function HandoffModal({ sourceAgentId, sourceLabel, outputText, selectedT
     }
   }
 
-  const noTargets = runningTargets.length === 0;
+  const noTargets  = runningTargets.length === 0;
+  const canSend    = !noTargets && text.trim().length > 0 && !sending;
+
+  const sourceHintClass = extracted.source === "none"
+    ? "handoff-source-hint handoff-source-hint--warn"
+    : "handoff-source-hint";
 
   return (
     <div
-      style={{
-        position:   "fixed",
-        inset:      0,
-        background: "var(--overlay-bg)",
-        backdropFilter: "blur(8px)",
-        display:    "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex:     100,
-      }}
+      className="cmdino-overlay"
+      style={{ zIndex: 100 }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div
-        style={{
-          background:   "var(--surface-1)",
-          border:       "1px solid var(--border-subtle)",
-          borderRadius: 12,
-          width:        560,
-          maxWidth:     "94vw",
-          maxHeight:    "86vh",
-          display:      "flex",
-          flexDirection: "column",
-          overflow:     "hidden",
-          boxShadow:    "var(--shadow-panel)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 16px", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0 }}>
-          <span style={{ color: "var(--text-main)", fontSize: 13, fontWeight: 650 }}>Review & Send</span>
-            <span style={{ color: "var(--text-muted)", fontSize: 12 }}>clean handoff from {sourceLabel}</span>
-          <span style={{ color: "var(--text-faint)", fontSize: 11 }}>({sourceAgentId.slice(0, 8)})</span>
-          <button
-            onClick={onClose}
-            style={{ marginLeft: "auto", background: "transparent", border: "none", color: "var(--text-muted)", fontSize: 14, cursor: "pointer", padding: "4px 7px", borderRadius: 999 }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--button-bg)"; e.currentTarget.style.color = "var(--text-main)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-muted)"; }}
-          >x</button>
+      <div className="handoff-modal soft-enter" onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="handoff-header">
+          <span className="handoff-header-title">Review & Send</span>
+          <span className="handoff-header-from">clean handoff from {sourceLabel}</span>
+          <span className="handoff-header-id">({sourceAgentId.slice(0, 8)})</span>
+          <button className="cmdino-close-btn" onClick={onClose} title="Close">✕</button>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0 }}>
-          <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Target</span>
+        {/* Target selection */}
+        <div className="handoff-target-row">
+          <span className="handoff-target-label">Target</span>
           {noTargets ? (
-            <span style={{ color: "var(--danger)", fontSize: 12 }}>No running terminals available as target.</span>
+            <span className="handoff-target-error">No running terminals available as target.</span>
           ) : (
             <select
+              className="handoff-target-select"
               value={targetId}
               onChange={(e) => setTargetId(e.target.value)}
-              style={{
-                background:   "var(--input-bg)",
-                border:       "1px solid var(--border-subtle)",
-                color:        "var(--text-main)",
-                fontSize:     12,
-                padding:      "7px 10px",
-                borderRadius: 999,
-                fontFamily:   "inherit",
-                flex:         1,
-              }}
             >
               {runningTargets.map((a) => (
                 <option key={a.id} value={a.id}>{a.label}</option>
@@ -111,16 +92,13 @@ export function HandoffModal({ sourceAgentId, sourceLabel, outputText, selectedT
           )}
         </div>
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "14px 16px", gap: 8, minHeight: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 600 }}>Marked handoff text</span>
-            <span style={{ color: "var(--text-faint)", fontSize: 11 }}>edit before sending</span>
+        {/* Handoff body */}
+        <div className="handoff-body">
+          <div className="handoff-body-label">
+            <span className="handoff-body-label-main">Marked handoff text</span>
+            <span className="handoff-body-label-hint">edit before sending</span>
           </div>
-          <div style={{
-            color: extracted.source === "none" ? "var(--warning)" : "var(--text-faint)",
-            fontSize: 11,
-            lineHeight: 1.5,
-          }}>
+          <div className={sourceHintClass}>
             {extracted.source === "handoff_marker"
               ? "Extracted from CMDINO_HANDOFF markers. Terminal banners and unrelated output were ignored."
               : extracted.source === "cmdino_result"
@@ -130,56 +108,22 @@ export function HandoffModal({ sourceAgentId, sourceLabel, outputText, selectedT
               : "No CMDINO_HANDOFF or CMDINO_RESULT handoff was found. Ask the agent for a marked handoff, or paste clean handoff text manually."}
           </div>
           <textarea
+            className="handoff-textarea"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            style={{
-              flex:        1,
-              background:  "var(--terminal-bg)",
-              border:      "1px solid var(--border-subtle)",
-              color:       "#e5e5e5",
-              fontSize:    11,
-              fontFamily:  "Cascadia Code, JetBrains Mono, Consolas, monospace",
-              padding:     "10px",
-              borderRadius: 12,
-              resize:      "none",
-              outline:     "none",
-              minHeight:   120,
-            }}
           />
-          {sendError && (
-            <div style={{ color: "var(--danger)", fontSize: 12 }}>{sendError}</div>
-          )}
+          {sendError && <div className="handoff-send-error">{sendError}</div>}
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 16px", borderTop: "1px solid var(--border-subtle)", flexShrink: 0 }}>
+        {/* Footer */}
+        <div className="handoff-footer">
+          <button className="cmdino-action-btn cmdino-action-btn--ghost" onClick={onClose}>
+            Cancel
+          </button>
           <button
-            onClick={onClose}
-            style={{
-              background:   "transparent",
-              border:       "1px solid transparent",
-              color:        "var(--text-muted)",
-              fontSize:     12,
-              padding:      "8px 14px",
-              borderRadius: 999,
-              fontFamily:   "inherit",
-              fontWeight:   600,
-              cursor:       "pointer",
-            }}
-          >Cancel</button>
-          <button
+            className="cmdino-action-btn cmdino-action-btn--primary"
             onClick={() => void handleSend()}
-            disabled={noTargets || !text.trim() || sending}
-            style={{
-              background:   noTargets || !text.trim() ? "var(--button-bg)" : "var(--accent)",
-              border:       "1px solid transparent",
-              color:        noTargets || !text.trim() ? "var(--text-faint)" : "var(--app-bg)",
-              fontSize:     12,
-              padding:      "8px 16px",
-              borderRadius: 999,
-              fontFamily:   "inherit",
-              fontWeight:   650,
-              cursor:       noTargets || !text.trim() ? "not-allowed" : "pointer",
-            }}
+            disabled={!canSend}
           >
             {sending ? "Sending…" : "Send to Agent"}
           </button>

@@ -119,50 +119,23 @@ export function WorkflowRunHistoryPanel({
 
   return (
     <>
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed", inset: 0,
-          background: "rgba(0,0,0,0.35)",
-          zIndex: 200,
-        }}
-      />
-      <div style={{
-        position: "fixed", top: 0, right: 0, bottom: 0,
-        width: 720,
-        maxWidth: "calc(100vw - 24px)",
-        background: "var(--surface-1)",
-        borderLeft: "1px solid var(--border-subtle)",
-        display: "flex", flexDirection: "column",
-        zIndex: 201,
-        boxShadow: "-12px 0 32px rgba(0,0,0,0.28)",
-      }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8,
-          padding: "14px 16px 12px",
-          borderBottom: "1px solid var(--border-subtle)",
-          flexShrink: 0,
-        }}>
+      <div className="wfhist-overlay" onClick={onClose} />
+      <div className="wfhist-drawer">
+        <div className="wfhist-header">
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: "var(--text-main)", fontSize: 13, fontWeight: 750 }}>
-              Workflow History
-            </div>
-            <div style={{ color: "var(--text-faint)", fontSize: 10, marginTop: 2 }}>
+            <div className="cmdino-panel-title" style={{ flex: "unset" }}>Workflow History</div>
+            <div className="cmdino-panel-subtitle">
               {currentProjectId ? `${projectCount} run${projectCount === 1 ? "" : "s"} for this project` : "Recent local workflow runs"}
             </div>
           </div>
-          <button className="cmd-icon-btn" onClick={onClose} title="Close">x</button>
+          <button className="cmdino-close-btn" onClick={onClose} title="Close">✕</button>
         </div>
 
         {notice && (
-          <div style={{
-            margin: "10px 16px 0",
-            border: "1px solid var(--border-subtle)",
-            borderRadius: 8,
-            padding: "8px 10px",
-            color: notice.startsWith("Resumed") ? "var(--success)" : "var(--warning)",
-            fontSize: 11,
-          }}>
+          <div
+            className={`cmdino-notice ${notice.startsWith("Resumed") ? "cmdino-notice--success" : "cmdino-notice--warning"}`}
+            style={{ margin: "10px 16px 0" }}
+          >
             {notice}
           </div>
         )}
